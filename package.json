@@ -1,0 +1,20 @@
+{
+  "name": "influencer-management-system",
+  "version": "1.0.0",
+  "description": "Influencer Marketing Operations & Employee Tracking System",
+  "main": "backend/dist/server.js",
+  "scripts": {
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "cd backend && npm run build && cd ../frontend && npm run build"
+  },
+  "keywords": [
+    "influencer",
+    "marketing",
+    "employee-tracking",
+    "mern"
+  ],
+  "author": "Google DeepMind Advanced Agentic Coding",
+  "license": "ISC"
+}
