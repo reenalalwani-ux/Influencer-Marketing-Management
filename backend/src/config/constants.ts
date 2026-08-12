@@ -46,7 +46,13 @@ export const PERMISSIONS = [
   'target.view',
   'target.create',
   'target.update',
-  'target.delete'
+  'target.delete',
+
+  // Influencer Module
+  'influencer.view',
+  'influencer.create',
+  'influencer.update',
+  'influencer.delete'
 ];
 
 export const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
@@ -59,7 +65,8 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
     'posting.view', 'posting.create', 'posting.update',
     'performance.view', 'report.view', 'report.export',
     'settings.view', 'audit.view',
-    'target.view', 'target.create', 'target.update', 'target.delete'
+    'target.view', 'target.create', 'target.update', 'target.delete',
+    'influencer.view', 'influencer.create', 'influencer.update', 'influencer.delete'
   ],
   [ROLES.TEAM_LEADER]: [
     'employee.view', 'employee.create', 'employee.update',
@@ -67,14 +74,16 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
     'task.view', 'task.create', 'task.update', 'task.verify',
     'posting.view', 'posting.create', 'posting.update',
     'performance.view', 'report.view',
-    'target.view', 'target.update'
+    'target.view', 'target.update',
+    'influencer.view', 'influencer.create', 'influencer.update'
   ],
   [ROLES.EMPLOYEE]: [
     'brand.view',
     'task.view', 'task.update',
     'posting.view', 'posting.update',
     'performance.view',
-    'target.view'
+    'target.view',
+    'influencer.view', 'influencer.create'
   ]
 };
 

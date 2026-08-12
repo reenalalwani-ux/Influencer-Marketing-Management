@@ -49,5 +49,15 @@ export const api = {
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || 'API request failed');
     return data;
+  },
+
+  async delete(endpoint: string) {
+    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'API request failed');
+    return data;
   }
 };

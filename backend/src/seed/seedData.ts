@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import {
   Permission, Role, User, Employee, Brand, EmployeeBrand,
-  Task, Notification, AuditLog, Setting, Target
+  Task, Notification, AuditLog, Setting, Target, Influencer
 } from '../models/allModels';
 import { PERMISSIONS, ROLE_DEFAULT_PERMISSIONS, ROLES, PLATFORMS, CONTENT_TYPES, TASK_STATUSES, PRIORITIES, DEPARTMENTS, DESIGNATIONS } from '../config/constants';
 
@@ -462,6 +462,115 @@ export const seedDatabase = async () => {
       category: 'System Lookup',
       description: 'Supported content types'
     });
+
+    // 14. Initial Influencer Records (Exact Google Sheet Sample Data)
+    const influencerCount = await Influencer.countDocuments();
+    if (influencerCount === 0) {
+      await Influencer.create([
+        {
+          sNo: 1,
+          transactionDate: new Date('2026-06-26'),
+          influencerManager: 'yash',
+          brandName: 'Loomista',
+          influencerName: 'Archi Thakur',
+          phone: '8894105116',
+          profileLink: 'https://www.instagram.com/archithakur',
+          category: 'Paid',
+
+          brandOnboardingAmt: 10000,
+          brandReceivedAmt: 10000,
+          brandPendingAmt: 0,
+          influencerOnboardingAmt: 6000,
+          influencerPaidAmt: 3000,
+          influencerPendingAmt: 3000,
+          ad2shipMargin: 4000,
+          inAmount: 10000,
+          outAmount: 3000,
+          balance: 7000,
+          finalPaymentReceived: true,
+
+          productLink: 'https://loomista.com/collections/co-ord-sets',
+          videoType: 'Single Product Video',
+          videoDescription: 'Loomista co-ord set styling reel',
+          orderId: '#LOOMISTA1082',
+          platform: 'Instagram',
+          status: 'Completed',
+          contentLink: 'https://www.instagram.com/reel/DXTw8shEch1',
+          adsCode: 'IG-ADS-8812',
+          isApproved: true,
+          notes: 'Dhibha - RECEIVED BY LAKSHITA',
+          remark: 'RECEIVED BY LAKSHITA'
+        },
+        {
+          sNo: 2,
+          transactionDate: new Date('2026-05-27'),
+          influencerManager: 'Lakshita Jaju',
+          brandName: 'Vaasva',
+          influencerName: 'Payal Rajput',
+          phone: '9876543210',
+          profileLink: 'https://www.instagram.com/payalrajput057',
+          category: 'Paid',
+
+          brandOnboardingAmt: 25000,
+          brandReceivedAmt: 25000,
+          brandPendingAmt: 0,
+          influencerOnboardingAmt: 15000,
+          influencerPaidAmt: 15000,
+          influencerPendingAmt: 0,
+          ad2shipMargin: 10000,
+          inAmount: 25000,
+          outAmount: 15000,
+          balance: 10000,
+          finalPaymentReceived: true,
+
+          productLink: 'https://www.vaasvajaipur.com/collections/trending/products/cinderella-blush-embellished-set',
+          videoType: 'Single Product Video',
+          videoDescription: 'Cinderella blush embellished set video review',
+          orderId: '#VAASVA16200',
+          platform: 'Instagram',
+          status: 'Approved',
+          contentLink: 'https://www.instagram.com/reel/DWO5Czkic50',
+          adsCode: 'IG-ADS-9912',
+          isApproved: true,
+          notes: 'Full payment cleared by Lakshita',
+          remark: 'Approved by client'
+        },
+        {
+          sNo: 3,
+          transactionDate: new Date('2026-05-28'),
+          influencerManager: 'Aayushi',
+          brandName: 'Vaasva',
+          influencerName: 'Kajal Patel',
+          phone: '9811223344',
+          profileLink: 'https://www.instagram.com/kajaaaal__',
+          category: 'Barter',
+
+          brandOnboardingAmt: 15000,
+          brandReceivedAmt: 15000,
+          brandPendingAmt: 0,
+          influencerOnboardingAmt: 8000,
+          influencerPaidAmt: 4000,
+          influencerPendingAmt: 4000,
+          ad2shipMargin: 7000,
+          inAmount: 15000,
+          outAmount: 4000,
+          balance: 11000,
+          finalPaymentReceived: false,
+
+          productLink: 'https://www.vaasvajaipur.com/collections/trending',
+          videoType: 'Single Product Video',
+          videoDescription: 'Product barter exchange - ethnic set gifted',
+          orderId: '#VAASVA16236',
+          platform: 'Instagram',
+          status: 'Pending',
+          contentLink: '',
+          adsCode: '',
+          isApproved: false,
+          notes: 'Barter outfit dispatched directly by brand',
+          remark: 'Awaiting content reel'
+        }
+      ]);
+    }
 
     console.log('[Seed] Database successfully populated with initial MVP dataset!');
   } catch (error) {

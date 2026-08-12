@@ -171,17 +171,17 @@ const TaskSchema = new Schema<ITask>({
   scheduledDate: { type: Date, required: true },
   scheduledTime: { type: String, required: true },
   deadline: { type: Date, required: true },
-  status: { 
-    type: String, 
-    enum: ['Pending', 'In Progress', 'Submitted', 'Verified', 'Rejected', 'Delayed', 'Missed'], 
-    default: 'Pending' 
+  status: {
+    type: String,
+    enum: ['Pending', 'In Progress', 'Submitted', 'Verified', 'Rejected', 'Delayed', 'Missed'],
+    default: 'Pending'
   },
   publishedUrl: { type: String },
   publishedDate: { type: Date },
-  verificationStatus: { 
-    type: String, 
-    enum: ['Unsubmitted', 'Pending Verification', 'Verified', 'Rejected'], 
-    default: 'Unsubmitted' 
+  verificationStatus: {
+    type: String,
+    enum: ['Unsubmitted', 'Pending Verification', 'Verified', 'Rejected'],
+    default: 'Unsubmitted'
   },
   verifiedBy: { type: Schema.Types.ObjectId, ref: 'User' },
   verifiedAt: { type: Date },
@@ -277,6 +277,119 @@ const TargetSchema = new Schema<ITarget>({
   createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
+// 14. Influencer Schema
+export interface IInfluencer extends Document {
+  sNo?: number;
+  transactionDate: Date;
+  influencerManager?: string;
+  brandId?: mongoose.Types.ObjectId;
+  brandName: string;
+  influencerName: string;
+  phone?: string;
+  profileLink?: string;
+  category: 'Paid' | 'Barter';
+
+  // Financial Breakdown
+  brandOnboardingAmt: number;
+  brandReceivedAmt: number;
+  brandPendingAmt: number;
+  influencerOnboardingAmt: number;
+  influencerPaidAmt: number;
+  influencerPendingAmt: number;
+  ad2shipMargin: number;
+  inAmount: number;
+  outAmount: number;
+  balance: number;
+  finalPaymentReceived: boolean;
+
+  // Deliverables & Content Details
+  productLink?: string;
+  videoType?: string;
+  videoDescription?: string;
+  refVideoLink?: string;
+  orderId?: string;
+  orderDate?: Date;
+  platform: string;
+  status: 'Pending' | 'Completed' | 'Settled' | 'Approved';
+  contentLink?: string;
+  adsCode?: string;
+  isApproved?: boolean;
+  notes?: string;
+  remark?: string;
+  createdBy?: mongoose.Types.ObjectId;
+}
+
+const InfluencerSchema = new Schema<IInfluencer>({
+  sNo: { type: Number },
+  transactionDate: { type: Date, default: Date.now },
+  influencerManager: { type: String, default: '' },
+  brandId: { type: Schema.Types.ObjectId, ref: 'Brand' },
+  brandName: { type: String, required: true },
+  influencerName: { type: String, required: true },
+  phone: { type: String, default: '' },
+  profileLink: { type: String, default: '' },
+  category: { type: String, enum: ['Paid', 'Barter'], default: 'Paid', required: true },
+
+  // Financial Breakdown
+  brandOnboardingAmt: { type: Number, default: 0 },
+  brandReceivedAmt: { type: Number, default: 0 },
+  brandPendingAmt: { type: Number, default: 0 },
+  influencerOnboardingAmt: { type: Number, default: 0 },
+  influencerPaidAmt: { type: Number, default: 0 },
+  influencerPendingAmt: { type: Number, default: 0 },
+  ad2shipMargin: { type: Number, default: 0 },
+  inAmount: { type: Number, default: 0 },
+  outAmount: { type: Number, default: 0 },
+  balance: { type: Number, default: 0 },
+  finalPaymentReceived: { type: Boolean, default: false },
+
+  // Deliverables & Content
+  productLink: { type: String, default: '' },
+  videoType: { type: String, default: 'Single Product Video' },
+  videoDescription: { type: String, default: '' },
+  refVideoLink: { type: String, default: '' },
+  orderId: { type: String, default: '' },
+  orderDate: { type: Date },
+  platform: { type: String, default: 'Instagram' },
+  status: { type: String, enum: ['Pending', 'Completed', 'Settled', 'Approved'], default: 'Completed' },
+  contentLink: { type: String, default: '' },
+  adsCode: { type: String, default: '' },
+  isApproved: { type: Boolean, default: true },
+  notes: { type: String, default: '' },
+  remark: { type: String, default: '' },
+  createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
+}, { timestamps: true });
+
+export interface IPaymentLog extends Document {
+  influencerId?: mongoose.Types.ObjectId;
+  influencerName: string;
+  brandName: string;
+  type: 'IN' | 'OUT';
+  amount: number;
+  paymentMode: string;
+  referenceNo?: string;
+  handledBy?: string;
+  notes?: string;
+  transactionDate: Date;
+  createdBy?: mongoose.Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const PaymentLogSchema = new Schema<IPaymentLog>({
+  influencerId: { type: Schema.Types.ObjectId, ref: 'Influencer' },
+  influencerName: { type: String, required: true },
+  brandName: { type: String, required: true },
+  type: { type: String, enum: ['IN', 'OUT'], required: true },
+  amount: { type: Number, required: true, default: 0 },
+  paymentMode: { type: String, default: 'Bank Transfer' },
+  referenceNo: { type: String, default: '' },
+  handledBy: { type: String, default: '' },
+  notes: { type: String, default: '' },
+  transactionDate: { type: Date, default: Date.now },
+  createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
+}, { timestamps: true });
+
 // Export Models
 export const Permission = mongoose.model<IPermission>('Permission', PermissionSchema);
 export const Role = mongoose.model<IRole>('Role', RoleSchema);
@@ -289,4 +402,7 @@ export const Notification = mongoose.model<INotification>('Notification', Notifi
 export const AuditLog = mongoose.model<IAuditLog>('AuditLog', AuditLogSchema);
 export const Setting = mongoose.model<ISetting>('Setting', SettingSchema);
 export const Target = mongoose.model<ITarget>('Target', TargetSchema);
+export const Influencer = mongoose.model<IInfluencer>('Influencer', InfluencerSchema);
+export const PaymentLog = mongoose.model<IPaymentLog>('PaymentLog', PaymentLogSchema);
+
 

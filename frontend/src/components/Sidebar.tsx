@@ -2,7 +2,7 @@ import React from 'react';
 import {
   LayoutDashboard, Users, Briefcase, UserCheck, Calendar,
   CheckSquare, CheckCircle, BarChart3, FileSpreadsheet, ShieldAlert,
-  Settings, Link2, Clock, Database, Target
+  Settings, Link2, Clock, Database, Target, Sparkles
 } from 'lucide-react';
 import { User } from '../types';
 
@@ -20,6 +20,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
     { id: 'targets', label: 'Target Module', icon: Target },
     ...(!isEmployee ? [{ id: 'employees', label: 'Employees', icon: Users }] : []),
     { id: 'brands', label: 'Brand Portfolio', icon: Briefcase },
+    { id: 'influencers', label: 'Influencer Module', icon: Sparkles },
     { id: 'employee-brands', label: 'Brand Assignments', icon: UserCheck },
     { id: 'tasks', label: 'Tasks & Content', icon: CheckSquare },
     { id: 'daily-posting', label: 'Daily Posting', icon: Clock, badge: 'Core' },

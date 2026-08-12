@@ -21,6 +21,7 @@ import reportRoutes from './routes/reportRoutes';
 import settingsRoutes from './routes/settingsRoutes';
 import dbRoutes from './routes/dbRoutes';
 import targetRoutes from './routes/targetRoutes';
+import influencerRoutes from './routes/influencerRoutes';
 
 dotenv.config();
 
@@ -60,6 +61,7 @@ app.use('/api/v1/audit-logs', auditLogRoutes);
 app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/settings', settingsRoutes);
 app.use('/api/v1/targets', targetRoutes);
+app.use('/api/v1/influencers', influencerRoutes);
 app.use('/api/v1/db', dbRoutes);
 
 // Start server and initialize DB

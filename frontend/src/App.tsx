@@ -9,6 +9,7 @@ import { DashboardView } from './views/DashboardView';
 import { TargetManagementView } from './views/TargetManagementView';
 import { EmployeeManagementView } from './views/EmployeeManagementView';
 import { BrandManagementView } from './views/BrandManagementView';
+import { InfluencerManagementView } from './views/InfluencerManagementView';
 import { EmployeeBrandAssignmentView } from './views/EmployeeBrandAssignmentView';
 import { TaskManagementView } from './views/TaskManagementView';
 import { DailyPostingView } from './views/DailyPostingView';
@@ -140,6 +141,7 @@ export const App: React.FC = () => {
 
           {activeView === 'employees' && <EmployeeManagementView />}
           {activeView === 'brands' && <BrandManagementView />}
+          {activeView === 'influencers' && <InfluencerManagementView />}
           {activeView === 'employee-brands' && <EmployeeBrandAssignmentView />}
           {activeView === 'tasks' && (
             <TaskManagementView

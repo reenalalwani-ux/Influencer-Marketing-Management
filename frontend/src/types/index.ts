@@ -146,3 +146,64 @@ export interface TargetItem {
   createdAt?: string;
   updatedAt?: string;
 }
+
+export interface InfluencerTransaction {
+  _id: string;
+  sNo?: number;
+  transactionDate: string;
+  influencerManager?: string;
+  brandId?: Brand | any;
+  brandName: string;
+  influencerName: string;
+  phone?: string;
+  profileLink?: string;
+  category: 'Paid' | 'Barter';
+
+  // Financial breakdown
+  brandOnboardingAmt: number;
+  brandReceivedAmt: number;
+  brandPendingAmt: number;
+  influencerOnboardingAmt: number;
+  influencerPaidAmt: number;
+  influencerPendingAmt: number;
+  ad2shipMargin: number;
+  inAmount: number;
+  outAmount: number;
+  balance: number;
+  finalPaymentReceived: boolean;
+
+  // Deliverables & Content
+  productLink?: string;
+  videoType?: string;
+  videoDescription?: string;
+  refVideoLink?: string;
+  orderId?: string;
+  orderDate?: string;
+  platform: string;
+  status: 'Pending' | 'Completed' | 'Settled' | 'Approved';
+  contentLink?: string;
+  adsCode?: string;
+  isApproved?: boolean;
+  notes?: string;
+  remark?: string;
+  createdBy?: any;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PaymentLogItem {
+  _id: string;
+  influencerId?: string;
+  influencerName: string;
+  brandName: string;
+  type: 'IN' | 'OUT';
+  amount: number;
+  paymentMode: string;
+  transactionDate: string;
+  referenceNo?: string;
+  handledBy: string;
+  notes?: string;
+  createdBy?: any;
+  createdAt?: string;
+  updatedAt?: string;
+}
