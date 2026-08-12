@@ -12,7 +12,6 @@ router.get('/pending', authenticateToken, checkPermission('task.verify'), async 
     const pendingTasks = await Task.find({ verificationStatus: 'Pending Verification' })
       .populate('employeeId', 'name employeeId email designation department')
       .populate('brandId', 'brandName brandId logo industry')
-      .populate('campaignId', 'title')
       .sort({ publishedDate: -1 });
 
     return res.json({ success: true, count: pendingTasks.length, data: pendingTasks });

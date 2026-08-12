@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CheckSquare, Plus, Send, ExternalLink, Calendar, Clock, Filter, Tag } from 'lucide-react';
 import { api } from '../services/api';
-import { TaskItem, Employee, Brand, Campaign } from '../types';
+import { TaskItem, Employee, Brand } from '../types';
 import { Modal } from '../components/Modal';
 
 interface TaskManagementViewProps {
@@ -12,14 +12,12 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ onOpenSu
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
 
   // Form fields
   const [employeeId, setEmployeeId] = useState('');
   const [brandId, setBrandId] = useState('');
-  const [campaignId, setCampaignId] = useState('');
   const [platform, setPlatform] = useState('Instagram');
   const [contentType, setContentType] = useState('Reel');
   const [title, setTitle] = useState('');
@@ -31,17 +29,15 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ onOpenSu
 
   const fetchData = async () => {
     try {
-      const [tRes, eRes, bRes, cRes] = await Promise.all([
+      const [tRes, eRes, bRes] = await Promise.all([
         api.get('/tasks'),
         api.get('/employees'),
-        api.get('/brands'),
-        api.get('/campaigns')
+        api.get('/brands')
       ]);
 
       if (tRes.success) setTasks(tRes.data);
       if (eRes.success) setEmployees(eRes.data);
       if (bRes.success) setBrands(bRes.data);
-      if (cRes.success) setCampaigns(cRes.data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -60,7 +56,7 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ onOpenSu
       const deadline = new Date(sched.getTime() + Number(deadlineHours) * 3600 * 1000);
 
       const res = await api.post('/tasks', {
-        employeeId, brandId, campaignId: campaignId || undefined,
+        employeeId, brandId,
         platform, contentType, title, description, priority,
         scheduledDate: sched, scheduledTime, deadline
       });
@@ -143,11 +139,10 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ onOpenSu
                       </td>
 
                       <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                          t.status === 'Verified' ? 'badge-verified' :
-                          t.status === 'Submitted' ? 'badge-submitted' :
-                          t.status === 'Pending' ? 'badge-pending' : 'badge-rejected'
-                        }`}>
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${t.status === 'Verified' ? 'badge-verified' :
+                            t.status === 'Submitted' ? 'badge-submitted' :
+                              t.status === 'Pending' ? 'badge-pending' : 'badge-rejected'
+                          }`}>
                           {t.status}
                         </span>
                       </td>

@@ -7,7 +7,7 @@ const router = Router();
 
 // GET /api/v1/postings/daily
 router.get('/daily', authenticateToken, checkPermission('posting.view'), async (req: AuthRequest, res: Response) => {
-  const { date, employeeId, brandId, campaignId, platform, status } = req.query;
+  const { date, employeeId, brandId, platform, status } = req.query;
 
   // Default date = today
   const targetDate = date ? new Date(date as string) : new Date();
@@ -23,7 +23,6 @@ router.get('/daily', authenticateToken, checkPermission('posting.view'), async (
 
   if (employeeId) filter.employeeId = employeeId;
   if (brandId) filter.brandId = brandId;
-  if (campaignId) filter.campaignId = campaignId;
   if (platform) filter.platform = platform;
   if (status) filter.status = status;
 
@@ -37,7 +36,6 @@ router.get('/daily', authenticateToken, checkPermission('posting.view'), async (
     const tasks = await Task.find(filter)
       .populate('employeeId', 'name employeeId designation department')
       .populate('brandId', 'brandName brandId logo industry')
-      .populate('campaignId', 'title status')
       .sort({ scheduledTime: 1 });
 
     // Calculate metrics for the selected day
@@ -63,7 +61,7 @@ router.get('/daily', authenticateToken, checkPermission('posting.view'), async (
 
 // GET /api/v1/postings/calendar
 router.get('/calendar', authenticateToken, checkPermission('posting.view'), async (req: AuthRequest, res: Response) => {
-  const { start, end, employeeId, brandId, campaignId, platform, contentType, status } = req.query;
+  const { start, end, employeeId, brandId, platform, contentType, status } = req.query;
 
   if (!start || !end) {
     return res.status(400).json({ success: false, message: 'Start and End dates are required' });
@@ -75,7 +73,6 @@ router.get('/calendar', authenticateToken, checkPermission('posting.view'), asyn
 
   if (employeeId) filter.employeeId = employeeId;
   if (brandId) filter.brandId = brandId;
-  if (campaignId) filter.campaignId = campaignId;
   if (platform) filter.platform = platform;
   if (contentType) filter.contentType = contentType;
   if (status) filter.status = status;
@@ -89,7 +86,6 @@ router.get('/calendar', authenticateToken, checkPermission('posting.view'), asyn
     const tasks = await Task.find(filter)
       .populate('employeeId', 'name employeeId designation')
       .populate('brandId', 'brandName brandId logo')
-      .populate('campaignId', 'title')
       .sort({ scheduledDate: 1, scheduledTime: 1 });
 
     return res.json({ success: true, count: tasks.length, data: tasks });

@@ -1,8 +1,8 @@
 import React from 'react';
-import { 
-  LayoutDashboard, Users, Briefcase, UserCheck, Flag, Calendar, 
-  CheckSquare, CheckCircle, BarChart3, FileSpreadsheet, ShieldAlert, 
-  Settings, Link2, Clock, Database
+import {
+  LayoutDashboard, Users, Briefcase, UserCheck, Calendar,
+  CheckSquare, CheckCircle, BarChart3, FileSpreadsheet, ShieldAlert,
+  Settings, Link2, Clock, Database, Target
 } from 'lucide-react';
 import { User } from '../types';
 
@@ -17,10 +17,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'targets', label: 'Target Module', icon: Target },
     ...(!isEmployee ? [{ id: 'employees', label: 'Employees', icon: Users }] : []),
     { id: 'brands', label: 'Brand Portfolio', icon: Briefcase },
     { id: 'employee-brands', label: 'Brand Assignments', icon: UserCheck },
-    { id: 'campaigns', label: 'Campaigns', icon: Flag },
     { id: 'tasks', label: 'Tasks & Content', icon: CheckSquare },
     { id: 'daily-posting', label: 'Daily Posting', icon: Clock, badge: 'Core' },
     { id: 'calendar', label: 'Posting Calendar', icon: Calendar },
@@ -45,20 +45,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
             <button
               key={item.id}
               onClick={() => setActiveView(item.id)}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 ${
-                isActive
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 ${isActive
                   ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-500 text-white shadow-md shadow-purple-500/25'
                   : 'text-slate-600 hover:text-purple-700 hover:bg-purple-50/60 border border-transparent'
-              }`}
+                }`}
             >
               <div className="flex items-center space-x-3">
                 <Icon size={18} className={isActive ? 'text-white' : 'text-slate-400'} />
                 <span>{item.label}</span>
               </div>
               {item.badge && (
-                <span className={`text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full ${
-                  isActive ? 'bg-white/20 text-white border border-white/30' : 'bg-purple-100 text-purple-700 border border-purple-200'
-                }`}>
+                <span className={`text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full ${isActive ? 'bg-white/20 text-white border border-white/30' : 'bg-purple-100 text-purple-700 border border-purple-200'
+                  }`}>
                   {item.badge}
                 </span>
               )}

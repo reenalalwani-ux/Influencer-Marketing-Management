@@ -92,9 +92,8 @@ export const PostingCalendarView: React.FC = () => {
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
-                className={`px-3 py-1.5 rounded-lg transition ${
-                  viewMode === mode ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
+                className={`px-3 py-1.5 rounded-lg transition ${viewMode === mode ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
               >
                 {mode}
               </button>
@@ -146,9 +145,8 @@ export const PostingCalendarView: React.FC = () => {
                   return (
                     <div
                       key={`day-${day}`}
-                      className={`h-28 p-2 rounded-xl border text-xs flex flex-col justify-between overflow-hidden transition ${
-                        isToday ? 'bg-purple-50 border-purple-300 shadow-xs' : 'bg-white border-slate-200 hover:border-purple-200'
-                      }`}
+                      className={`h-28 p-2 rounded-xl border text-xs flex flex-col justify-between overflow-hidden transition ${isToday ? 'bg-purple-50 border-purple-300 shadow-xs' : 'bg-white border-slate-200 hover:border-purple-200'
+                        }`}
                     >
                       <div className="flex justify-between items-center">
                         <span className={`font-extrabold text-xs ${isToday ? 'text-purple-700' : 'text-slate-800'}`}>
@@ -165,10 +163,9 @@ export const PostingCalendarView: React.FC = () => {
                         {dayTasks.map((t) => (
                           <div
                             key={t._id}
-                            className={`p-1 rounded text-[10px] truncate font-bold border ${
-                              t.status === 'Verified' ? 'badge-verified' :
-                              t.status === 'Submitted' ? 'badge-submitted' : 'badge-pending'
-                            }`}
+                            className={`p-1 rounded text-[10px] truncate font-bold border ${t.status === 'Verified' ? 'badge-verified' :
+                                t.status === 'Submitted' ? 'badge-submitted' : 'badge-pending'
+                              }`}
                             title={`${t.scheduledTime} - ${t.title} (${t.platform})`}
                           >
                             {t.scheduledTime}: {t.title}

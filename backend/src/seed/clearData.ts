@@ -4,7 +4,7 @@ dotenv.config();
 import { connectDB } from '../config/db';
 import { 
   User, Employee, Brand, EmployeeBrand, 
-  Campaign, CampaignEmployee, Task, Notification, AuditLog 
+  Task, Notification, AuditLog 
 } from '../models/allModels';
 
 export const clearDemoData = async () => {
@@ -19,8 +19,6 @@ export const clearDemoData = async () => {
     await Employee.deleteMany({});
     await Brand.deleteMany({});
     await EmployeeBrand.deleteMany({});
-    await Campaign.deleteMany({});
-    await CampaignEmployee.deleteMany({});
     await Task.deleteMany({});
     await Notification.deleteMany({});
     await AuditLog.deleteMany({});

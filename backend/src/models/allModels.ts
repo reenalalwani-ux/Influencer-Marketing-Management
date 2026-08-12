@@ -136,58 +136,11 @@ const EmployeeBrandSchema = new Schema<IEmployeeBrand>({
   status: { type: String, enum: ['Active', 'Completed', 'Removed'], default: 'Active' }
 }, { timestamps: true });
 
-// 7. Campaign Schema
-export interface ICampaign extends Document {
-  brandId: mongoose.Types.ObjectId;
-  title: string;
-  description?: string;
-  platforms: string[];
-  startDate: Date;
-  endDate: Date;
-  status: 'Draft' | 'Planning' | 'Active' | 'Paused' | 'Completed' | 'Cancelled';
-  managerId?: mongoose.Types.ObjectId;
-  priority: 'Low' | 'Medium' | 'High' | 'Urgent';
-}
-
-const CampaignSchema = new Schema<ICampaign>({
-  brandId: { type: Schema.Types.ObjectId, ref: 'Brand', required: true },
-  title: { type: String, required: true },
-  description: { type: String },
-  platforms: [{ type: String }],
-  startDate: { type: Date, required: true },
-  endDate: { type: Date, required: true },
-  status: { type: String, enum: ['Draft', 'Planning', 'Active', 'Paused', 'Completed', 'Cancelled'], default: 'Active' },
-  managerId: { type: Schema.Types.ObjectId, ref: 'Employee' },
-  priority: { type: String, enum: ['Low', 'Medium', 'High', 'Urgent'], default: 'Medium' }
-}, { timestamps: true });
-
-// 8. CampaignEmployee Relationship Schema
-export interface ICampaignEmployee extends Document {
-  campaignId: mongoose.Types.ObjectId;
-  employeeId: mongoose.Types.ObjectId;
-  role: string;
-  assignedBy?: mongoose.Types.ObjectId;
-  startDate: Date;
-  endDate?: Date;
-  status: 'Active' | 'Completed' | 'Removed';
-}
-
-const CampaignEmployeeSchema = new Schema<ICampaignEmployee>({
-  campaignId: { type: Schema.Types.ObjectId, ref: 'Campaign', required: true },
-  employeeId: { type: Schema.Types.ObjectId, ref: 'Employee', required: true },
-  role: { type: String, default: 'Content Creator' },
-  assignedBy: { type: Schema.Types.ObjectId, ref: 'User' },
-  startDate: { type: Date, default: Date.now },
-  endDate: { type: Date },
-  status: { type: String, enum: ['Active', 'Completed', 'Removed'], default: 'Active' }
-}, { timestamps: true });
-
-// 9. Task / Content Schema
+// 7. Task / Content Schema
 export interface ITask extends Document {
   taskId: string;
   employeeId: mongoose.Types.ObjectId;
   brandId: mongoose.Types.ObjectId;
-  campaignId?: mongoose.Types.ObjectId;
   platform: string;
   contentType: string;
   title: string;
@@ -210,7 +163,6 @@ const TaskSchema = new Schema<ITask>({
   taskId: { type: String, required: true, unique: true },
   employeeId: { type: Schema.Types.ObjectId, ref: 'Employee', required: true },
   brandId: { type: Schema.Types.ObjectId, ref: 'Brand', required: true },
-  campaignId: { type: Schema.Types.ObjectId, ref: 'Campaign' },
   platform: { type: String, required: true },
   contentType: { type: String, required: true },
   title: { type: String, required: true },
@@ -296,6 +248,35 @@ const SettingSchema = new Schema<ISetting>({
   description: { type: String }
 }, { timestamps: true });
 
+// 13. Target Schema
+export interface ITarget extends Document {
+  title: string;
+  targetAmount: number;
+  achievedAmount: number;
+  currency: string;
+  period: string;
+  startDate?: Date;
+  endDate?: Date;
+  status: 'Active' | 'Completed' | 'Archived';
+  isActive: boolean;
+  description?: string;
+  createdBy?: mongoose.Types.ObjectId;
+}
+
+const TargetSchema = new Schema<ITarget>({
+  title: { type: String, required: true },
+  targetAmount: { type: Number, required: true, default: 0 },
+  achievedAmount: { type: Number, required: true, default: 0 },
+  currency: { type: String, default: '$' },
+  period: { type: String, required: true },
+  startDate: { type: Date },
+  endDate: { type: Date },
+  status: { type: String, enum: ['Active', 'Completed', 'Archived'], default: 'Active' },
+  isActive: { type: Boolean, default: true },
+  description: { type: String },
+  createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
+}, { timestamps: true });
+
 // Export Models
 export const Permission = mongoose.model<IPermission>('Permission', PermissionSchema);
 export const Role = mongoose.model<IRole>('Role', RoleSchema);
@@ -303,9 +284,9 @@ export const User = mongoose.model<IUser>('User', UserSchema);
 export const Employee = mongoose.model<IEmployee>('Employee', EmployeeSchema);
 export const Brand = mongoose.model<IBrand>('Brand', BrandSchema);
 export const EmployeeBrand = mongoose.model<IEmployeeBrand>('EmployeeBrand', EmployeeBrandSchema);
-export const Campaign = mongoose.model<ICampaign>('Campaign', CampaignSchema);
-export const CampaignEmployee = mongoose.model<ICampaignEmployee>('CampaignEmployee', CampaignEmployeeSchema);
 export const Task = mongoose.model<ITask>('Task', TaskSchema);
 export const Notification = mongoose.model<INotification>('Notification', NotificationSchema);
 export const AuditLog = mongoose.model<IAuditLog>('AuditLog', AuditLogSchema);
 export const Setting = mongoose.model<ISetting>('Setting', SettingSchema);
+export const Target = mongoose.model<ITarget>('Target', TargetSchema);
+

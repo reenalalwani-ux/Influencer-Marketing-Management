@@ -20,13 +20,6 @@ export const PERMISSIONS = [
   'brand.delete',
   'brand.assign',
 
-  // Campaign
-  'campaign.view',
-  'campaign.create',
-  'campaign.update',
-  'campaign.delete',
-  'campaign.assign',
-
   // Task
   'task.view',
   'task.create',
@@ -47,42 +40,47 @@ export const PERMISSIONS = [
   // Settings & System
   'settings.view',
   'settings.update',
-  'audit.view'
+  'audit.view',
+
+  // Target Module
+  'target.view',
+  'target.create',
+  'target.update',
+  'target.delete'
 ];
 
 export const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
   [ROLES.SUPER_ADMIN]: PERMISSIONS,
   [ROLES.ADMIN]: PERMISSIONS,
   [ROLES.MARKETING_MANAGER]: [
-    'employee.view',
-    'brand.view', 'brand.create', 'brand.update', 'brand.assign',
-    'campaign.view', 'campaign.create', 'campaign.update', 'campaign.assign',
-    'task.view', 'task.create', 'task.update', 'task.verify',
+    'employee.view', 'employee.create', 'employee.update', 'employee.delete',
+    'brand.view', 'brand.create', 'brand.update', 'brand.delete', 'brand.assign',
+    'task.view', 'task.create', 'task.update', 'task.delete', 'task.verify',
     'posting.view', 'posting.create', 'posting.update',
     'performance.view', 'report.view', 'report.export',
-    'settings.view'
+    'settings.view', 'audit.view',
+    'target.view', 'target.create', 'target.update', 'target.delete'
   ],
   [ROLES.TEAM_LEADER]: [
-    'employee.view',
-    'brand.view',
-    'campaign.view', 'campaign.update',
+    'employee.view', 'employee.create', 'employee.update',
+    'brand.view', 'brand.create', 'brand.update', 'brand.assign',
     'task.view', 'task.create', 'task.update', 'task.verify',
     'posting.view', 'posting.create', 'posting.update',
-    'performance.view', 'report.view'
+    'performance.view', 'report.view',
+    'target.view', 'target.update'
   ],
   [ROLES.EMPLOYEE]: [
     'brand.view',
-    'campaign.view',
     'task.view', 'task.update',
     'posting.view', 'posting.update',
-    'performance.view'
+    'performance.view',
+    'target.view'
   ]
 };
 
 export const PLATFORMS = ['Instagram', 'YouTube', 'TikTok', 'X (Twitter)', 'LinkedIn', 'Facebook'];
 export const CONTENT_TYPES = ['Reel', 'Post', 'Story', 'Short', 'Video', 'Carousel', 'Article', 'Tweet'];
 export const TASK_STATUSES = ['Pending', 'In Progress', 'Submitted', 'Verified', 'Rejected', 'Delayed', 'Missed'];
-export const CAMPAIGN_STATUSES = ['Draft', 'Planning', 'Active', 'Paused', 'Completed', 'Cancelled'];
 export const PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'];
 export const DEPARTMENTS = ['Influencer Marketing', 'Content Creation', 'Campaign Strategy', 'Quality Control', 'Management'];
 export const DESIGNATIONS = ['Marketing Manager', 'Senior Influencer Specialist', 'Influencer Executive', 'Content Strategist', 'Team Lead'];

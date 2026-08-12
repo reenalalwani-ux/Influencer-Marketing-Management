@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Briefcase, Plus, Globe, Mail, Phone, ExternalLink, Users, Flag } from 'lucide-react';
+import { Briefcase, Plus, Globe, Mail, Phone, ExternalLink, Users } from 'lucide-react';
 import { api } from '../services/api';
 import { Brand } from '../types';
 import { Modal } from '../components/Modal';
@@ -178,31 +178,6 @@ export const BrandManagementView: React.FC = () => {
                       </div>
                       <span className="px-2 py-0.5 rounded text-[10px] badge-verified font-bold">
                         {empAssignment.priority}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Active Campaigns */}
-            <div>
-              <h4 className="font-extrabold text-slate-900 text-sm mb-2 flex items-center gap-1.5">
-                <Flag size={16} className="text-purple-600" />
-                Campaign Projects ({selectedBrand.campaigns?.length || 0})
-              </h4>
-              <div className="space-y-2">
-                {selectedBrand.campaigns?.length === 0 ? (
-                  <p className="text-xs text-slate-500 font-medium">No campaigns created under this brand.</p>
-                ) : (
-                  selectedBrand.campaigns?.map((camp: any) => (
-                    <div key={camp._id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
-                      <div>
-                        <div className="font-bold text-slate-900">{camp.campaignName}</div>
-                        <div className="text-slate-500 font-medium">{camp.platform} • Goal: {camp.targetPosts} Posts</div>
-                      </div>
-                      <span className="px-2 py-0.5 rounded text-[10px] badge-verified font-bold">
-                        {camp.status}
                       </span>
                     </div>
                   ))

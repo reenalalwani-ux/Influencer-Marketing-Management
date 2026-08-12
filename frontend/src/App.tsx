@@ -3,12 +3,13 @@ import { User, TaskItem } from './types';
 import { api } from './services/api';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
+import { TargetTopBanner } from './components/TargetTopBanner';
 import { LoginView } from './views/LoginView';
 import { DashboardView } from './views/DashboardView';
+import { TargetManagementView } from './views/TargetManagementView';
 import { EmployeeManagementView } from './views/EmployeeManagementView';
 import { BrandManagementView } from './views/BrandManagementView';
 import { EmployeeBrandAssignmentView } from './views/EmployeeBrandAssignmentView';
-import { CampaignManagementView } from './views/CampaignManagementView';
 import { TaskManagementView } from './views/TaskManagementView';
 import { DailyPostingView } from './views/DailyPostingView';
 import { PostingCalendarView } from './views/PostingCalendarView';
@@ -22,6 +23,7 @@ import { URLSubmissionModal } from './components/URLSubmissionModal';
 export const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [targetRefreshCount, setTargetRefreshCount] = useState(0);
 
   // Helper to read initial active view from browser URL hash
   const getViewFromHash = () => {
@@ -106,6 +108,13 @@ export const App: React.FC = () => {
         setActiveView={handleNavigate}
       />
 
+      {/* Target Module Top System Banner */}
+      <TargetTopBanner
+        user={user}
+        onNavigateToTargets={() => handleNavigate('targets')}
+        refreshTrigger={targetRefreshCount}
+      />
+
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
           user={user}
@@ -122,10 +131,16 @@ export const App: React.FC = () => {
             />
           )}
 
+          {activeView === 'targets' && (
+            <TargetManagementView
+              userRole={user.role}
+              onTargetUpdated={() => setTargetRefreshCount(prev => prev + 1)}
+            />
+          )}
+
           {activeView === 'employees' && <EmployeeManagementView />}
           {activeView === 'brands' && <BrandManagementView />}
           {activeView === 'employee-brands' && <EmployeeBrandAssignmentView />}
-          {activeView === 'campaigns' && <CampaignManagementView />}
           {activeView === 'tasks' && (
             <TaskManagementView
               onOpenSubmitUrlModal={(task) => setSubmitUrlTask(task)}

@@ -1,5 +1,6 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from './auth';
+import { ROLE_DEFAULT_PERMISSIONS } from '../config/constants';
 
 export const checkPermission = (requiredPermission: string) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -7,13 +8,15 @@ export const checkPermission = (requiredPermission: string) => {
       return res.status(401).json({ success: false, message: 'Authentication required' });
     }
 
-    // Super Admin has all permissions automatically
-    if (req.user.role === 'Super Admin') {
+    // Super Admin & Admin have all permissions automatically
+    if (req.user.role === 'Super Admin' || req.user.role === 'Admin') {
       return next();
     }
 
     const permissions = req.userPermissions || [];
-    if (!permissions.includes(requiredPermission)) {
+    const defaultRolePerms = ROLE_DEFAULT_PERMISSIONS[req.user.role] || [];
+
+    if (!permissions.includes(requiredPermission) && !defaultRolePerms.includes(requiredPermission)) {
       return res.status(403).json({ 
         success: false, 
         message: `Forbidden: Missing required permission '${requiredPermission}'` 

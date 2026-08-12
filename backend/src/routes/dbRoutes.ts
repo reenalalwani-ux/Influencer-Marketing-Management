@@ -2,7 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import { 
   Permission, Role, User, Employee, Brand, EmployeeBrand, 
-  Campaign, CampaignEmployee, Task, Notification, AuditLog, Setting 
+  Task, Notification, AuditLog, Setting, Target
 } from '../models/allModels';
 
 const router = Router();
@@ -14,12 +14,11 @@ const modelsMap: Record<string, mongoose.Model<any>> = {
   employees: Employee,
   brands: Brand,
   employeebrands: EmployeeBrand,
-  campaigns: Campaign,
-  campaignemployees: CampaignEmployee,
   tasks: Task,
   notifications: Notification,
   auditlogs: AuditLog,
-  settings: Setting
+  settings: Setting,
+  targets: Target
 };
 
 // GET /api/v1/db/overview - Get database overview with collection counts

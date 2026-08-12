@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { Employee, Task, EmployeeBrand, CampaignEmployee } from '../models/allModels';
+import { Employee, Task, EmployeeBrand } from '../models/allModels';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 
@@ -35,9 +35,6 @@ router.get('/', authenticateToken, checkPermission('performance.view'), async (r
         // Fetch brands managed count
         const brandsCount = await EmployeeBrand.countDocuments({ employeeId: empId, status: 'Active' });
 
-        // Fetch campaigns managed count
-        const campaignsCount = await CampaignEmployee.countDocuments({ employeeId: empId, status: 'Active' });
-
         return {
           employee: {
             id: emp._id,
@@ -56,8 +53,7 @@ router.get('/', authenticateToken, checkPermission('performance.view'), async (r
             missed,
             completionRate,
             onTimeRate,
-            brandsManaged: brandsCount,
-            campaignsManaged: campaignsCount
+            brandsManaged: brandsCount
           }
         };
       })
@@ -75,7 +71,7 @@ router.get('/:employeeId', authenticateToken, checkPermission('performance.view'
     const emp = await Employee.findById(req.params.employeeId);
     if (!emp) return res.status(404).json({ success: false, message: 'Employee not found' });
 
-    const tasks = await Task.find({ employeeId: emp._id }).populate('brandId', 'brandName').populate('campaignId', 'title');
+    const tasks = await Task.find({ employeeId: emp._id }).populate('brandId', 'brandName');
     const totalAssigned = tasks.length;
     const completed = tasks.filter(t => t.status === 'Verified' || t.status === 'Submitted').length;
     const pending = tasks.filter(t => t.status === 'Pending' || t.status === 'In Progress').length;
@@ -84,7 +80,6 @@ router.get('/:employeeId', authenticateToken, checkPermission('performance.view'
 
     const completionRate = totalAssigned > 0 ? Math.round((completed / totalAssigned) * 100) : 0;
     const brands = await EmployeeBrand.find({ employeeId: emp._id, status: 'Active' }).populate('brandId');
-    const campaigns = await CampaignEmployee.find({ employeeId: emp._id, status: 'Active' }).populate('campaignId');
 
     return res.json({
       success: true,
@@ -99,7 +94,6 @@ router.get('/:employeeId', authenticateToken, checkPermission('performance.view'
           completionRate
         },
         brands,
-        campaigns,
         tasks
       }
     });

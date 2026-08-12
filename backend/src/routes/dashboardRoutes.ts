@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { User, Employee, Brand, Campaign, Task, EmployeeBrand, CampaignEmployee, AuditLog } from '../models/allModels';
+import { User, Employee, Brand, Task, EmployeeBrand, AuditLog, Target } from '../models/allModels';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -14,6 +14,12 @@ router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response) 
   const endOfDay = new Date(today.setHours(23, 59, 59, 999));
 
   try {
+    // Fetch Active Target
+    let activeTarget = await Target.findOne({ isActive: true, status: 'Active' }).sort({ updatedAt: -1 });
+    if (!activeTarget) {
+      activeTarget = await Target.findOne({ status: 'Active' }).sort({ createdAt: -1 });
+    }
+
     if (role === 'Employee') {
       // Find employee document
       const emp = await Employee.findOne({ email: req.user.email });
@@ -24,10 +30,6 @@ router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response) 
       // My Brands
       const myBrands = await EmployeeBrand.find({ employeeId: emp._id, status: 'Active' })
         .populate('brandId', 'brandName brandId logo industry');
-
-      // My Campaigns
-      const myCampaigns = await CampaignEmployee.find({ employeeId: emp._id, status: 'Active' })
-        .populate('campaignId', 'title status brandId startDate endDate');
 
       // Today's Tasks
       const todaysTasks = await Task.find({
@@ -52,7 +54,6 @@ router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response) 
         role: 'Employee',
         data: {
           myBrands,
-          myCampaigns,
           todaySummary: {
             total: todaysTasks.length,
             completed: completedCount,
@@ -60,7 +61,8 @@ router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response) 
             delayed: delayedCount
           },
           todaysTasks,
-          upcomingTasks
+          upcomingTasks,
+          activeTarget
         }
       });
     }
@@ -68,7 +70,6 @@ router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response) 
     // Manager / Super Admin / Admin Dashboard
     const totalEmployees = await Employee.countDocuments({ status: 'Active' });
     const totalBrands = await Brand.countDocuments({ status: 'Active' });
-    const activeCampaigns = await Campaign.countDocuments({ status: 'Active' });
 
     // Today's System Tasks
     const todaysTasks = await Task.find({
@@ -93,7 +94,6 @@ router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response) 
       data: {
         totalEmployees,
         totalBrands,
-        activeCampaigns,
         todaySummary: {
           total: todaysTasks.length,
           completed,
@@ -102,7 +102,8 @@ router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response) 
         },
         todaysTasks,
         upcomingPostings,
-        recentAuditLogs
+        recentAuditLogs,
+        activeTarget
       }
     });
   } catch (error) {

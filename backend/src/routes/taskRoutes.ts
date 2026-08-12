@@ -20,12 +20,11 @@ export const detectPlatform = (url: string): string => {
 
 // GET /api/v1/tasks
 router.get('/', authenticateToken, checkPermission('task.view'), async (req: AuthRequest, res: Response) => {
-  const { employeeId, brandId, campaignId, status, platform, date, verificationStatus } = req.query;
+  const { employeeId, brandId, status, platform, date, verificationStatus } = req.query;
   const filter: any = {};
 
   if (employeeId) filter.employeeId = employeeId;
   if (brandId) filter.brandId = brandId;
-  if (campaignId) filter.campaignId = campaignId;
   if (status) filter.status = status;
   if (platform) filter.platform = platform;
   if (verificationStatus) filter.verificationStatus = verificationStatus;
@@ -49,7 +48,6 @@ router.get('/', authenticateToken, checkPermission('task.view'), async (req: Aut
     const tasks = await Task.find(filter)
       .populate('employeeId', 'name employeeId designation department')
       .populate('brandId', 'brandName brandId logo industry')
-      .populate('campaignId', 'title status')
       .populate('verifiedBy', 'name role')
       .sort({ scheduledDate: 1, scheduledTime: 1 });
 
@@ -65,7 +63,6 @@ router.get('/:id', authenticateToken, checkPermission('task.view'), async (req: 
     const task = await Task.findById(req.params.id)
       .populate('employeeId', 'name employeeId email designation department')
       .populate('brandId', 'brandName brandId logo industry')
-      .populate('campaignId', 'title status description')
       .populate('verifiedBy', 'name email role');
 
     if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
@@ -77,7 +74,7 @@ router.get('/:id', authenticateToken, checkPermission('task.view'), async (req: 
 
 // POST /api/v1/tasks
 router.post('/', authenticateToken, checkPermission('task.create'), async (req: AuthRequest, res: Response) => {
-  const { employeeId, brandId, campaignId, platform, contentType, title, description, priority, scheduledDate, scheduledTime, deadline } = req.body;
+  const { employeeId, brandId, platform, contentType, title, description, priority, scheduledDate, scheduledTime, deadline } = req.body;
 
   if (!employeeId || !brandId || !platform || !contentType || !title || !scheduledDate || !scheduledTime || !deadline) {
     return res.status(400).json({ success: false, message: 'Required task fields missing' });
@@ -91,7 +88,6 @@ router.post('/', authenticateToken, checkPermission('task.create'), async (req: 
       taskId,
       employeeId,
       brandId,
-      campaignId: campaignId || undefined,
       platform,
       contentType,
       title,

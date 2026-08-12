@@ -204,11 +204,10 @@ export const DailyPostingView: React.FC<DailyPostingViewProps> = ({ onOpenSubmit
                   </div>
 
                   <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 border-slate-100 pt-3 md:pt-0">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      t.status === 'Verified' ? 'badge-verified' :
-                      t.status === 'Submitted' ? 'badge-submitted' :
-                      t.status === 'Pending' ? 'badge-pending' : 'badge-rejected'
-                    }`}>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${t.status === 'Verified' ? 'badge-verified' :
+                        t.status === 'Submitted' ? 'badge-submitted' :
+                          t.status === 'Pending' ? 'badge-pending' : 'badge-rejected'
+                      }`}>
                       {t.status}
                     </span>
 

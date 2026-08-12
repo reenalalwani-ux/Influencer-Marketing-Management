@@ -37,7 +37,6 @@ export interface Brand {
   status: 'Active' | 'Inactive';
   notes?: string;
   assignedEmployees?: EmployeeBrandAssignment[];
-  campaigns?: Campaign[];
 }
 
 export interface EmployeeBrandAssignment {
@@ -52,37 +51,11 @@ export interface EmployeeBrandAssignment {
   status: 'Active' | 'Completed' | 'Removed';
 }
 
-export interface Campaign {
-  _id: string;
-  brandId: Brand | string;
-  title: string;
-  description?: string;
-  platforms: string[];
-  startDate: string;
-  endDate: string;
-  status: 'Draft' | 'Planning' | 'Active' | 'Paused' | 'Completed' | 'Cancelled';
-  managerId?: Employee | string;
-  priority: 'Low' | 'Medium' | 'High' | 'Urgent';
-  assignedEmployees?: CampaignEmployeeAssignment[];
-}
-
-export interface CampaignEmployeeAssignment {
-  _id: string;
-  campaignId: Campaign | string;
-  employeeId: Employee | string;
-  role: string;
-  assignedBy?: User | string;
-  startDate: string;
-  endDate?: string;
-  status: 'Active' | 'Completed' | 'Removed';
-}
-
 export interface TaskItem {
   _id: string;
   taskId: string;
   employeeId: Employee | any;
   brandId: Brand | any;
-  campaignId?: Campaign | any;
   platform: string;
   contentType: string;
   title: string;
@@ -142,7 +115,6 @@ export interface PerformanceMetrics {
   completionRate: number;
   onTimeRate: number;
   brandsManaged: number;
-  campaignsManaged: number;
 }
 
 export interface EmployeePerformanceData {
@@ -156,4 +128,21 @@ export interface EmployeePerformanceData {
     role: string;
   };
   metrics: PerformanceMetrics;
+}
+
+export interface TargetItem {
+  _id: string;
+  title: string;
+  targetAmount: number;
+  achievedAmount: number;
+  currency: string;
+  period: string;
+  startDate?: string;
+  endDate?: string;
+  status: 'Active' | 'Completed' | 'Archived';
+  isActive: boolean;
+  description?: string;
+  createdBy?: any;
+  createdAt?: string;
+  updatedAt?: string;
 }

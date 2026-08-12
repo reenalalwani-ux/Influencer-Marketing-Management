@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { Employee, Brand, Task, EmployeeBrand, Campaign } from '../models/allModels';
+import { Employee, Brand, Task, EmployeeBrand } from '../models/allModels';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 
@@ -50,7 +50,6 @@ router.get('/brand-summary', authenticateToken, checkPermission('report.view'), 
     const report = await Promise.all(
       brands.map(async (b) => {
         const assignedEmployees = await EmployeeBrand.countDocuments({ brandId: b._id, status: 'Active' });
-        const totalCampaigns = await Campaign.countDocuments({ brandId: b._id });
         const tasks = await Task.find({ brandId: b._id });
 
         const totalTasks = tasks.length;
@@ -63,7 +62,6 @@ router.get('/brand-summary', authenticateToken, checkPermission('report.view'), 
           brandName: b.brandName,
           industry: b.industry,
           assignedEmployees,
-          totalCampaigns,
           totalTasks,
           completed,
           pending,
@@ -92,20 +90,17 @@ router.get('/daily-posting', authenticateToken, checkPermission('report.view'), 
     const tasks = await Task.find({ scheduledDate: { $gte: startOfDay, $lte: endOfDay } })
       .populate('employeeId', 'name employeeId')
       .populate('brandId', 'brandName')
-      .populate('campaignId', 'title')
       .sort({ scheduledTime: 1 });
 
     const report = tasks.map(t => {
       const emp = t.employeeId as any;
       const brand = t.brandId as any;
-      const campaign = t.campaignId as any;
       return {
         taskId: t.taskId,
         scheduledDate: t.scheduledDate.toISOString().split('T')[0],
         scheduledTime: t.scheduledTime,
         employee: emp ? emp.name : 'Unassigned',
         brand: brand ? brand.brandName : 'N/A',
-        campaign: campaign ? campaign.title : 'N/A',
         platform: t.platform,
         contentType: t.contentType,
         taskTitle: t.title,

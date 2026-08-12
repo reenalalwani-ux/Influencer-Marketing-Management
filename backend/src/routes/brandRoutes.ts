@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { Brand, EmployeeBrand, Campaign } from '../models/allModels';
+import { Brand, EmployeeBrand } from '../models/allModels';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 import { logActivity } from '../middleware/auditLog';
@@ -26,15 +26,11 @@ router.get('/:id', authenticateToken, checkPermission('brand.view'), async (req:
     const assignedEmployees = await EmployeeBrand.find({ brandId: brand._id, status: 'Active' })
       .populate('employeeId', 'name employeeId email designation department phone');
 
-    // Fetch active campaigns for this brand
-    const campaigns = await Campaign.find({ brandId: brand._id }).sort({ createdAt: -1 });
-
     return res.json({
       success: true,
       data: {
         ...brand.toObject(),
-        assignedEmployees,
-        campaigns
+        assignedEmployees
       }
     });
   } catch (error) {

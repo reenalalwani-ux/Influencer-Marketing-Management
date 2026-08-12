@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
-import { 
-  Permission, Role, User, Employee, Brand, EmployeeBrand, 
-  Campaign, CampaignEmployee, Task, Notification, AuditLog, Setting 
+import {
+  Permission, Role, User, Employee, Brand, EmployeeBrand,
+  Task, Notification, AuditLog, Setting, Target
 } from '../models/allModels';
 import { PERMISSIONS, ROLE_DEFAULT_PERMISSIONS, ROLES, PLATFORMS, CONTENT_TYPES, TASK_STATUSES, PRIORITIES, DEPARTMENTS, DESIGNATIONS } from '../config/constants';
 
@@ -37,9 +37,60 @@ export const seedDatabase = async () => {
       console.log('[Seed] Created Marketing Manager (manager@influencer.com) in MongoDB Atlas');
     }
 
+    // Seed initial active target if none exists
+    const targetCount = await Target.countDocuments();
+    if (targetCount === 0) {
+      await Target.create({
+        title: 'August 2026 Influencer Revenue Target',
+        targetAmount: 100000,
+        achievedAmount: 68500,
+        currency: '$',
+        period: 'August 2026',
+        startDate: new Date('2026-08-01'),
+        endDate: new Date('2026-08-31'),
+        status: 'Active',
+        isActive: true,
+        description: 'Monthly influencer campaign revenue target for Q3 2026.',
+        createdBy: manager?._id || admin?._id
+      });
+      console.log('[Seed] Initial Active Target ($100,000) seeded in database.');
+    }
+
+    // Always sync permissions & roles so existing database records receive new permissions (e.g. Target Module)
+    for (const code of PERMISSIONS) {
+      const [moduleName] = code.split('.');
+      await Permission.updateOne(
+        { code },
+        {
+          $setOnInsert: {
+            code,
+            name: code.replace('.', ' ').toUpperCase(),
+            module: moduleName.toUpperCase(),
+            description: `Permission to execute ${code}`
+          }
+        },
+        { upsert: true }
+      );
+    }
+
+    for (const [roleName, permissions] of Object.entries(ROLE_DEFAULT_PERMISSIONS)) {
+      await Role.updateOne(
+        { name: roleName },
+        {
+          $set: { permissions },
+          $setOnInsert: {
+            name: roleName,
+            description: `Default system role for ${roleName}`,
+            isSystemRole: true
+          }
+        },
+        { upsert: true }
+      );
+    }
+
     const userCount = await User.countDocuments();
     if (userCount > 0) {
-      console.log(`[Seed] MongoDB Atlas Cloud Database connected with ${userCount} active users.`);
+      console.log(`[Seed] MongoDB Cloud Database connected with ${userCount} active users (Roles & Permissions synced).`);
       return;
     }
 
@@ -268,69 +319,7 @@ export const seedDatabase = async () => {
       status: 'Active'
     });
 
-    // 8. Seed Campaigns
-    const campaignNikeSummer = await Campaign.create({
-      brandId: brandNike._id,
-      title: 'Summer Fitness Campaign 2026',
-      description: 'Promote Nike Air Max running shoes across fitness creators',
-      platforms: ['Instagram', 'YouTube'],
-      startDate: new Date('2026-08-01'),
-      endDate: new Date('2026-08-31'),
-      status: 'Active',
-      managerId: managerEmp._id,
-      priority: 'High'
-    });
-
-    const campaignAdidasRun = await Campaign.create({
-      brandId: brandAdidas._id,
-      title: 'Ultraboost Running Club',
-      description: 'Marathon community athlete influencer showcases',
-      platforms: ['Instagram', 'TikTok'],
-      startDate: new Date('2026-08-05'),
-      endDate: new Date('2026-09-15'),
-      status: 'Active',
-      managerId: managerEmp._id,
-      priority: 'Medium'
-    });
-
-    const campaignPumaFest = await Campaign.create({
-      brandId: brandPuma._id,
-      title: 'Puma Streetwear Fest',
-      description: 'Youth lifestyle reels and shorts launch',
-      platforms: ['Instagram', 'YouTube', 'TikTok'],
-      startDate: new Date('2026-08-10'),
-      endDate: new Date('2026-08-25'),
-      status: 'Active',
-      managerId: managerEmp._id,
-      priority: 'High'
-    });
-
-    // 9. Seed Campaign-Employee Assignments (`campaign_employees`)
-    await CampaignEmployee.create({
-      campaignId: campaignNikeSummer._id,
-      employeeId: rahulEmp._id,
-      role: 'Reels Content Strategist',
-      assignedBy: managerUser._id,
-      status: 'Active'
-    });
-
-    await CampaignEmployee.create({
-      campaignId: campaignNikeSummer._id,
-      employeeId: priyaEmp._id,
-      role: 'YouTube Video Coordinator',
-      assignedBy: managerUser._id,
-      status: 'Active'
-    });
-
-    await CampaignEmployee.create({
-      campaignId: campaignPumaFest._id,
-      employeeId: priyaEmp._id,
-      role: 'TikTok & Reel Coordinator',
-      assignedBy: managerUser._id,
-      status: 'Active'
-    });
-
-    // 10. Seed Tasks / Daily Postings
+    // 8. Seed Tasks / Daily Postings
     const todayStr = new Date().toISOString().split('T')[0];
     const todayDate = new Date();
 
@@ -339,7 +328,6 @@ export const seedDatabase = async () => {
       taskId: 'TSK-10001',
       employeeId: rahulEmp._id,
       brandId: brandNike._id,
-      campaignId: campaignNikeSummer._id,
       platform: 'Instagram',
       contentType: 'Reel',
       title: 'Nike Air Max Summer Reel Showcase',
@@ -359,7 +347,6 @@ export const seedDatabase = async () => {
       taskId: 'TSK-10002',
       employeeId: rahulEmp._id,
       brandId: brandAdidas._id,
-      campaignId: campaignAdidasRun._id,
       platform: 'Instagram',
       contentType: 'Story',
       title: 'Adidas Ultraboost Unboxing Story',
@@ -382,7 +369,6 @@ export const seedDatabase = async () => {
       taskId: 'TSK-10003',
       employeeId: priyaEmp._id,
       brandId: brandPuma._id,
-      campaignId: campaignPumaFest._id,
       platform: 'Instagram',
       contentType: 'Reel',
       title: 'Puma Streetwear Dance Challenge Reel',
@@ -400,7 +386,6 @@ export const seedDatabase = async () => {
       taskId: 'TSK-10004',
       employeeId: priyaEmp._id,
       brandId: brandNike._id,
-      campaignId: campaignNikeSummer._id,
       platform: 'YouTube',
       contentType: 'Short',
       title: 'Nike Morning Workout Routine Short',

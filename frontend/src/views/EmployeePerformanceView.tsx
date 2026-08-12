@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BarChart3, Award, CheckCircle2, Clock, AlertCircle, Briefcase, Flag } from 'lucide-react';
+import { BarChart3, Award, CheckCircle2, Clock, AlertCircle, Briefcase } from 'lucide-react';
 import { api } from '../services/api';
 import { EmployeePerformanceData } from '../types';
 
@@ -89,7 +89,6 @@ export const EmployeePerformanceView: React.FC = () => {
 
                 <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                   <span>Brands Managed: <strong className="text-slate-900 font-bold">{metrics.brandsManaged}</strong></span>
-                  <span>Campaigns Managed: <strong className="text-slate-900 font-bold">{metrics.campaignsManaged}</strong></span>
                 </div>
               </div>
             );

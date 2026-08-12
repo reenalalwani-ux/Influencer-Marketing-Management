@@ -61,19 +61,12 @@ Employee Performance (Calculated completion & on-time rates)
 - **Important Design Rule**: Decoupled N-to-N relationship collection (`employee_brands`) rather than embedding simple brand IDs in employee documents.
 - **Data**: `employeeId`, `brandId`, `assignedBy`, `startDate`, `endDate`, `responsibility`, `priority` (`Low`, `Medium`, `High`, `Urgent`), `status` (`Active`, `Completed`, `Removed`).
 
-### Module 6: Campaign Management
-- **Structure**: Brand (1) -> Campaigns (N).
-- **Statuses**: `Draft`, `Planning`, `Active`, `Paused`, `Completed`, `Cancelled`.
+### Module 6: Task / Content Management
+- **Fields**: `taskId` (`TSK-10001`), `employeeId`, `brandId`, `platform` (`Instagram`, `YouTube`, `TikTok`, `X`, `LinkedIn`), `contentType` (`Reel`, `Story`, `Short`, `Video`, `Post`), `title`, `description`, `priority`, `scheduledDate`, `scheduledTime`, `deadline`, `status` (`Pending`, `In Progress`, `Submitted`, `Verified`, `Rejected`, `Delayed`, `Missed`).
 
-### Module 7: Employee-Campaign Assignment (`campaign_employees`)
-- **Purpose**: Connect employees to specific campaign projects with roles (`Content Creator`, `Video Coordinator`, etc.).
-
-### Module 8: Task / Content Management
-- **Fields**: `taskId` (`TSK-10001`), `employeeId`, `brandId`, `campaignId`, `platform` (`Instagram`, `YouTube`, `TikTok`, `X`, `LinkedIn`), `contentType` (`Reel`, `Story`, `Short`, `Video`, `Post`), `title`, `description`, `priority`, `scheduledDate`, `scheduledTime`, `deadline`, `status` (`Pending`, `In Progress`, `Submitted`, `Verified`, `Rejected`, `Delayed`, `Missed`).
-
-### Module 9: Daily Posting Management
+### Module 7: Daily Posting Management
 - **Operational Workspace**: Real-time counter metrics (`Total`, `Completed`, `Pending`, `Delayed`, `Rejected/Missed`) for selected dates.
-- **Filters**: Employee, Brand, Campaign, Platform, Status.
+- **Filters**: Employee, Brand, Platform, Status.
 
 ### Module 10: Posting Calendar
 - **Views**: Interactive `Daily`, `Weekly`, and `Monthly` visual calendar grids using task schedule data.
@@ -106,6 +99,12 @@ Employee Performance (Calculated completion & on-time rates)
 ### Module 18: System Settings
 - Configurable lookup parameters (Social Media Platforms, Content Types, Departments, System Roles & Permissions).
 
+### Module 19: Target Management Module
+- **Purpose**: System-wide revenue / performance target setting & tracking for Managers and Admins.
+- **Top System Banner**: Sticky header top bar showing real-time Target Goal Amount, Achieved Amount, Remaining Amount, and animated completion percentage gauge.
+- **Dashboard Widget**: Interactive Target Progress card embedded directly in the main Dashboard.
+- **Attributes**: `title`, `targetAmount`, `achievedAmount`, `currency`, `period`, `startDate`, `endDate`, `status` (`Active`/`Completed`/`Archived`), `isActive`, `description`, `createdBy`.
+
 ---
 
 ## 3. Database Collections Overview
@@ -123,6 +122,7 @@ tasks               - Content tasks, daily posting schedules, published URLs & v
 notifications       - User in-app notifications
 audit_logs          - Immutable system activity log history
 settings            - Configurable lookup parameters
+targets             - Monetary / Sales target goals & achieved metrics
 ```
 
 ---

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  Users, Briefcase, Flag, CheckCircle2, Clock, AlertTriangle, 
+import {
+  Users, Briefcase, Flag, CheckCircle2, Clock, AlertTriangle,
   ArrowUpRight, ExternalLink, Calendar, Send, ShieldCheck
 } from 'lucide-react';
 import { api } from '../services/api';
@@ -201,11 +201,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
                   </div>
 
                   <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                      t.status === 'Verified' ? 'badge-verified' :
-                      t.status === 'Submitted' ? 'badge-submitted' :
-                      t.status === 'Pending' ? 'badge-pending' : 'badge-rejected'
-                    }`}>
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${t.status === 'Verified' ? 'badge-verified' :
+                        t.status === 'Submitted' ? 'badge-submitted' :
+                          t.status === 'Pending' ? 'badge-pending' : 'badge-rejected'
+                      }`}>
                       {t.status}
                     </span>
 

@@ -10,8 +10,6 @@ import rolesRoutes from './routes/rolesRoutes';
 import employeeRoutes from './routes/employeeRoutes';
 import brandRoutes from './routes/brandRoutes';
 import employeeBrandRoutes from './routes/employeeBrandRoutes';
-import campaignRoutes from './routes/campaignRoutes';
-import campaignEmployeeRoutes from './routes/campaignEmployeeRoutes';
 import taskRoutes from './routes/taskRoutes';
 import postingRoutes from './routes/postingRoutes';
 import verificationRoutes from './routes/verificationRoutes';
@@ -22,6 +20,7 @@ import auditLogRoutes from './routes/auditLogRoutes';
 import reportRoutes from './routes/reportRoutes';
 import settingsRoutes from './routes/settingsRoutes';
 import dbRoutes from './routes/dbRoutes';
+import targetRoutes from './routes/targetRoutes';
 
 dotenv.config();
 
@@ -51,8 +50,6 @@ app.use('/api/v1/roles', rolesRoutes);
 app.use('/api/v1/employees', employeeRoutes);
 app.use('/api/v1/brands', brandRoutes);
 app.use('/api/v1/employee-brands', employeeBrandRoutes);
-app.use('/api/v1/campaigns', campaignRoutes);
-app.use('/api/v1/campaign-employees', campaignEmployeeRoutes);
 app.use('/api/v1/tasks', taskRoutes);
 app.use('/api/v1/postings', postingRoutes);
 app.use('/api/v1/verification', verificationRoutes);
@@ -62,6 +59,7 @@ app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/audit-logs', auditLogRoutes);
 app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/settings', settingsRoutes);
+app.use('/api/v1/targets', targetRoutes);
 app.use('/api/v1/db', dbRoutes);
 
 // Start server and initialize DB
