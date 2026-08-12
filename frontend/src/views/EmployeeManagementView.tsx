@@ -3,12 +3,15 @@ import { Users, Plus, Search, Filter, Mail, Phone, Shield, CheckCircle2, XCircle
 import { api } from '../services/api';
 import { Employee } from '../types';
 import { Modal } from '../components/Modal';
+import { Pagination } from '../components/Pagination';
 
 export const EmployeeManagementView: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
 
   // Form fields
   const [name, setName] = useState('');
@@ -94,46 +97,58 @@ export const EmployeeManagementView: React.FC = () => {
       {loading ? (
         <div className="text-center py-8 text-slate-500">Loading employee list...</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredEmployees.map((emp) => (
-            <div key={emp._id} className="bg-white glass-card-hover p-5 rounded-2xl border border-slate-200 shadow-xs relative">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 text-white flex items-center justify-center font-extrabold text-lg shadow-sm">
-                    {emp.name.charAt(0)}
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredEmployees.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((emp) => (
+              <div key={emp._id} className="bg-white glass-card-hover p-5 rounded-2xl border border-slate-200 shadow-xs relative">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 text-white flex items-center justify-center font-extrabold text-lg shadow-sm">
+                      {emp.name.charAt(0)}
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-base">{emp.name}</h3>
+                      <span className="text-xs text-purple-600 font-bold">{emp.employeeId}</span>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-base">{emp.name}</h3>
-                    <span className="text-xs text-purple-600 font-bold">{emp.employeeId}</span>
-                  </div>
+
+                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${emp.status === 'Active' ? 'badge-verified' : 'badge-rejected'
+                    }`}>
+                    {emp.status}
+                  </span>
                 </div>
 
-                <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${emp.status === 'Active' ? 'badge-verified' : 'badge-rejected'
-                  }`}>
-                  {emp.status}
-                </span>
+                <div className="mt-4 pt-3 border-t border-slate-100 space-y-2 text-xs text-slate-600">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Designation:</span>
+                    <span className="font-semibold text-slate-800">{emp.designation}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Department:</span>
+                    <span className="text-slate-800">{emp.department}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">System Role:</span>
+                    <span className="text-purple-600 font-bold">{emp.role}</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5 text-slate-500 pt-1">
+                    <Mail size={13} className="text-slate-400" />
+                    <span>{emp.email}</span>
+                  </div>
+                </div>
               </div>
+            ))}
+          </div>
 
-              <div className="mt-4 pt-3 border-t border-slate-100 space-y-2 text-xs text-slate-600">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Designation:</span>
-                  <span className="font-semibold text-slate-800">{emp.designation}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Department:</span>
-                  <span className="text-slate-800">{emp.department}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">System Role:</span>
-                  <span className="text-purple-600 font-bold">{emp.role}</span>
-                </div>
-                <div className="flex items-center space-x-1.5 text-slate-500 pt-1">
-                  <Mail size={13} className="text-slate-400" />
-                  <span>{emp.email}</span>
-                </div>
-              </div>
-            </div>
-          ))}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={Math.ceil(filteredEmployees.length / itemsPerPage)}
+              totalItems={filteredEmployees.length}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+            />
+          </div>
         </div>
       )}
 

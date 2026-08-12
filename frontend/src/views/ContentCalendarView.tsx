@@ -130,10 +130,13 @@ export const ContentCalendarView: React.FC = () => {
       const res = await api.get('/brands');
       if (res.success && res.data.length > 0) {
         setBrands(res.data);
-        if (!selectedBrandFilter || selectedBrandFilter === 'All') {
-          const defaultB = res.data.find((b: any) => b.brandName?.toLowerCase().includes('kala'))?.brandName || res.data[0]?.brandName || 'Kala Kurti';
-          setSelectedBrandFilter(defaultB);
+        const bNames = res.data.map((b: any) => b.brandName);
+        if (!selectedBrandFilter || !bNames.includes(selectedBrandFilter)) {
+          setSelectedBrandFilter(bNames[0]);
         }
+      } else {
+        setBrands([]);
+        setSelectedBrandFilter('');
       }
     } catch (err) {
       console.error(err);
@@ -277,10 +280,10 @@ export const ContentCalendarView: React.FC = () => {
     return true;
   });
 
-  // Unique brand list (combining Brand Portfolio & existing entries)
+  // Unique brand list (from assigned brands API response)
   const uniqueBrands = Array.from(new Set([
     ...brands.map(b => b.brandName),
-    'Kala Kurti'
+    ...(items.map(i => i.brandName))
   ].filter(Boolean))).sort();
 
   const uniqueDesigners = Array.from(new Set([...employees.map(e => e.name), ...items.map(i => i.assignedDesignerName).filter(Boolean)]));

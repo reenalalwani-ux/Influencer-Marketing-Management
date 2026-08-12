@@ -7,6 +7,38 @@ import { PERMISSIONS, ROLE_DEFAULT_PERMISSIONS, ROLES, PLATFORMS, CONTENT_TYPES,
 
 export const seedDatabase = async () => {
   try {
+    // Always sync permissions & roles so existing database records receive updated permissions
+    for (const code of PERMISSIONS) {
+      const [moduleName] = code.split('.');
+      await Permission.updateOne(
+        { code },
+        {
+          $setOnInsert: {
+            code,
+            name: code.replace('.', ' ').toUpperCase(),
+            module: moduleName.toUpperCase(),
+            description: `Permission to execute ${code}`
+          }
+        },
+        { upsert: true }
+      );
+    }
+
+    for (const [roleName, permissions] of Object.entries(ROLE_DEFAULT_PERMISSIONS)) {
+      await Role.updateOne(
+        { name: roleName },
+        {
+          $set: { permissions },
+          $setOnInsert: {
+            name: roleName,
+            description: `Default system role for ${roleName}`,
+            isSystemRole: true
+          }
+        },
+        { upsert: true }
+      );
+    }
+
     // Ensure Super Admin & Manager are ALWAYS persisted in DB
     const adminPassword = await bcrypt.hash('Admin@123', 10);
     const managerPassword = await bcrypt.hash('Manager@123', 10);
@@ -54,38 +86,6 @@ export const seedDatabase = async () => {
         createdBy: manager?._id || admin?._id
       });
       console.log('[Seed] Initial Active Target ($100,000) seeded in database.');
-    }
-
-    // Always sync permissions & roles so existing database records receive new permissions (e.g. Target Module)
-    for (const code of PERMISSIONS) {
-      const [moduleName] = code.split('.');
-      await Permission.updateOne(
-        { code },
-        {
-          $setOnInsert: {
-            code,
-            name: code.replace('.', ' ').toUpperCase(),
-            module: moduleName.toUpperCase(),
-            description: `Permission to execute ${code}`
-          }
-        },
-        { upsert: true }
-      );
-    }
-
-    for (const [roleName, permissions] of Object.entries(ROLE_DEFAULT_PERMISSIONS)) {
-      await Role.updateOne(
-        { name: roleName },
-        {
-          $set: { permissions },
-          $setOnInsert: {
-            name: roleName,
-            description: `Default system role for ${roleName}`,
-            isSystemRole: true
-          }
-        },
-        { upsert: true }
-      );
     }
 
     const userCount = await User.countDocuments();

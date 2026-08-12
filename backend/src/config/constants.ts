@@ -78,8 +78,9 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
     'influencer.view', 'influencer.create', 'influencer.update'
   ],
   [ROLES.EMPLOYEE]: [
+    'employee.view',
     'brand.view',
-    'task.view', 'task.update',
+    'task.view', 'task.create', 'task.update',
     'posting.view', 'posting.update',
     'performance.view',
     'target.view',

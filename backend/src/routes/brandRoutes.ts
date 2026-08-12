@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { Brand, EmployeeBrand } from '../models/allModels';
+import { Brand, EmployeeBrand, Employee } from '../models/allModels';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 import { logActivity } from '../middleware/auditLog';
@@ -9,7 +9,27 @@ const router = Router();
 // GET /api/v1/brands
 router.get('/', authenticateToken, checkPermission('brand.view'), async (req: AuthRequest, res: Response) => {
   try {
-    const brands = await Brand.find().sort({ createdAt: -1 });
+    let filter: any = {};
+
+    // Filter brands to ONLY those assigned if the user is an employee
+    const isEmployeeRole = req.user?.role?.toLowerCase() === 'employee';
+    if (isEmployeeRole) {
+      const emp = await Employee.findOne({
+        $or: [
+          { email: req.user?.email },
+          { name: req.user?.name }
+        ]
+      });
+      if (emp) {
+        const assignments = await EmployeeBrand.find({ employeeId: emp._id, status: 'Active' });
+        const assignedBrandIds = assignments.map(a => a.brandId);
+        filter = { _id: { $in: assignedBrandIds } };
+      } else {
+        filter = { _id: { $in: [] } };
+      }
+    }
+
+    const brands = await Brand.find(filter).sort({ createdAt: -1 });
     return res.json({ success: true, count: brands.length, data: brands });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error fetching brands', error });

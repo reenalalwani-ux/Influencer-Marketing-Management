@@ -8,7 +8,25 @@ const router = Router();
 // GET /api/v1/performance
 router.get('/', authenticateToken, checkPermission('performance.view'), async (req: AuthRequest, res: Response) => {
   try {
-    const employees = await Employee.find({ status: 'Active' }).sort({ name: 1 });
+    let filter: any = { status: 'Active' };
+
+    // Employee Role Isolation: If user is an employee, only return their own performance data
+    const isEmployeeRole = req.user?.role?.toLowerCase() === 'employee';
+    if (isEmployeeRole) {
+      const emp = await Employee.findOne({
+        $or: [
+          { email: req.user?.email },
+          { name: req.user?.name }
+        ]
+      });
+      if (emp) {
+        filter._id = emp._id;
+      } else {
+        filter._id = null;
+      }
+    }
+
+    const employees = await Employee.find(filter).sort({ name: 1 });
 
     const performanceReport = await Promise.all(
       employees.map(async (emp) => {

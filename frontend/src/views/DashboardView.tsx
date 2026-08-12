@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { User, TaskItem } from '../types';
+import { Pagination } from '../components/Pagination';
 
 interface DashboardViewProps {
   user: User | null;
@@ -15,6 +16,9 @@ interface DashboardViewProps {
 export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, onOpenSubmitUrlModal }) => {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [taskPage, setTaskPage] = useState(1);
+  const [logPage, setLogPage] = useState(1);
+  const itemsPerPage = 3;
 
   const fetchDashboardStats = async () => {
     try {
@@ -216,7 +220,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
                 No postings scheduled for today.
               </div>
             ) : (
-              data.todaysTasks.map((t: TaskItem) => (
+              data.todaysTasks.slice((taskPage - 1) * itemsPerPage, taskPage * itemsPerPage).map((t: TaskItem) => (
                 <div
                   key={t._id}
                   className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:border-purple-200 transition"
@@ -270,6 +274,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
               ))
             )}
           </div>
+
+          <Pagination
+            currentPage={taskPage}
+            totalPages={Math.ceil((data?.todaysTasks?.length || 0) / itemsPerPage)}
+            totalItems={data?.todaysTasks?.length || 0}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setTaskPage}
+          />
         </div>
 
         {/* Sidebar Panel */}
@@ -292,13 +304,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
               </div>
             </div>
           ) : (
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
-              <h3 className="text-lg font-extrabold text-slate-900 mb-4 flex items-center gap-2">
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+              <h3 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
                 <ShieldCheck size={18} className="text-purple-600" />
                 Recent System Activity
               </h3>
               <div className="space-y-2.5">
-                {data?.recentAuditLogs?.slice(0, 5).map((log: any) => (
+                {(data?.recentAuditLogs || []).slice((logPage - 1) * itemsPerPage, logPage * itemsPerPage).map((log: any) => (
                   <div key={log._id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs">
                     <div className="flex justify-between font-bold text-slate-900">
                       <span>{log.userName}</span>
@@ -310,6 +322,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
                   </div>
                 ))}
               </div>
+
+              <Pagination
+                currentPage={logPage}
+                totalPages={Math.ceil((data?.recentAuditLogs?.length || 0) / itemsPerPage)}
+                totalItems={data?.recentAuditLogs?.length || 0}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setLogPage}
+              />
             </div>
           )}
         </div>

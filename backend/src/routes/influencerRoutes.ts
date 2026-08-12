@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { Influencer, Brand, PaymentLog } from '../models/allModels';
+import { Influencer, Brand, PaymentLog, Employee, EmployeeBrand } from '../models/allModels';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 import { logActivity } from '../middleware/auditLog';
@@ -11,6 +11,24 @@ router.get('/', authenticateToken, checkPermission('influencer.view'), async (re
   try {
     const { category, timeframe, year, month, search } = req.query;
     const filter: any = {};
+
+    // 0. Employee Role Brand Filtering
+    const isEmployeeRole = req.user?.role?.toLowerCase() === 'employee';
+    if (isEmployeeRole) {
+      const emp = await Employee.findOne({
+        $or: [
+          { email: req.user?.email },
+          { name: req.user?.name }
+        ]
+      });
+      if (emp) {
+        const assignments = await EmployeeBrand.find({ employeeId: emp._id, status: 'Active' });
+        const assignedBrandIds = assignments.map(a => a.brandId);
+        filter.brandId = { $in: assignedBrandIds };
+      } else {
+        filter.brandId = { $in: [] };
+      }
+    }
 
     // 1. Sub-module Category Filter (Paid vs Barter)
     if (category && category !== 'All') {

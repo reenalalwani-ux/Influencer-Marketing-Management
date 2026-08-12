@@ -74,7 +74,17 @@ router.get('/:id', authenticateToken, checkPermission('task.view'), async (req: 
 
 // POST /api/v1/tasks
 router.post('/', authenticateToken, checkPermission('task.create'), async (req: AuthRequest, res: Response) => {
-  const { employeeId, brandId, platform, contentType, title, description, priority, scheduledDate, scheduledTime, deadline } = req.body;
+  let { employeeId, brandId, platform, contentType, title, description, priority, scheduledDate, scheduledTime, deadline } = req.body;
+
+  // Force employeeId to self if user has Employee role
+  if (req.user?.role?.toLowerCase() === 'employee') {
+    const empDoc = await Employee.findOne({
+      $or: [{ email: req.user?.email }, { name: req.user?.name }]
+    });
+    if (empDoc) {
+      employeeId = empDoc._id.toString();
+    }
+  }
 
   if (!employeeId || !brandId || !platform || !contentType || !title || !scheduledDate || !scheduledTime || !deadline) {
     return res.status(400).json({ success: false, message: 'Required task fields missing' });
@@ -156,7 +166,7 @@ router.put('/:id', authenticateToken, checkPermission('task.update'), async (req
 });
 
 // POST /api/v1/tasks/:id/submit-url (Published URL Submission)
-router.post('/:id/submit-url', authenticateToken, checkPermission('task.update'), async (req: AuthRequest, res: Response) => {
+router.post('/:id/submit-url', authenticateToken, async (req: AuthRequest, res: Response) => {
   const { publishedUrl } = req.body;
   if (!publishedUrl) {
     return res.status(400).json({ success: false, message: 'Published URL is required' });

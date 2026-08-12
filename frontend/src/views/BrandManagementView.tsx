@@ -3,12 +3,15 @@ import { Briefcase, Plus, Globe, Mail, Phone, ExternalLink, Users } from 'lucide
 import { api } from '../services/api';
 import { Brand } from '../types';
 import { Modal } from '../components/Modal';
+import { Pagination } from '../components/Pagination';
 
 export const BrandManagementView: React.FC = () => {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
 
   // Form states
   const [brandName, setBrandName] = useState('');
@@ -83,70 +86,82 @@ export const BrandManagementView: React.FC = () => {
       {loading ? (
         <div className="text-center py-8 text-slate-500 font-medium">Loading brand portfolio...</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {brands.map((b) => (
-            <div key={b._id} className="bg-white glass-card-hover p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
-              <div>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 text-white font-extrabold text-xl flex items-center justify-center shadow-md">
-                      {b.brandName.charAt(0)}
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-900 text-lg">{b.brandName}</h3>
-                      <span className="text-xs text-purple-600 font-bold">{b.brandId}</span>
-                    </div>
-                  </div>
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold badge-verified">
-                    {b.status}
-                  </span>
-                </div>
-
-                <div className="mt-4 space-y-2 text-xs text-slate-600">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Industry:</span>
-                    <span className="font-semibold text-slate-800">{b.industry}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Contact Person:</span>
-                    <span className="text-slate-800 font-bold">{b.contactPerson}</span>
-                  </div>
-                  <div className="flex flex-col gap-1.5 pt-1.5 border-t border-slate-100 text-xs">
-                    <div className="flex items-center space-x-1.5 text-slate-600 truncate">
-                      <Mail size={13} className="text-purple-600 shrink-0" />
-                      <span className="truncate font-medium">{b.email}</span>
-                    </div>
-                    {b.phone && (
-                      <div className="flex items-center space-x-1.5 text-slate-600 font-medium">
-                        <Phone size={13} className="text-purple-600 shrink-0" />
-                        <span className="font-bold text-slate-800">{b.phone}</span>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {brands.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((b) => (
+              <div key={b._id} className="bg-white glass-card-hover p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 text-white font-extrabold text-xl flex items-center justify-center shadow-md">
+                        {b.brandName.charAt(0)}
                       </div>
-                    )}
+                      <div>
+                        <h3 className="font-bold text-slate-900 text-lg">{b.brandName}</h3>
+                        <span className="text-xs text-purple-600 font-bold">{b.brandId}</span>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold badge-verified">
+                      {b.status}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 space-y-2 text-xs text-slate-600">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Industry:</span>
+                      <span className="font-semibold text-slate-800">{b.industry}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Contact Person:</span>
+                      <span className="text-slate-800 font-bold">{b.contactPerson}</span>
+                    </div>
+                    <div className="flex flex-col gap-1.5 pt-1.5 border-t border-slate-100 text-xs">
+                      <div className="flex items-center space-x-1.5 text-slate-600 truncate">
+                        <Mail size={13} className="text-purple-600 shrink-0" />
+                        <span className="truncate font-medium">{b.email}</span>
+                      </div>
+                      {b.phone && (
+                        <div className="flex items-center space-x-1.5 text-slate-600 font-medium">
+                          <Phone size={13} className="text-purple-600 shrink-0" />
+                          <span className="font-bold text-slate-800">{b.phone}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between">
-                {b.website ? (
-                  <a
-                    href={b.website}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs text-purple-600 hover:text-purple-700 flex items-center gap-1 font-semibold"
+                <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between">
+                  {b.website ? (
+                    <a
+                      href={b.website}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-purple-600 hover:text-purple-700 flex items-center gap-1 font-semibold"
+                    >
+                      <Globe size={13} /> Website <ExternalLink size={11} />
+                    </a>
+                  ) : <span />}
+
+                  <button
+                    onClick={() => handleViewBrandDetails(b._id)}
+                    className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold transition"
                   >
-                    <Globe size={13} /> Website <ExternalLink size={11} />
-                  </a>
-                ) : <span />}
-
-                <button
-                  onClick={() => handleViewBrandDetails(b._id)}
-                  className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold transition"
-                >
-                  View Details
-                </button>
+                    View Details
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={Math.ceil(brands.length / itemsPerPage)}
+              totalItems={brands.length}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+            />
+          </div>
         </div>
       )}
 

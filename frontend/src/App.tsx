@@ -35,6 +35,7 @@ export const App: React.FC = () => {
 
   const [activeView, setActiveView] = useState<string>(getViewFromHash);
   const [submitUrlTask, setSubmitUrlTask] = useState<TaskItem | null>(null);
+  const [taskRefreshCount, setTaskRefreshCount] = useState(0);
 
   // Custom view navigator that updates browser URL bar
   const handleNavigate = (view: string) => {
@@ -153,12 +154,15 @@ export const App: React.FC = () => {
           {activeView === 'employee-brands' && <EmployeeBrandAssignmentView />}
           {activeView === 'tasks' && (
             <TaskManagementView
+              currentUser={user}
+              refreshTrigger={taskRefreshCount}
               onOpenSubmitUrlModal={(task) => setSubmitUrlTask(task)}
             />
           )}
 
           {activeView === 'daily-posting' && (
             <DailyPostingView
+              refreshTrigger={taskRefreshCount}
               onOpenSubmitUrlModal={(task) => setSubmitUrlTask(task)}
             />
           )}
@@ -179,7 +183,7 @@ export const App: React.FC = () => {
           task={submitUrlTask}
           onClose={() => setSubmitUrlTask(null)}
           onSuccess={() => {
-            // Trigger refresh or notification
+            setTaskRefreshCount(prev => prev + 1);
           }}
         />
       )}

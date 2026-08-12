@@ -2,18 +2,22 @@ import React, { useEffect, useState } from 'react';
 import { Clock, Calendar as CalendarIcon, Filter, CheckCircle2, AlertTriangle, Send, ExternalLink, RefreshCw } from 'lucide-react';
 import { api } from '../services/api';
 import { TaskItem, Employee, Brand } from '../types';
+import { Pagination } from '../components/Pagination';
 
 interface DailyPostingViewProps {
+  refreshTrigger?: number;
   onOpenSubmitUrlModal: (task: TaskItem) => void;
 }
 
-export const DailyPostingView: React.FC<DailyPostingViewProps> = ({ onOpenSubmitUrlModal }) => {
+export const DailyPostingView: React.FC<DailyPostingViewProps> = ({ refreshTrigger, onOpenSubmitUrlModal }) => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [metrics, setMetrics] = useState<any>({ total: 0, completed: 0, pending: 0, delayed: 0, missed: 0 });
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
 
   // Filters
   const [selectedEmployee, setSelectedEmployee] = useState('');
@@ -42,7 +46,7 @@ export const DailyPostingView: React.FC<DailyPostingViewProps> = ({ onOpenSubmit
 
   useEffect(() => {
     fetchDailyData();
-  }, [selectedDate, selectedEmployee, selectedBrand, selectedPlatform]);
+  }, [selectedDate, selectedEmployee, selectedBrand, selectedPlatform, refreshTrigger]);
 
   useEffect(() => {
     const fetchLookup = async () => {
@@ -171,71 +175,83 @@ export const DailyPostingView: React.FC<DailyPostingViewProps> = ({ onOpenSubmit
               No postings scheduled for this date matching the selected filters.
             </div>
           ) : (
-            tasks.map((t) => {
-              const emp = t.employeeId as any;
-              const brand = t.brandId as any;
-              return (
-                <div
-                  key={t._id}
-                  className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4 hover:border-purple-200 transition"
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className="w-14 text-center border-r border-slate-200 pr-4 shrink-0">
-                      <div className="font-extrabold text-purple-700 text-sm">{t.scheduledTime}</div>
-                      <div className="text-[10px] text-slate-500 uppercase font-bold mt-0.5">Time</div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                          {t.platform} • {t.contentType}
-                        </span>
-                        <span className="text-xs font-bold text-purple-700">
-                          {brand?.brandName || 'Brand'}
-                        </span>
+            <>
+              {tasks.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((t) => {
+                const emp = t.employeeId as any;
+                const brand = t.brandId as any;
+                return (
+                  <div
+                    key={t._id}
+                    className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4 hover:border-purple-200 transition"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className="w-14 text-center border-r border-slate-200 pr-4 shrink-0">
+                        <div className="font-extrabold text-purple-700 text-sm">{t.scheduledTime}</div>
+                        <div className="text-[10px] text-slate-500 uppercase font-bold mt-0.5">Time</div>
                       </div>
 
-                      <div className="font-bold text-slate-900 text-base">{t.title}</div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                            {t.platform} • {t.contentType}
+                          </span>
+                          <span className="text-xs font-bold text-purple-700">
+                            {brand?.brandName || 'Brand'}
+                          </span>
+                        </div>
 
-                      <div className="text-xs text-slate-600">
-                        Assigned Employee: <span className="text-slate-900 font-bold">{emp?.name || 'Unassigned'}</span> ({emp?.designation})
+                        <div className="font-bold text-slate-900 text-base">{t.title}</div>
+
+                        <div className="text-xs text-slate-600">
+                          Assigned Employee: <span className="text-slate-900 font-bold">{emp?.name || 'Unassigned'}</span> ({emp?.designation})
+                        </div>
                       </div>
                     </div>
+
+                    <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 border-slate-100 pt-3 md:pt-0">
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${t.status === 'Verified' ? 'badge-verified' :
+                          t.status === 'Submitted' ? 'badge-submitted' :
+                            t.status === 'Pending' ? 'badge-pending' : 'badge-rejected'
+                        }`}>
+                        {t.status}
+                      </span>
+
+                      {t.status === 'Pending' && (
+                        <button
+                          onClick={() => onOpenSubmitUrlModal(t)}
+                          className="px-3.5 py-2 btn-gradient-primary rounded-xl text-xs font-bold shadow-md flex items-center space-x-1.5"
+                        >
+                          <Send size={13} />
+                          <span>Submit Published URL</span>
+                        </button>
+                      )}
+
+                      {t.publishedUrl && (
+                        <a
+                          href={t.publishedUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold transition flex items-center space-x-1"
+                        >
+                          <ExternalLink size={13} />
+                          <span>Open Link</span>
+                        </a>
+                      )}
+                    </div>
                   </div>
+                );
+              })}
 
-                  <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 border-slate-100 pt-3 md:pt-0">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${t.status === 'Verified' ? 'badge-verified' :
-                        t.status === 'Submitted' ? 'badge-submitted' :
-                          t.status === 'Pending' ? 'badge-pending' : 'badge-rejected'
-                      }`}>
-                      {t.status}
-                    </span>
-
-                    {t.status === 'Pending' && (
-                      <button
-                        onClick={() => onOpenSubmitUrlModal(t)}
-                        className="px-3.5 py-2 btn-gradient-primary rounded-xl text-xs font-bold shadow-md flex items-center space-x-1.5"
-                      >
-                        <Send size={13} />
-                        <span>Submit Published URL</span>
-                      </button>
-                    )}
-
-                    {t.publishedUrl && (
-                      <a
-                        href={t.publishedUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold transition flex items-center space-x-1"
-                      >
-                        <ExternalLink size={13} />
-                        <span>Open Link</span>
-                      </a>
-                    )}
-                  </div>
-                </div>
-              );
-            })
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={Math.ceil(tasks.length / itemsPerPage)}
+                  totalItems={tasks.length}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={setCurrentPage}
+                />
+              </div>
+            </>
           )}
         </div>
       )}

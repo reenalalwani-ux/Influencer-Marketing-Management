@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { ContentCalendar, Brand, Employee } from '../models/allModels';
+import { ContentCalendar, Brand, Employee, EmployeeBrand } from '../models/allModels';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 import { logActivity } from '../middleware/auditLog';
@@ -11,6 +11,31 @@ router.get('/', authenticateToken, checkPermission('task.view'), async (req: Aut
   try {
     const { brandId, brandName, year, month, search, designer } = req.query;
     const filter: any = {};
+
+    // 0. Employee Role Brand Filtering
+    const isEmployeeRole = req.user?.role?.toLowerCase() === 'employee';
+    if (isEmployeeRole) {
+      const emp = await Employee.findOne({
+        $or: [
+          { email: req.user?.email },
+          { name: req.user?.name }
+        ]
+      });
+      if (emp) {
+        const assignments = await EmployeeBrand.find({ employeeId: emp._id, status: 'Active' }).populate('brandId');
+        const assignedBrandIds = assignments.map(a => a.brandId?._id || a.brandId);
+        const assignedBrandNames = assignments.map(a => (a.brandId as any)?.brandName).filter(Boolean);
+
+        if (!brandId && !brandName) {
+          filter.$or = [
+            { brandId: { $in: assignedBrandIds } },
+            { brandName: { $in: assignedBrandNames } }
+          ];
+        }
+      } else {
+        filter.brandId = { $in: [] };
+      }
+    }
 
     if (brandId && brandId !== 'All') {
       filter.brandId = brandId;

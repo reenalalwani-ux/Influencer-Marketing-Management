@@ -3,6 +3,7 @@ import { CheckCircle2, XCircle, ExternalLink, ShieldCheck, Clock, MessageSquare 
 import { api } from '../services/api';
 import { TaskItem } from '../types';
 import { Modal } from '../components/Modal';
+import { Pagination } from '../components/Pagination';
 
 export const VerificationQueueView: React.FC = () => {
   const [pendingTasks, setPendingTasks] = useState<TaskItem[]>([]);
@@ -10,6 +11,8 @@ export const VerificationQueueView: React.FC = () => {
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [comments, setComments] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   const fetchPending = async () => {
     try {
@@ -74,51 +77,63 @@ export const VerificationQueueView: React.FC = () => {
               <p className="text-xs text-slate-500 mt-1 font-medium">All employee published URL submissions have been verified!</p>
             </div>
           ) : (
-            pendingTasks.map((t) => {
-              const emp = t.employeeId as any;
-              const brand = t.brandId as any;
-              return (
-                <div key={t._id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded text-[10px] uppercase font-bold badge-pending">
-                        Pending Manager Verification
-                      </span>
-                      <span className="text-xs font-bold text-purple-700 font-mono">Task #{t.taskId}</span>
+            <>
+              {pendingTasks.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((t) => {
+                const emp = t.employeeId as any;
+                const brand = t.brandId as any;
+                return (
+                  <div key={t._id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-0.5 rounded text-[10px] uppercase font-bold badge-pending">
+                          Pending Manager Verification
+                        </span>
+                        <span className="text-xs font-bold text-purple-700 font-mono">Task #{t.taskId}</span>
+                      </div>
+
+                      <h3 className="font-bold text-slate-900 text-base">{t.title}</h3>
+
+                      <div className="text-xs text-slate-600 space-x-3">
+                        <span>Submitted by: <strong className="text-slate-900">{emp?.name || 'Employee'}</strong></span>
+                        <span>• Brand: <strong className="text-purple-700">{brand?.brandName || 'Brand'}</strong></span>
+                      </div>
+
+                      <div className="pt-2">
+                        <a
+                          href={t.publishedUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center space-x-1.5 text-xs text-purple-700 hover:text-purple-900 bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-200 font-mono font-bold"
+                        >
+                          <ExternalLink size={13} />
+                          <span>{t.publishedUrl}</span>
+                        </a>
+                      </div>
                     </div>
 
-                    <h3 className="font-bold text-slate-900 text-base">{t.title}</h3>
-
-                    <div className="text-xs text-slate-600 space-x-3">
-                      <span>Submitted by: <strong className="text-slate-900">{emp?.name || 'Employee'}</strong></span>
-                      <span>• Brand: <strong className="text-purple-700">{brand?.brandName || 'Brand'}</strong></span>
-                    </div>
-
-                    <div className="pt-2">
-                      <a
-                        href={t.publishedUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center space-x-1.5 text-xs text-purple-700 hover:text-purple-900 bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-200 font-mono font-bold"
+                    <div className="flex items-center space-x-3 self-end md:self-center">
+                      <button
+                        onClick={() => setSelectedTask(t)}
+                        className="px-4 py-2 btn-gradient-primary rounded-xl text-xs font-bold shadow-md flex items-center space-x-1.5"
                       >
-                        <ExternalLink size={13} />
-                        <span>{t.publishedUrl}</span>
-                      </a>
+                        <CheckCircle2 size={14} />
+                        <span>Review & Verify</span>
+                      </button>
                     </div>
                   </div>
+                );
+              })}
 
-                  <div className="flex items-center space-x-3 self-end md:self-center">
-                    <button
-                      onClick={() => setSelectedTask(t)}
-                      className="px-4 py-2 btn-gradient-primary rounded-xl text-xs font-bold shadow-md flex items-center space-x-1.5"
-                    >
-                      <CheckCircle2 size={14} />
-                      <span>Review & Verify</span>
-                    </button>
-                  </div>
-                </div>
-              );
-            })
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={Math.ceil(pendingTasks.length / itemsPerPage)}
+                  totalItems={pendingTasks.length}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={setCurrentPage}
+                />
+              </div>
+            </>
           )}
         </div>
       )}

@@ -3,6 +3,7 @@ import { Sparkles, Plus, Search, Filter, DollarSign, User, Trash2, Edit2, ArrowU
 import { api } from '../services/api';
 import { InfluencerTransaction, Brand, PaymentLogItem } from '../types';
 import { Modal } from '../components/Modal';
+import { Pagination } from '../components/Pagination';
 
 // Custom Attractive Pill Select for Status
 const StatusPillDropdown: React.FC<{
@@ -131,6 +132,8 @@ export const InfluencerManagementView: React.FC = () => {
   const [transactionDate, setTransactionDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
   const [remark, setRemark] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
 
   const fetchBrands = async () => {
     try {
@@ -732,7 +735,7 @@ export const InfluencerManagementView: React.FC = () => {
                         </td>
                       </tr>
                     ) : (
-                      filteredInfluencers.map((item, idx) => (
+                      filteredInfluencers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((item, idx) => (
                         <tr key={item._id} className="hover:bg-purple-50/40 transition">
                           <td className="px-3 py-2.5 text-center font-mono font-bold text-slate-400 border-r border-slate-200">
                             {item.sNo || idx + 1}
@@ -978,6 +981,16 @@ export const InfluencerManagementView: React.FC = () => {
             )}
           </div>
         )}
+
+        <div className="p-4 bg-slate-50 border-t border-slate-200">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={Math.ceil((viewMode === 'Payment Audit Logs' ? paymentLogs.length : filteredInfluencers.length) / itemsPerPage)}
+            totalItems={viewMode === 'Payment Audit Logs' ? paymentLogs.length : filteredInfluencers.length}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+          />
+        </div>
       </div>
 
       {/* Add / Edit Full Google Sheet Form Modal */}
