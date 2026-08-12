@@ -2,9 +2,9 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { connectDB } from '../config/db';
-import { 
-  User, Employee, Brand, EmployeeBrand, 
-  Task, Notification, AuditLog 
+import {
+  User, Employee, Brand, EmployeeBrand,
+  Task, Notification, AuditLog
 } from '../models/allModels';
 
 export const clearDemoData = async () => {
@@ -14,7 +14,7 @@ export const clearDemoData = async () => {
 
     // Delete all sample users except Super Admin (admin@influencer.com)
     await User.deleteMany({ email: { $ne: 'admin@influencer.com' } });
-    
+
     // Clear all sample entity collections
     await Employee.deleteMany({});
     await Brand.deleteMany({});
