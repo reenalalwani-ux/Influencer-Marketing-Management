@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Users, Briefcase, Flag, CheckCircle2, Clock, AlertTriangle,
+  Users, Briefcase, Target, CheckCircle2, Clock, AlertTriangle,
   ArrowUpRight, ExternalLink, Calendar, Send, ShieldCheck
 } from 'lucide-react';
 import { api } from '../services/api';
@@ -75,7 +75,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
       {/* Metric Summary Cards */}
       {isEmployee ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+          <div
+            onClick={() => onNavigate('brands')}
+            className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs cursor-pointer hover:border-purple-300 hover:shadow-sm transition"
+          >
             <div className="flex justify-between items-center text-slate-500 mb-2 text-xs uppercase font-extrabold">
               <span>My Brands</span>
               <Briefcase size={18} className="text-purple-600" />
@@ -84,16 +87,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
             <p className="text-xs text-slate-500 font-medium mt-1">Active assigned brands</p>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+          <div
+            onClick={() => onNavigate('targets')}
+            className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs cursor-pointer hover:border-purple-300 hover:shadow-sm transition"
+          >
             <div className="flex justify-between items-center text-slate-500 mb-2 text-xs uppercase font-extrabold">
-              <span>My Campaigns</span>
-              <Flag size={18} className="text-purple-600" />
+              <span>Active Target</span>
+              <Target size={18} className="text-purple-600" />
             </div>
-            <div className="text-3xl font-extrabold text-slate-900">{data?.myCampaigns?.length || 0}</div>
-            <p className="text-xs text-slate-500 font-medium mt-1">Active campaign projects</p>
+            <div className="text-2xl font-extrabold text-slate-900 truncate">
+              {data?.activeTarget ? `${data.activeTarget.currency || '$'}${Number(data.activeTarget.targetAmount).toLocaleString()}` : '$0'}
+            </div>
+            <p className="text-xs text-purple-600 font-bold mt-1 truncate">
+              {data?.activeTarget
+                ? `${Math.round(((data.activeTarget.achievedAmount || 0) / (data.activeTarget.targetAmount || 1)) * 100)}% Achieved`
+                : 'No target set'}
+            </p>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+          <div
+            onClick={() => onNavigate('daily-posting')}
+            className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs cursor-pointer hover:border-purple-300 hover:shadow-sm transition"
+          >
             <div className="flex justify-between items-center text-slate-500 mb-2 text-xs uppercase font-extrabold">
               <span>Today Completed</span>
               <CheckCircle2 size={18} className="text-emerald-600" />
@@ -104,7 +119,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
             <p className="text-xs text-slate-500 font-medium mt-1">Tasks verified or submitted</p>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+          <div
+            onClick={() => onNavigate('daily-posting')}
+            className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs cursor-pointer hover:border-purple-300 hover:shadow-sm transition"
+          >
             <div className="flex justify-between items-center text-slate-500 mb-2 text-xs uppercase font-extrabold">
               <span>Pending Submission</span>
               <Clock size={18} className="text-amber-600" />
@@ -117,7 +135,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+          <div
+            onClick={() => onNavigate('employees')}
+            className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs cursor-pointer hover:border-purple-300 hover:shadow-sm transition"
+          >
             <div className="flex justify-between items-center text-slate-500 mb-2 text-xs uppercase font-extrabold">
               <span>Active Employees</span>
               <Users size={18} className="text-purple-600" />
@@ -126,7 +147,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
             <p className="text-xs text-slate-500 font-medium mt-1">Company internal staff</p>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+          <div
+            onClick={() => onNavigate('brands')}
+            className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs cursor-pointer hover:border-purple-300 hover:shadow-sm transition"
+          >
             <div className="flex justify-between items-center text-slate-500 mb-2 text-xs uppercase font-extrabold">
               <span>Total Brands</span>
               <Briefcase size={18} className="text-purple-600" />
@@ -135,16 +159,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
             <p className="text-xs text-slate-500 font-medium mt-1">Active handled brands</p>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+          <div
+            onClick={() => onNavigate('targets')}
+            className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs cursor-pointer hover:border-purple-300 hover:shadow-sm transition"
+          >
             <div className="flex justify-between items-center text-slate-500 mb-2 text-xs uppercase font-extrabold">
-              <span>Active Campaigns</span>
-              <Flag size={18} className="text-emerald-600" />
+              <span>Active Target</span>
+              <Target size={18} className="text-purple-600" />
             </div>
-            <div className="text-3xl font-extrabold text-slate-900">{data?.activeCampaigns || 0}</div>
-            <p className="text-xs text-slate-500 font-medium mt-1">Ongoing marketing campaigns</p>
+            <div className="text-2xl font-extrabold text-slate-900 truncate">
+              {data?.activeTarget ? `${data.activeTarget.currency || '$'}${Number(data.activeTarget.targetAmount).toLocaleString()}` : '$0'}
+            </div>
+            <p className="text-xs text-purple-600 font-bold mt-1 truncate">
+              {data?.activeTarget
+                ? `${Math.round(((data.activeTarget.achievedAmount || 0) / (data.activeTarget.targetAmount || 1)) * 100)}% Achieved (${data.activeTarget.currency || '$'}${Number(data.activeTarget.achievedAmount).toLocaleString()})`
+                : 'Click to set target'}
+            </p>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+          <div
+            onClick={() => onNavigate('daily-posting')}
+            className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs cursor-pointer hover:border-purple-300 hover:shadow-sm transition"
+          >
             <div className="flex justify-between items-center text-slate-500 mb-2 text-xs uppercase font-extrabold">
               <span>Today Completion</span>
               <CheckCircle2 size={18} className="text-amber-600" />
