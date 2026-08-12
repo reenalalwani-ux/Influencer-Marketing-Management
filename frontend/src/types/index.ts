@@ -207,3 +207,22 @@ export interface PaymentLogItem {
   createdAt?: string;
   updatedAt?: string;
 }
+
+export interface ContentCalendarItem {
+  _id: string;
+  brandId?: any;
+  brandName: string;
+  postDate: string;
+  dayOfWeek?: string;
+  typeOfPost: string;
+  platform: string;
+  referenceLink?: string;
+  mediaLink?: string;
+  assignedDesignerId?: any;
+  assignedDesignerName?: string;
+  status: 'Draft' | 'Pending' | 'Approved' | 'Published';
+  notes?: string;
+  createdBy?: any;
+  createdAt?: string;
+  updatedAt?: string;
+}

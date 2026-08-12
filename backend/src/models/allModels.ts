@@ -390,6 +390,40 @@ export const PaymentLogSchema = new Schema<IPaymentLog>({
   createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
+export interface IContentCalendar extends Document {
+  brandId?: mongoose.Types.ObjectId;
+  brandName: string;
+  postDate: Date;
+  dayOfWeek?: string;
+  typeOfPost: string;
+  platform: string;
+  referenceLink?: string;
+  mediaLink?: string;
+  assignedDesignerId?: mongoose.Types.ObjectId;
+  assignedDesignerName?: string;
+  status: 'Draft' | 'Pending' | 'Approved' | 'Published';
+  notes?: string;
+  createdBy?: mongoose.Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const ContentCalendarSchema = new Schema<IContentCalendar>({
+  brandId: { type: Schema.Types.ObjectId, ref: 'Brand' },
+  brandName: { type: String, required: true },
+  postDate: { type: Date, required: true },
+  dayOfWeek: { type: String, default: '' },
+  typeOfPost: { type: String, required: true, default: 'Intro Post' },
+  platform: { type: String, default: 'Instagram' },
+  referenceLink: { type: String, default: '' },
+  mediaLink: { type: String, default: '' },
+  assignedDesignerId: { type: Schema.Types.ObjectId, ref: 'Employee' },
+  assignedDesignerName: { type: String, default: '' },
+  status: { type: String, enum: ['Draft', 'Pending', 'Approved', 'Published'], default: 'Pending' },
+  notes: { type: String, default: '' },
+  createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
+}, { timestamps: true });
+
 // Export Models
 export const Permission = mongoose.model<IPermission>('Permission', PermissionSchema);
 export const Role = mongoose.model<IRole>('Role', RoleSchema);
@@ -404,5 +438,6 @@ export const Setting = mongoose.model<ISetting>('Setting', SettingSchema);
 export const Target = mongoose.model<ITarget>('Target', TargetSchema);
 export const Influencer = mongoose.model<IInfluencer>('Influencer', InfluencerSchema);
 export const PaymentLog = mongoose.model<IPaymentLog>('PaymentLog', PaymentLogSchema);
+export const ContentCalendar = mongoose.model<IContentCalendar>('ContentCalendar', ContentCalendarSchema);
 
 

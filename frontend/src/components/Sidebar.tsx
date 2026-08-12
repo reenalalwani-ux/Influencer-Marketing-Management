@@ -25,6 +25,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
     { id: 'tasks', label: 'Tasks & Content', icon: CheckSquare },
     { id: 'daily-posting', label: 'Daily Posting', icon: Clock, badge: 'Core' },
     { id: 'calendar', label: 'Posting Calendar', icon: Calendar },
+    { id: 'content-calendar', label: 'Content Calendar', icon: FileSpreadsheet },
     ...(!isEmployee ? [{ id: 'verification', label: 'Verification Queue', icon: CheckCircle }] : []),
     { id: 'performance', label: 'Performance', icon: BarChart3 },
     { id: 'reports', label: 'Reports & Export', icon: FileSpreadsheet },
@@ -45,19 +46,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
           return (
             <button
               key={item.id}
-              onClick={() => setActiveView(item.id)}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 ${isActive
+              onClick={() => {
+                setActiveView(item.id);
+                window.scrollTo(0, 0);
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 ${
+                isActive
                   ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-500 text-white shadow-md shadow-purple-500/25'
                   : 'text-slate-600 hover:text-purple-700 hover:bg-purple-50/60 border border-transparent'
-                }`}
+              }`}
             >
-              <div className="flex items-center space-x-3">
-                <Icon size={18} className={isActive ? 'text-white' : 'text-slate-400'} />
-                <span>{item.label}</span>
+              <div className="flex items-center space-x-2.5 min-w-0">
+                <Icon size={18} className={`shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                <span className="whitespace-nowrap truncate">{item.label}</span>
               </div>
               {item.badge && (
-                <span className={`text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full ${isActive ? 'bg-white/20 text-white border border-white/30' : 'bg-purple-100 text-purple-700 border border-purple-200'
-                  }`}>
+                <span
+                  className={`shrink-0 text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full ml-1 ${
+                    isActive
+                      ? 'bg-white/20 text-white border border-white/30'
+                      : 'bg-purple-100 text-purple-700 border border-purple-200'
+                  }`}
+                >
                   {item.badge}
                 </span>
               )}

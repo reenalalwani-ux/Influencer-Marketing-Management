@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import {
   Permission, Role, User, Employee, Brand, EmployeeBrand,
-  Task, Notification, AuditLog, Setting, Target, Influencer
+  Task, Notification, AuditLog, Setting, Target, Influencer, ContentCalendar
 } from '../models/allModels';
 import { PERMISSIONS, ROLE_DEFAULT_PERMISSIONS, ROLES, PLATFORMS, CONTENT_TYPES, TASK_STATUSES, PRIORITIES, DEPARTMENTS, DESIGNATIONS } from '../config/constants';
 
@@ -568,6 +568,126 @@ export const seedDatabase = async () => {
           isApproved: false,
           notes: 'Barter outfit dispatched directly by brand',
           remark: 'Awaiting content reel'
+        }
+      ]);
+    }
+
+    // 15. Initial Content Calendar Entries
+    const contentCalCount = await ContentCalendar.countDocuments();
+    if (contentCalCount === 0) {
+      const kalaBrand = await Brand.findOne({ brandName: /Kala Kurti/i });
+      const brandName = kalaBrand ? kalaBrand.brandName : 'Kala Kurti';
+      const brandId = kalaBrand ? kalaBrand._id : undefined;
+
+      await ContentCalendar.create([
+        {
+          brandId,
+          brandName,
+          postDate: new Date('2026-07-29'),
+          dayOfWeek: 'Wednesday',
+          typeOfPost: 'Intro Post',
+          platform: 'Instagram',
+          referenceLink: 'https://www.instagram.com/p/DXrNPZVIa4c/?utm_source=ig_web_copy_link',
+          mediaLink: '',
+          assignedDesignerName: 'Lucia',
+          status: 'Approved'
+        },
+        {
+          brandId,
+          brandName,
+          postDate: new Date('2026-07-31'),
+          dayOfWeek: 'Friday',
+          typeOfPost: 'Founders video',
+          platform: 'Instagram',
+          referenceLink: 'https://www.instagram.com/reel/DY4gkOgyCTX/?utm_source=ig_web_copy_link',
+          mediaLink: '',
+          assignedDesignerName: 'Rituja',
+          status: 'Published'
+        },
+        {
+          brandId,
+          brandName,
+          postDate: new Date('2026-08-03'),
+          dayOfWeek: 'Monday',
+          typeOfPost: 'Product Reel',
+          platform: 'Instagram',
+          referenceLink: 'https://www.instagram.com/p/DYABcE4EuZn/?utm_source=ig_web_copy_link',
+          mediaLink: '',
+          assignedDesignerName: 'Rituja',
+          status: 'Approved'
+        },
+        {
+          brandId,
+          brandName,
+          postDate: new Date('2026-08-05'),
+          dayOfWeek: 'Wednesday',
+          typeOfPost: 'Sale video',
+          platform: 'Instagram',
+          referenceLink: 'https://www.instagram.com/reel/DYCgIVdzUZR/?utm_source=ig_web_copy_link',
+          mediaLink: '',
+          assignedDesignerName: 'Vikrant',
+          status: 'Approved'
+        },
+        {
+          brandId,
+          brandName,
+          postDate: new Date('2026-08-07'),
+          dayOfWeek: 'Friday',
+          typeOfPost: 'BTS',
+          platform: 'Instagram',
+          referenceLink: 'https://www.instagram.com/reel/DZmL8K3J1XN/?utm_source=ig_web_copy_link',
+          mediaLink: '',
+          assignedDesignerName: 'Lucia',
+          status: 'Pending'
+        },
+        {
+          brandId,
+          brandName,
+          postDate: new Date('2026-08-10'),
+          dayOfWeek: 'Monday',
+          typeOfPost: 'Sale Video',
+          platform: 'Instagram',
+          referenceLink: 'https://www.instagram.com/reel/Damjrt-ovut/?utm_source=ig_web_copy_link',
+          mediaLink: '',
+          assignedDesignerName: 'Rituja',
+          status: 'Pending'
+        },
+        {
+          brandId,
+          brandName,
+          postDate: new Date('2026-08-12'),
+          dayOfWeek: 'Wednesday',
+          typeOfPost: 'Launching video',
+          platform: 'Instagram',
+          referenceLink: 'https://www.instagram.com/reel/DZwrtTcWRUM/?utm_source=ig_web_copy_link',
+          mediaLink: '',
+          assignedDesignerName: 'Rituja',
+          status: 'Draft'
+        },
+        {
+          brandId,
+          brandName,
+          postDate: new Date('2026-08-13'),
+          dayOfWeek: 'Thursday',
+          typeOfPost: 'Intro Video',
+          platform: 'Instagram',
+          referenceLink: '',
+          mediaLink: '',
+          assignedDesignerName: 'Vikrant',
+          status: 'Draft',
+          notes: 'BRAND INTRO VIDEO'
+        },
+        {
+          brandId,
+          brandName,
+          postDate: new Date('2026-08-15'),
+          dayOfWeek: 'Saturday',
+          typeOfPost: 'website launching',
+          platform: 'Instagram',
+          referenceLink: 'https://www.instagram.com/reel/DZNAuzTLScF3/?utm_source=ig_web_copy_link',
+          mediaLink: '',
+          assignedDesignerName: 'Lucia',
+          status: 'Draft'
         }
       ]);
     }

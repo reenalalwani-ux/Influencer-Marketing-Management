@@ -14,6 +14,7 @@ import { EmployeeBrandAssignmentView } from './views/EmployeeBrandAssignmentView
 import { TaskManagementView } from './views/TaskManagementView';
 import { DailyPostingView } from './views/DailyPostingView';
 import { PostingCalendarView } from './views/PostingCalendarView';
+import { ContentCalendarView } from './views/ContentCalendarView';
 import { VerificationQueueView } from './views/VerificationQueueView';
 import { EmployeePerformanceView } from './views/EmployeePerformanceView';
 import { AuditLogView } from './views/AuditLogView';
@@ -39,12 +40,19 @@ export const App: React.FC = () => {
   const handleNavigate = (view: string) => {
     setActiveView(view);
     window.location.hash = `#/${view}`;
+    window.scrollTo(0, 0);
   };
+
+  // Scroll to top whenever active view changes
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeView]);
 
   // Sync state when browser back/forward buttons are clicked or URL changes directly
   useEffect(() => {
     const handleHashChange = () => {
       setActiveView(getViewFromHash());
+      window.scrollTo(0, 0);
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
@@ -156,6 +164,7 @@ export const App: React.FC = () => {
           )}
 
           {activeView === 'calendar' && <PostingCalendarView />}
+          {activeView === 'content-calendar' && <ContentCalendarView />}
           {activeView === 'verification' && <VerificationQueueView />}
           {activeView === 'performance' && <EmployeePerformanceView />}
           {activeView === 'reports' && <ReportsView />}
