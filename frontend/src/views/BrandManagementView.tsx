@@ -109,11 +109,19 @@ export const BrandManagementView: React.FC = () => {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Contact Person:</span>
-                    <span className="text-slate-800">{b.contactPerson}</span>
+                    <span className="text-slate-800 font-bold">{b.contactPerson}</span>
                   </div>
-                  <div className="flex items-center space-x-1 text-slate-500">
-                    <Mail size={12} className="text-slate-400" />
-                    <span>{b.email}</span>
+                  <div className="flex flex-col gap-1.5 pt-1.5 border-t border-slate-100 text-xs">
+                    <div className="flex items-center space-x-1.5 text-slate-600 truncate">
+                      <Mail size={13} className="text-purple-600 shrink-0" />
+                      <span className="truncate font-medium">{b.email}</span>
+                    </div>
+                    {b.phone && (
+                      <div className="flex items-center space-x-1.5 text-slate-600 font-medium">
+                        <Phone size={13} className="text-purple-600 shrink-0" />
+                        <span className="font-bold text-slate-800">{b.phone}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
