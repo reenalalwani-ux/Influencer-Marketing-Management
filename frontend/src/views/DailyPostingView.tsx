@@ -3,6 +3,7 @@ import { Clock, Calendar as CalendarIcon, Filter, CheckCircle2, AlertTriangle, S
 import { api } from '../services/api';
 import { TaskItem, Employee, Brand } from '../types';
 import { Pagination } from '../components/Pagination';
+import { InlineLoader } from '../components/PageLoader';
 
 interface DailyPostingViewProps {
   refreshTrigger?: number;
@@ -167,7 +168,7 @@ export const DailyPostingView: React.FC<DailyPostingViewProps> = ({ refreshTrigg
 
       {/* Operational List */}
       {loading ? (
-        <div className="text-center py-8 text-slate-500 font-medium">Loading daily postings...</div>
+        <InlineLoader message="Loading daily postings..." />
       ) : (
         <div className="space-y-3">
           {tasks.length === 0 ? (

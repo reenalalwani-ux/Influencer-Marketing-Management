@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, CheckSquare, Square, User as UserIcon, RefreshCw, CheckCircle2, Check, Search, ChevronDown } from 'lucide-react';
 import { api } from '../services/api';
 import { TaskItem, Employee, Brand } from '../types';
+import { InlineLoader } from '../components/PageLoader';
 
 export const PostingCalendarView: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -303,9 +304,7 @@ export const PostingCalendarView: React.FC = () => {
 
           {/* Spreadsheet Table Grid */}
           {loading ? (
-            <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 text-slate-500 font-medium">
-              Loading posting matrix sheet...
-            </div>
+            <InlineLoader message="Loading posting matrix..." />
           ) : (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
               <div className="overflow-x-auto max-h-[600px]">
@@ -426,7 +425,7 @@ export const PostingCalendarView: React.FC = () => {
       {viewMode !== 'Sheet Matrix' && (
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
           {loading ? (
-            <div className="text-center py-8 text-slate-500 font-medium">Loading posting calendar...</div>
+            <InlineLoader message="Loading posting calendar..." />
           ) : viewMode === 'Monthly' && (
             <div>
               {/* Day headers */}

@@ -1,17 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { Briefcase, Plus, Globe, Mail, Phone, ExternalLink, Users } from 'lucide-react';
+import { Briefcase, Plus, Globe, Mail, Phone, ExternalLink, Search, Users } from 'lucide-react';
 import { api } from '../services/api';
 import { Brand } from '../types';
 import { Modal } from '../components/Modal';
 import { Pagination } from '../components/Pagination';
+import { InlineLoader } from '../components/PageLoader';
+import { DataTable, DataTableColumn } from '../components/DataTable';
 
 export const BrandManagementView: React.FC = () => {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  const itemsPerPage = 10;
 
   // Form states
   const [brandName, setBrandName] = useState('');
@@ -63,8 +66,95 @@ export const BrandManagementView: React.FC = () => {
     }
   };
 
+  const filteredBrands = brands.filter(b =>
+    b.brandName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    b.brandId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    b.industry.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    b.contactPerson.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const paginatedBrands = filteredBrands.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const columns: DataTableColumn<Brand>[] = [
+    {
+      key: 'brandName',
+      label: 'Brand',
+      sortable: true,
+      render: (_, row) => (
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center font-extrabold text-sm shadow shrink-0">
+            {row.brandName.charAt(0)}
+          </div>
+          <div>
+            <div className="font-bold text-slate-900 text-xs">{row.brandName}</div>
+            <div className="text-[10px] text-purple-600 font-bold">{row.brandId}</div>
+          </div>
+        </div>
+      ),
+    },
+    { key: 'industry', label: 'Industry', sortable: true },
+    { key: 'contactPerson', label: 'Contact Person', sortable: true },
+    {
+      key: 'email',
+      label: 'Contact Details',
+      render: (_, row) => (
+        <div className="space-y-0.5 text-[11px]">
+          <div className="flex items-center gap-1 text-slate-600">
+            <Mail size={11} className="text-purple-600 shrink-0" />
+            <span>{row.email}</span>
+          </div>
+          {row.phone && (
+            <div className="flex items-center gap-1 text-slate-500">
+              <Phone size={11} className="text-slate-400 shrink-0" />
+              <span>{row.phone}</span>
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'website',
+      label: 'Website',
+      render: (val) => val ? (
+        <a
+          href={val}
+          target="_blank"
+          rel="noreferrer"
+          className="text-purple-600 hover:text-purple-700 flex items-center gap-1 font-semibold text-xs"
+        >
+          <Globe size={12} /> Link <ExternalLink size={10} />
+        </a>
+      ) : <span className="text-slate-400">—</span>,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      sortable: true,
+      render: (val) => (
+        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold badge-verified">
+          {val}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (_, row) => (
+        <button
+          onClick={() => handleViewBrandDetails(row._id)}
+          className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold transition"
+        >
+          Details
+        </button>
+      ),
+    },
+  ];
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-4 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2.5">
@@ -83,81 +173,34 @@ export const BrandManagementView: React.FC = () => {
         </button>
       </div>
 
+      {/* Search */}
+      <div className="bg-white p-3 rounded-2xl flex items-center space-x-3 border border-slate-200 shadow-xs">
+        <Search size={16} className="text-purple-600 ml-1 shrink-0" />
+        <input
+          type="text"
+          placeholder="Search by brand name, ID, industry, or contact person..."
+          value={searchTerm}
+          onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+          className="bg-transparent border-none text-sm text-slate-900 placeholder-slate-400 focus:outline-none w-full"
+        />
+        <span className="text-xs text-slate-400 font-medium shrink-0">{filteredBrands.length} records</span>
+      </div>
+
       {loading ? (
-        <div className="text-center py-8 text-slate-500 font-medium">Loading brand portfolio...</div>
+        <InlineLoader message="Loading brand portfolio..." />
       ) : (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {brands.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((b) => (
-              <div key={b._id} className="bg-white glass-card-hover p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
-                <div>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 text-white font-extrabold text-xl flex items-center justify-center shadow-md">
-                        {b.brandName.charAt(0)}
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-900 text-lg">{b.brandName}</h3>
-                        <span className="text-xs text-purple-600 font-bold">{b.brandId}</span>
-                      </div>
-                    </div>
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold badge-verified">
-                      {b.status}
-                    </span>
-                  </div>
-
-                  <div className="mt-4 space-y-2 text-xs text-slate-600">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-500">Industry:</span>
-                      <span className="font-semibold text-slate-800">{b.industry}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-500">Contact Person:</span>
-                      <span className="text-slate-800 font-bold">{b.contactPerson}</span>
-                    </div>
-                    <div className="flex flex-col gap-1.5 pt-1.5 border-t border-slate-100 text-xs">
-                      <div className="flex items-center space-x-1.5 text-slate-600 truncate">
-                        <Mail size={13} className="text-purple-600 shrink-0" />
-                        <span className="truncate font-medium">{b.email}</span>
-                      </div>
-                      {b.phone && (
-                        <div className="flex items-center space-x-1.5 text-slate-600 font-medium">
-                          <Phone size={13} className="text-purple-600 shrink-0" />
-                          <span className="font-bold text-slate-800">{b.phone}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between">
-                  {b.website ? (
-                    <a
-                      href={b.website}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs text-purple-600 hover:text-purple-700 flex items-center gap-1 font-semibold"
-                    >
-                      <Globe size={13} /> Website <ExternalLink size={11} />
-                    </a>
-                  ) : <span />}
-
-                  <button
-                    onClick={() => handleViewBrandDetails(b._id)}
-                    className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold transition"
-                  >
-                    View Details
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="space-y-3">
+          <DataTable
+            columns={columns}
+            data={paginatedBrands}
+            rowKey="_id"
+            emptyMessage="No brands found matching your search."
+          />
+          <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
             <Pagination
               currentPage={currentPage}
-              totalPages={Math.ceil(brands.length / itemsPerPage)}
-              totalItems={brands.length}
+              totalPages={Math.ceil(filteredBrands.length / itemsPerPage)}
+              totalItems={filteredBrands.length}
               itemsPerPage={itemsPerPage}
               onPageChange={setCurrentPage}
             />

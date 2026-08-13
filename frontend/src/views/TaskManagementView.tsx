@@ -4,6 +4,7 @@ import { api } from '../services/api';
 import { TaskItem, Employee, Brand, User } from '../types';
 import { Modal } from '../components/Modal';
 import { Pagination } from '../components/Pagination';
+import { InlineLoader } from '../components/PageLoader';
 
 interface TaskManagementViewProps {
   currentUser?: User | null;
@@ -155,7 +156,7 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
       </div>
 
       {loading ? (
-        <div className="text-center py-8 text-slate-500 font-medium">Loading content tasks...</div>
+        <InlineLoader message="Loading content tasks..." />
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="overflow-x-auto">

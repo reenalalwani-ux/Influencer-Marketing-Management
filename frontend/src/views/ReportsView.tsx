@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { FileSpreadsheet, Download, RefreshCw } from 'lucide-react';
 import { api } from '../services/api';
+import { InlineLoader } from '../components/PageLoader';
 
 export const ReportsView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'employee' | 'brand' | 'daily'>('employee');
@@ -97,7 +98,7 @@ export const ReportsView: React.FC = () => {
 
       {/* Data Table */}
       {loading ? (
-        <div className="text-center py-8 text-slate-500 font-medium">Generating report data...</div>
+        <InlineLoader message="Generating report data..." />
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="overflow-x-auto">

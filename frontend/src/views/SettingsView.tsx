@@ -3,6 +3,7 @@ import { Settings as SettingsIcon, Shield, Sliders, Plus, Edit2, Users, CheckCir
 import { api } from '../services/api';
 import { SystemRole, Employee } from '../types';
 import { Modal } from '../components/Modal';
+import { InlineLoader } from '../components/PageLoader';
 
 // Available permission catalog grouped by module
 const PERMISSION_GROUPS: { moduleName: string; icon: string; permissions: { code: string; label: string }[] }[] = [
@@ -293,7 +294,7 @@ export const SettingsView: React.FC = () => {
       )}
 
       {loading ? (
-        <div className="text-center py-10 text-slate-500 font-medium">Loading Roles & Permissions module...</div>
+        <InlineLoader message="Loading Roles & Permissions module..." />
       ) : (
         <>
           {/* TAB 1: ROLES & PERMISSIONS MATRIX */}

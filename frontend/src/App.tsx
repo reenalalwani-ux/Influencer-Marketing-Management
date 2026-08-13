@@ -151,7 +151,7 @@ export const App: React.FC = () => {
           setActiveView={handleNavigate}
         />
 
-        <main className="flex-1 p-6 overflow-y-auto max-w-7xl mx-auto w-full">
+        <main className="flex-1 p-4 overflow-y-auto w-full">
           {activeView === 'dashboard' && (
             <DashboardView
               user={user}

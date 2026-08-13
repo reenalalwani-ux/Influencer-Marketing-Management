@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Sparkles, Plus, Search, Filter, DollarSign, User, Trash2, Edit2, ArrowUpRight, ArrowDownRight, ExternalLink, Video, Link2, ChevronDown, Receipt, Eye, ShoppingBag } from 'lucide-react';
+import { Sparkles, Plus, Search, Filter, DollarSign, User, Trash2, Edit2, ArrowUpRight, ArrowDownRight, ExternalLink, Video, Link2, ChevronDown, Receipt, Eye, ShoppingBag, ChevronUp, ChevronsUpDown } from 'lucide-react';
 import { api } from '../services/api';
 import { InfluencerTransaction, Brand, PaymentLogItem } from '../types';
 import { Modal } from '../components/Modal';
 import { Pagination } from '../components/Pagination';
+import { InlineLoader } from '../components/PageLoader';
 
 // Custom Attractive Pill Select for Status
 const StatusPillDropdown: React.FC<{
@@ -84,6 +85,58 @@ export const InfluencerManagementView: React.FC = () => {
     netBalance: 0,
     totalCount: 0
   });
+
+  // Sorting State
+  const [sortKey, setSortKey] = useState<string>('transactionDate');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const SortHeader = ({
+    field,
+    label,
+    align = 'left',
+    bgClass = 'bg-slate-800 text-slate-200',
+    className = ''
+  }: {
+    field: string;
+    label: string;
+    align?: 'left' | 'right' | 'center';
+    bgClass?: string;
+    className?: string;
+  }) => {
+    const isSorted = sortKey === field;
+    const activeClass = isSorted
+      ? 'bg-purple-950 text-purple-200 font-extrabold border-b-2 border-purple-400'
+      : bgClass;
+
+    return (
+      <th
+        onClick={() => handleSort(field)}
+        className={`px-3.5 py-3 border-b border-r border-slate-700/80 select-none cursor-pointer hover:bg-slate-700/90 transition-colors ${activeClass} ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'} ${className}`}
+      >
+        <div className={`flex items-center gap-1.5 ${align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : 'justify-start'}`}>
+          <span className="truncate">{label}</span>
+          {isSorted ? (
+            sortDir === 'asc' ? (
+              <ChevronUp size={13} className="text-purple-300 shrink-0 font-bold" />
+            ) : (
+              <ChevronDown size={13} className="text-purple-300 shrink-0 font-bold" />
+            )
+          ) : (
+            <ChevronsUpDown size={11} className="text-slate-400 opacity-40 shrink-0 hover:opacity-100 transition" />
+          )}
+        </div>
+      </th>
+    );
+  };
 
   // Modal State — Influencer Record
   const [showModal, setShowModal] = useState(false);
@@ -434,6 +487,20 @@ export const InfluencerManagementView: React.FC = () => {
     return true;
   });
 
+  const sortedInfluencers = React.useMemo(() => {
+    if (!sortKey) return filteredInfluencers;
+    return [...filteredInfluencers].sort((a: any, b: any) => {
+      let aVal = a[sortKey] ?? '';
+      let bVal = b[sortKey] ?? '';
+      if (typeof aVal === 'string') {
+        const cmp = aVal.localeCompare(String(bVal), undefined, { numeric: true });
+        return sortDir === 'asc' ? cmp : -cmp;
+      }
+      const cmp = (Number(aVal) || 0) - (Number(bVal) || 0);
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [filteredInfluencers, sortKey, sortDir]);
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Top Header */}
@@ -702,7 +769,7 @@ export const InfluencerManagementView: React.FC = () => {
       {/* Google Sheets Spreadsheet Data Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         {loading ? (
-          <div className="text-center py-12 text-slate-500 font-medium">Loading ledger records...</div>
+          <InlineLoader message="Loading ledger records..." />
         ) : (
           <div className="overflow-x-auto max-h-[600px]">
             <table className="w-full text-left text-xs border-collapse">
@@ -711,43 +778,43 @@ export const InfluencerManagementView: React.FC = () => {
                 <>
                   <thead className="bg-slate-800 text-white font-extrabold uppercase text-[10px] sticky top-0 z-20">
                     <tr>
-                      <th className="px-3 py-3 border-b border-r border-slate-700 min-w-[40px] text-center">#</th>
-                      <th className="px-3 py-3 border-b border-r border-slate-700 min-w-[80px]">Date</th>
-                      <th className="px-3 py-3 border-b border-r border-slate-700 min-w-[120px]">Manager</th>
-                      <th className="px-4 py-3 border-b border-r border-slate-700 min-w-[140px]">Brand</th>
-                      <th className="px-4 py-3 border-b border-r border-slate-700 min-w-[160px]">Influencer Name</th>
-                      <th className="px-3 py-3 border-b border-r border-slate-700 min-w-[100px]">Phone</th>
-                      <th className="px-3 py-3 border-b border-r border-slate-700 min-w-[80px]">Type</th>
+                      <th className="px-3 py-3 border-b border-r border-slate-700 min-w-[40px] text-center bg-slate-800">#</th>
+                      <SortHeader field="transactionDate" label="Date" className="min-w-[90px]" />
+                      <SortHeader field="influencerManager" label="Manager" className="min-w-[120px]" />
+                      <SortHeader field="brandName" label="Brand" className="min-w-[140px]" />
+                      <SortHeader field="influencerName" label="Influencer Name" className="min-w-[160px]" />
+                      <th className="px-3 py-3 border-b border-r border-slate-700 min-w-[100px] bg-slate-800">Phone</th>
+                      <SortHeader field="category" label="Type" className="min-w-[80px]" />
 
                       {/* Performance Views & Orders */}
-                      <th className="px-3 py-3 border-b border-r border-slate-700 bg-purple-900 text-purple-100 text-right min-w-[90px]">Views</th>
-                      <th className="px-3 py-3 border-b border-r border-slate-700 bg-emerald-900 text-emerald-100 text-right min-w-[85px]">Orders</th>
+                      <SortHeader field="viewsCount" label="Views" align="right" bgClass="bg-purple-900 text-purple-100" className="min-w-[90px]" />
+                      <SortHeader field="ordersCount" label="Orders" align="right" bgClass="bg-emerald-900 text-emerald-100" className="min-w-[85px]" />
 
                       {/* Brand Breakdown */}
-                      <th className="px-3 py-3 border-b border-r border-slate-700 bg-sky-900 text-sky-100 text-right min-w-[95px]">Brand Onboard</th>
-                      <th className="px-3 py-3 border-b border-r border-slate-700 bg-emerald-900 text-emerald-100 text-right min-w-[90px]">Received</th>
-                      <th className="px-3 py-3 border-b border-r border-slate-700 bg-amber-900 text-amber-100 text-right min-w-[85px]">Pending</th>
+                      <SortHeader field="brandOnboardingAmt" label="Brand Onboard" align="right" bgClass="bg-sky-900 text-sky-100" className="min-w-[95px]" />
+                      <SortHeader field="brandReceivedAmt" label="Received" align="right" bgClass="bg-emerald-900 text-emerald-100" className="min-w-[90px]" />
+                      <SortHeader field="brandPendingAmt" label="Pending" align="right" bgClass="bg-amber-900 text-amber-100" className="min-w-[85px]" />
 
                       {/* Influencer Payout Breakdown */}
-                      <th className="px-3 py-3 border-b border-r border-slate-700 bg-purple-900 text-purple-100 text-right min-w-[95px]">Inf Onboard</th>
-                      <th className="px-3 py-3 border-b border-r border-slate-700 bg-rose-900 text-rose-100 text-right min-w-[85px]">Paid</th>
-                      <th className="px-3 py-3 border-b border-r border-slate-700 bg-amber-900 text-amber-100 text-right min-w-[85px]">Pending</th>
+                      <SortHeader field="influencerOnboardingAmt" label="Inf Onboard" align="right" bgClass="bg-purple-900 text-purple-100" className="min-w-[95px]" />
+                      <SortHeader field="influencerPaidAmt" label="Paid" align="right" bgClass="bg-rose-900 text-rose-100" className="min-w-[85px]" />
+                      <SortHeader field="influencerPendingAmt" label="Pending" align="right" bgClass="bg-amber-900 text-amber-100" className="min-w-[85px]" />
 
                       {/* Margin & Final Payment */}
-                      <th className="px-3 py-3 border-b border-r border-slate-700 bg-emerald-900 text-emerald-100 text-right min-w-[95px]">Margin</th>
-                      <th className="px-3 py-3 border-b border-r border-slate-700 text-center min-w-[60px]">Paid?</th>
-                      <th className="px-3 py-3 border-b border-slate-700 text-right min-w-[70px]">Actions</th>
+                      <SortHeader field="ad2shipMargin" label="Margin" align="right" bgClass="bg-emerald-900 text-emerald-100" className="min-w-[95px]" />
+                      <SortHeader field="finalPaymentReceived" label="Paid?" align="center" className="min-w-[60px]" />
+                      <th className="px-3 py-3 border-b border-slate-700 text-right min-w-[70px] bg-slate-800">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
-                    {filteredInfluencers.length === 0 ? (
+                    {sortedInfluencers.length === 0 ? (
                       <tr>
                         <td colSpan={18} className="px-6 py-12 text-center text-slate-500 font-semibold">
                           No influencer records found matching your filters. Click "Add Influencer Record" or Reset Filters.
                         </td>
                       </tr>
                     ) : (
-                      filteredInfluencers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((item, idx) => (
+                      sortedInfluencers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((item, idx) => (
                         <tr key={item._id} className="hover:bg-purple-50/40 transition">
                           <td className="px-3 py-2.5 text-center font-mono font-bold text-slate-400 border-r border-slate-200">
                             {item.sNo || idx + 1}
@@ -847,30 +914,30 @@ export const InfluencerManagementView: React.FC = () => {
                 <>
                   <thead className="bg-slate-800 text-white font-extrabold uppercase text-[10px] sticky top-0 z-20">
                     <tr>
-                      <th className="px-3 py-3 border-b border-r border-slate-700">Date</th>
-                      <th className="px-4 py-3 border-b border-r border-slate-700">Brand</th>
-                      <th className="px-4 py-3 border-b border-r border-slate-700">Influencer</th>
+                      <SortHeader field="transactionDate" label="Date" className="min-w-[85px]" />
+                      <SortHeader field="brandName" label="Brand" className="min-w-[140px]" />
+                      <SortHeader field="influencerName" label="Influencer" className="min-w-[150px]" />
                       <th className="px-3 py-3 border-b border-r border-slate-700">Product Link</th>
-                      <th className="px-3 py-3 border-b border-r border-slate-700">Video Type</th>
-                      <th className="px-3 py-3 border-b border-r border-slate-700">Order ID</th>
-                      <th className="px-3 py-3 border-b border-r border-slate-700 text-right">Reel Views</th>
-                      <th className="px-3 py-3 border-b border-r border-slate-700 text-right">Orders Driven</th>
-                      <th className="px-3 py-3 border-b border-r border-slate-700">Status</th>
+                      <SortHeader field="videoType" label="Video Type" className="min-w-[140px]" />
+                      <SortHeader field="orderId" label="Order ID" className="min-w-[100px]" />
+                      <SortHeader field="viewsCount" label="Reel Views" align="right" className="min-w-[90px]" />
+                      <SortHeader field="ordersCount" label="Orders Driven" align="right" className="min-w-[95px]" />
+                      <SortHeader field="status" label="Status" align="center" className="min-w-[100px]" />
                       <th className="px-3 py-3 border-b border-r border-slate-700">Content Reel</th>
                       <th className="px-3 py-3 border-b border-r border-slate-700">Ads Code</th>
-                      <th className="px-3 py-3 border-b border-r border-slate-700">Approved?</th>
+                      <SortHeader field="isApproved" label="Approved?" align="center" className="min-w-[100px]" />
                       <th className="px-3 py-3 border-b border-slate-700 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
-                    {filteredInfluencers.length === 0 ? (
+                    {sortedInfluencers.length === 0 ? (
                       <tr>
                         <td colSpan={13} className="px-6 py-12 text-center text-slate-500 font-semibold">
                           No deliverables found matching your filters.
                         </td>
                       </tr>
                     ) : (
-                      filteredInfluencers.map((item) => (
+                      sortedInfluencers.map((item) => (
                         <tr key={item._id} className="hover:bg-purple-50/40 transition">
                           <td className="px-3 py-2.5 font-mono text-slate-600 border-r border-slate-200">
                             {new Date(item.transactionDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}

@@ -3,6 +3,7 @@ import { ShieldAlert, Search, Clock, User as UserIcon, ChevronLeft, ChevronRight
 import { api } from '../services/api';
 import { AuditLogItem } from '../types';
 import { Pagination } from '../components/Pagination';
+import { InlineLoader } from '../components/PageLoader';
 
 export const AuditLogView: React.FC = () => {
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
@@ -68,7 +69,7 @@ export const AuditLogView: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="text-center py-8 text-slate-500 font-medium">Loading audit trail...</div>
+        <InlineLoader message="Loading audit trail..." />
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="overflow-x-auto">

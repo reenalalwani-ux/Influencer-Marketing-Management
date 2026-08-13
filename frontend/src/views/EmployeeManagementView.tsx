@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Users, Plus, Search, Filter, Mail, Phone, Shield, CheckCircle2, XCircle, UserCheck } from 'lucide-react';
+import { Users, Plus, Search, Mail } from 'lucide-react';
 import { api } from '../services/api';
 import { Employee } from '../types';
 import { Modal } from '../components/Modal';
 import { Pagination } from '../components/Pagination';
+import { InlineLoader } from '../components/PageLoader';
+import { DataTable, DataTableColumn } from '../components/DataTable';
 
 export const EmployeeManagementView: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -11,7 +13,7 @@ export const EmployeeManagementView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  const itemsPerPage = 10;
 
   // Form fields
   const [name, setName] = useState('');
@@ -46,7 +48,6 @@ export const EmployeeManagementView: React.FC = () => {
       if (res.success) {
         setShowAddModal(false);
         fetchEmployees();
-        // Reset form
         setName(''); setEmail(''); setPhone('');
       }
     } catch (err: any) {
@@ -60,8 +61,65 @@ export const EmployeeManagementView: React.FC = () => {
     e.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const paginatedEmployees = filteredEmployees.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const columns: DataTableColumn<Employee>[] = [
+    {
+      key: 'name',
+      label: 'Employee',
+      sortable: true,
+      render: (_, row) => (
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-600 to-pink-500 text-white flex items-center justify-center font-extrabold text-sm shadow shrink-0">
+            {row.name.charAt(0)}
+          </div>
+          <div>
+            <div className="font-bold text-slate-900 text-xs">{row.name}</div>
+            <div className="text-[10px] text-purple-600 font-bold">{row.employeeId}</div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'email',
+      label: 'Email',
+      sortable: true,
+      render: (val) => (
+        <div className="flex items-center gap-1.5 text-slate-600">
+          <Mail size={12} className="text-slate-400" />
+          <span className="font-medium">{val}</span>
+        </div>
+      ),
+    },
+    { key: 'designation', label: 'Designation', sortable: true },
+    { key: 'department', label: 'Department', sortable: true },
+    {
+      key: 'role',
+      label: 'System Role',
+      sortable: true,
+      render: (val) => (
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-700 border border-purple-200">
+          {val}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      sortable: true,
+      render: (val) => (
+        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${val === 'Active' ? 'badge-verified' : 'badge-rejected'}`}>
+          {val}
+        </span>
+      ),
+    },
+  ];
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-4 animate-fade-in">
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -71,7 +129,6 @@ export const EmployeeManagementView: React.FC = () => {
           </h2>
           <p className="text-sm text-slate-500 mt-1">Manage internal company staff, designations, and roles</p>
         </div>
-
         <button
           onClick={() => setShowAddModal(true)}
           className="px-4 py-2.5 btn-gradient-primary rounded-xl font-bold text-sm flex items-center space-x-2 self-start sm:self-auto shadow-md"
@@ -81,66 +138,31 @@ export const EmployeeManagementView: React.FC = () => {
         </button>
       </div>
 
-      {/* Search & Filter */}
-      <div className="bg-white p-4 rounded-2xl flex items-center space-x-3 border border-slate-200 shadow-xs">
-        <Search size={18} className="text-purple-600 ml-1" />
+      {/* Search */}
+      <div className="bg-white p-3 rounded-2xl flex items-center space-x-3 border border-slate-200 shadow-xs">
+        <Search size={16} className="text-purple-600 ml-1 shrink-0" />
         <input
           type="text"
           placeholder="Search by name, ID, or email..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
           className="bg-transparent border-none text-sm text-slate-900 placeholder-slate-400 focus:outline-none w-full"
         />
+        <span className="text-xs text-slate-400 font-medium shrink-0">{filteredEmployees.length} records</span>
       </div>
 
-      {/* Employees Grid / Table */}
+      {/* Data Table */}
       {loading ? (
-        <div className="text-center py-8 text-slate-500">Loading employee list...</div>
+        <InlineLoader message="Loading employee list..." />
       ) : (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredEmployees.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((emp) => (
-              <div key={emp._id} className="bg-white glass-card-hover p-5 rounded-2xl border border-slate-200 shadow-xs relative">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 text-white flex items-center justify-center font-extrabold text-lg shadow-sm">
-                      {emp.name.charAt(0)}
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-900 text-base">{emp.name}</h3>
-                      <span className="text-xs text-purple-600 font-bold">{emp.employeeId}</span>
-                    </div>
-                  </div>
-
-                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${emp.status === 'Active' ? 'badge-verified' : 'badge-rejected'
-                    }`}>
-                    {emp.status}
-                  </span>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-slate-100 space-y-2 text-xs text-slate-600">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Designation:</span>
-                    <span className="font-semibold text-slate-800">{emp.designation}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Department:</span>
-                    <span className="text-slate-800">{emp.department}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">System Role:</span>
-                    <span className="text-purple-600 font-bold">{emp.role}</span>
-                  </div>
-                  <div className="flex items-center space-x-1.5 text-slate-500 pt-1">
-                    <Mail size={13} className="text-slate-400" />
-                    <span>{emp.email}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="space-y-3">
+          <DataTable
+            columns={columns}
+            data={paginatedEmployees}
+            rowKey="_id"
+            emptyMessage="No employees found matching your search."
+          />
+          <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
             <Pagination
               currentPage={currentPage}
               totalPages={Math.ceil(filteredEmployees.length / itemsPerPage)}

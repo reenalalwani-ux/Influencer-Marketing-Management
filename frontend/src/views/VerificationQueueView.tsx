@@ -4,6 +4,7 @@ import { api } from '../services/api';
 import { TaskItem } from '../types';
 import { Modal } from '../components/Modal';
 import { Pagination } from '../components/Pagination';
+import { InlineLoader } from '../components/PageLoader';
 
 export const VerificationQueueView: React.FC = () => {
   const [pendingTasks, setPendingTasks] = useState<TaskItem[]>([]);
@@ -67,7 +68,7 @@ export const VerificationQueueView: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="text-center py-8 text-slate-500 font-medium">Loading pending verifications...</div>
+        <InlineLoader message="Loading pending verifications..." />
       ) : (
         <div className="space-y-4">
           {pendingTasks.length === 0 ? (

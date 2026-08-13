@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Target, TrendingUp, Plus, Edit3, Trash2, CheckCircle2, Award, DollarSign, Clock, AlertCircle, ShieldCheck } from 'lucide-react';
 import { TargetItem } from '../types';
 import { api } from '../services/api';
+import { PageLoader } from '../components/PageLoader';
+import { DataTable, DataTableColumn } from '../components/DataTable';
 
 interface TargetManagementViewProps {
   userRole?: string;
@@ -136,7 +138,6 @@ export const TargetManagementView: React.FC<TargetManagementViewProps> = ({ user
   const handleDelete = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this target record?')) return;
     try {
-      const res = await api.get(`/targets`); // Or delete API
       await api.get(`/targets`);
       const resDel = await fetch(`http://localhost:5000/api/v1/targets/${id}`, {
         method: 'DELETE',
@@ -158,14 +159,116 @@ export const TargetManagementView: React.FC<TargetManagementViewProps> = ({ user
   const activeTarget = targets.find(t => t.isActive && t.status === 'Active') || targets[0];
   const activePercentage = activeTarget ? Math.min(100, Math.round((activeTarget.achievedAmount / activeTarget.targetAmount) * 100)) : 0;
 
-  if (loading) {
-    return (
-      <div className="p-8 text-center text-slate-400">
-        <div className="animate-spin w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full mx-auto mb-2"></div>
-        Loading Target Module...
-      </div>
-    );
-  }
+  if (loading) return <PageLoader message="Loading Target Module..." />;
+
+  const columns: DataTableColumn<TargetItem>[] = [
+    {
+      key: 'title',
+      label: 'Target Title & Period',
+      sortable: true,
+      render: (_, row) => (
+        <div>
+          <div className="font-extrabold text-slate-900">{row.title}</div>
+          <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+            <Clock size={12} className="text-purple-600" />
+            <span>{row.period}</span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'targetAmount',
+      label: 'Goal Amount',
+      sortable: true,
+      render: (val, row) => (
+        <span className="font-extrabold text-slate-900">
+          {row.currency}{new Intl.NumberFormat().format(val)}
+        </span>
+      ),
+    },
+    {
+      key: 'achievedAmount',
+      label: 'Achieved Amount',
+      sortable: true,
+      render: (val, row) => (
+        <span className="font-extrabold text-emerald-600">
+          {row.currency}{new Intl.NumberFormat().format(val)}
+        </span>
+      ),
+    },
+    {
+      key: 'progress',
+      label: 'Progress',
+      render: (_, row) => {
+        const pct = Math.min(100, Math.round(((row.achievedAmount || 0) / (row.targetAmount || 1)) * 100));
+        return (
+          <div className="w-36">
+            <div className="flex justify-between items-center text-xs font-bold mb-1 text-slate-700">
+              <span>{pct}%</span>
+            </div>
+            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-purple-600 to-indigo-500"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      sortable: true,
+      render: (val) => (
+        <span className={`px-2.5 py-0.5 rounded-full text-xs font-extrabold ${
+          val === 'Active' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600 border border-slate-200'
+        }`}>
+          {val}
+        </span>
+      ),
+    },
+    {
+      key: 'isActive',
+      label: 'Top System Banner',
+      render: (val, row) => val ? (
+        <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-purple-100 text-purple-700 border border-purple-200 flex items-center gap-1 w-max">
+          <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse" /> Active Top Banner
+        </span>
+      ) : isManagerOrAdmin ? (
+        <button
+          onClick={() => handleSetActive(row._id)}
+          className="text-xs font-bold text-slate-500 hover:text-purple-700 hover:underline"
+        >
+          Set as Top Banner
+        </button>
+      ) : (
+        <span className="text-xs text-slate-400">Inactive</span>
+      ),
+    },
+    ...(isManagerOrAdmin ? [{
+      key: 'actions',
+      label: 'Actions',
+      render: (_: any, row: TargetItem) => (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => handleOpenEditModal(row)}
+            className="p-1.5 rounded-lg bg-slate-100 hover:bg-purple-50 text-slate-600 hover:text-purple-700 transition"
+            title="Edit Target"
+          >
+            <Edit3 size={15} />
+          </button>
+          <button
+            onClick={() => handleDelete(row._id)}
+            className="p-1.5 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 transition"
+            title="Delete Target"
+          >
+            <Trash2 size={15} />
+          </button>
+        </div>
+      ),
+    }] : []),
+  ];
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -196,49 +299,6 @@ export const TargetManagementView: React.FC<TargetManagementViewProps> = ({ user
         )}
       </div>
 
-      {/* Metric Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-          <div className="flex justify-between items-center text-slate-500 mb-2 text-xs uppercase font-extrabold">
-            <span>Current Active Target</span>
-            <Target size={18} className="text-purple-600" />
-          </div>
-          <div className="text-3xl font-extrabold text-slate-900">
-            {activeTarget ? `${activeTarget.currency}${new Intl.NumberFormat().format(activeTarget.targetAmount)}` : 'N/A'}
-          </div>
-          <p className="text-xs text-slate-500 font-medium mt-1">Period: {activeTarget?.period || 'None'}</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-          <div className="flex justify-between items-center text-slate-500 mb-2 text-xs uppercase font-extrabold">
-            <span>Total Achieved</span>
-            <Award size={18} className="text-emerald-600" />
-          </div>
-          <div className="text-3xl font-extrabold text-emerald-600">
-            {activeTarget ? `${activeTarget.currency}${new Intl.NumberFormat().format(activeTarget.achievedAmount)}` : '$0'}
-          </div>
-          <p className="text-xs text-slate-500 font-medium mt-1">Current total achieved revenue</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-          <div className="flex justify-between items-center text-slate-500 mb-2 text-xs uppercase font-extrabold">
-            <span>Completion Rate</span>
-            <TrendingUp size={18} className="text-indigo-600" />
-          </div>
-          <div className="text-3xl font-extrabold text-indigo-600">{activePercentage}%</div>
-          <p className="text-xs text-slate-500 font-medium mt-1">Goal completion metric</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-          <div className="flex justify-between items-center text-slate-500 mb-2 text-xs uppercase font-extrabold">
-            <span>Total Target Records</span>
-            <CheckCircle2 size={18} className="text-amber-600" />
-          </div>
-          <div className="text-3xl font-extrabold text-slate-900">{targets.length}</div>
-          <p className="text-xs text-slate-500 font-medium mt-1">Target campaigns tracked</p>
-        </div>
-      </div>
-
       {/* Featured Active Target Hero Card */}
       {activeTarget && (
         <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 text-white shadow-xl border border-indigo-500/30 relative overflow-hidden">
@@ -254,153 +314,32 @@ export const TargetManagementView: React.FC<TargetManagementViewProps> = ({ user
                 <span className="text-xs font-bold text-slate-300">{activeTarget.period}</span>
               </div>
               <h3 className="text-2xl font-extrabold tracking-tight text-white">{activeTarget.title}</h3>
-              {activeTarget.description && (
-                <p className="text-xs text-slate-300 font-medium leading-relaxed">{activeTarget.description}</p>
-              )}
+              <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">{activeTarget.description || 'Target revenue set for current operational cycle.'}</p>
             </div>
 
-            <div className="flex items-center gap-4 bg-white/5 border border-white/10 p-4 rounded-2xl backdrop-blur-md shrink-0">
-              <div>
-                <div className="text-[11px] text-slate-400 uppercase font-extrabold">Target Goal</div>
-                <div className="text-2xl font-extrabold text-white">{activeTarget.currency}{new Intl.NumberFormat().format(activeTarget.targetAmount)}</div>
-              </div>
-              <div className="h-10 w-px bg-white/10" />
-              <div>
-                <div className="text-[11px] text-purple-300 uppercase font-extrabold">Achieved</div>
-                <div className="text-2xl font-extrabold text-emerald-400">{activeTarget.currency}{new Intl.NumberFormat().format(activeTarget.achievedAmount)}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Progress Bar Container */}
-          <div className="mt-6 space-y-2 relative z-10">
-            <div className="flex justify-between items-center text-xs font-bold">
-              <span className="text-purple-300 flex items-center gap-1.5">
-                <TrendingUp size={14} /> {activePercentage}% Achieved
+            <div className="flex flex-col items-end shrink-0 text-right bg-slate-800/80 p-4 rounded-2xl border border-slate-700/60 backdrop-blur-md">
+              <span className="text-xs uppercase font-extrabold text-indigo-300 tracking-wider">Goal Revenue</span>
+              <span className="text-3xl font-black text-white">{activeTarget.currency}{new Intl.NumberFormat().format(activeTarget.targetAmount)}</span>
+              <span className="text-xs font-semibold text-emerald-400 mt-1 flex items-center gap-1">
+                <Award size={14} /> Achieved: {activeTarget.currency}{new Intl.NumberFormat().format(activeTarget.achievedAmount)} ({activePercentage}%)
               </span>
-              <span className="text-slate-300">
-                Remaining: <span className="font-extrabold text-amber-400">{activeTarget.currency}{new Intl.NumberFormat().format(Math.max(0, activeTarget.targetAmount - activeTarget.achievedAmount))}</span>
-              </span>
-            </div>
-            <div className="w-full bg-slate-800/90 rounded-full h-4 overflow-hidden border border-slate-700/80 p-0.5">
-              <div
-                className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-purple-500 via-indigo-400 to-emerald-400"
-                style={{ width: `${activePercentage}%` }}
-              />
             </div>
           </div>
         </div>
       )}
 
-      {/* Target History Table & Cards */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-extrabold text-slate-900">All Target Records</h3>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">Manage revenue goals and set system-wide active target banners</p>
-          </div>
+      {/* Target History Table */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-lg font-extrabold text-slate-900">All Target Records</h3>
+          <span className="text-xs text-slate-400 font-medium">{targets.length} target campaigns</span>
         </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50 text-[11px] uppercase font-extrabold text-slate-500 border-b border-slate-200">
-                <th className="py-3.5 px-6">Target Title & Period</th>
-                <th className="py-3.5 px-6">Goal Amount</th>
-                <th className="py-3.5 px-6">Achieved Amount</th>
-                <th className="py-3.5 px-6">Progress</th>
-                <th className="py-3.5 px-6">Status</th>
-                <th className="py-3.5 px-6">Top System Banner</th>
-                {isManagerOrAdmin && <th className="py-3.5 px-6 text-right">Actions</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-sm font-medium text-slate-700">
-              {targets.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-8 text-slate-400 font-medium">
-                    No target records created yet. Click "Set New Target" to get started.
-                  </td>
-                </tr>
-              ) : (
-                targets.map((t) => {
-                  const pct = Math.min(100, Math.round(((t.achievedAmount || 0) / (t.targetAmount || 1)) * 100));
-                  return (
-                    <tr key={t._id} className="hover:bg-slate-50/80 transition">
-                      <td className="py-4 px-6">
-                        <div className="font-extrabold text-slate-900">{t.title}</div>
-                        <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                          <Clock size={12} className="text-purple-600" />
-                          <span>{t.period}</span>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6 font-extrabold text-slate-900">
-                        {t.currency}{new Intl.NumberFormat().format(t.targetAmount)}
-                      </td>
-                      <td className="py-4 px-6 font-extrabold text-emerald-600">
-                        {t.currency}{new Intl.NumberFormat().format(t.achievedAmount)}
-                      </td>
-                      <td className="py-4 px-6 w-48">
-                        <div className="flex justify-between items-center text-xs font-bold mb-1 text-slate-700">
-                          <span>{pct}%</span>
-                        </div>
-                        <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
-                          <div
-                            className="h-full rounded-full bg-gradient-to-r from-purple-600 to-indigo-500"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-extrabold ${
-                          t.status === 'Active' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600 border border-slate-200'
-                        }`}>
-                          {t.status}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6">
-                        {t.isActive ? (
-                          <span className="px-2.5 py-1 rounded-full text-xs font-extrabold bg-purple-100 text-purple-700 border border-purple-200 flex items-center gap-1 w-max">
-                            <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse" /> Active Top Banner
-                          </span>
-                        ) : isManagerOrAdmin ? (
-                          <button
-                            onClick={() => handleSetActive(t._id)}
-                            className="text-xs font-bold text-slate-500 hover:text-purple-700 hover:underline"
-                          >
-                            Set as Top Banner
-                          </button>
-                        ) : (
-                          <span className="text-xs text-slate-400">Inactive</span>
-                        )}
-                      </td>
-
-                      {isManagerOrAdmin && (
-                        <td className="py-4 px-6 text-right">
-                          <div className="flex items-center justify-end space-x-2">
-                            <button
-                              onClick={() => handleOpenEditModal(t)}
-                              className="p-1.5 rounded-lg bg-slate-100 hover:bg-purple-50 text-slate-600 hover:text-purple-700 transition"
-                              title="Edit Target"
-                            >
-                              <Edit3 size={15} />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(t._id)}
-                              className="p-1.5 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 transition"
-                              title="Delete Target"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={columns}
+          data={targets}
+          rowKey="_id"
+          emptyMessage="No target records created yet. Click 'Set New Target' to get started."
+        />
       </div>
 
       {/* Modal for Creating / Editing Target */}

@@ -3,6 +3,8 @@ import { UserCheck, Plus, Trash2, Calendar, Shield, Briefcase, User as UserIcon 
 import { api } from '../services/api';
 import { Employee, Brand, EmployeeBrandAssignment } from '../types';
 import { Modal } from '../components/Modal';
+import { InlineLoader } from '../components/PageLoader';
+import { DataTable, DataTableColumn } from '../components/DataTable';
 
 export const EmployeeBrandAssignmentView = () => {
   const [assignments, setAssignments] = useState<EmployeeBrandAssignment[]>([]);
@@ -75,8 +77,98 @@ export const EmployeeBrandAssignmentView = () => {
     }
   };
 
+  const columns: DataTableColumn<EmployeeBrandAssignment>[] = [
+    {
+      key: 'employee',
+      label: 'Employee',
+      sortable: true,
+      render: (_, row) => {
+        const emp = row.employeeId as any;
+        return (
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs border border-purple-200 shrink-0">
+              <UserIcon size={14} />
+            </div>
+            <div>
+              <div className="text-slate-900 font-extrabold text-xs">{emp?.name || 'N/A'}</div>
+              <div className="text-[10px] text-slate-500 font-medium">{emp?.designation}</div>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'brand',
+      label: 'Assigned Brand',
+      sortable: true,
+      render: (_, row) => {
+        const brand = row.brandId as any;
+        return (
+          <div>
+            <div className="font-extrabold text-purple-700 flex items-center gap-1.5 text-xs">
+              <Briefcase size={13} />
+              {brand?.brandName || 'N/A'}
+            </div>
+            <div className="text-[10px] text-slate-500 font-medium">{brand?.industry}</div>
+          </div>
+        );
+      },
+    },
+    { key: 'responsibility', label: 'Responsibility', sortable: false },
+    {
+      key: 'priority',
+      label: 'Priority',
+      sortable: true,
+      render: (val) => (
+        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+          val === 'Urgent' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+          val === 'High' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-purple-50 text-purple-700 border border-purple-200'
+        }`}>
+          {val}
+        </span>
+      ),
+    },
+    {
+      key: 'startDate',
+      label: 'Assigned Date',
+      sortable: true,
+      render: (val) => (
+        <span className="text-xs text-slate-600 font-semibold font-mono">
+          {new Date(val).toLocaleDateString()}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      sortable: true,
+      render: (val) => (
+        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${val === 'Active' ? 'badge-verified' : 'badge-rejected'}`}>
+          {val}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (_, row) => (
+        <div className="text-right">
+          {row.status === 'Active' && (
+            <button
+              onClick={() => handleUnassign(row._id)}
+              className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs transition border border-rose-200 font-bold"
+              title="Unassign Employee"
+            >
+              <Trash2 size={15} />
+            </button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-4 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2.5">
@@ -98,95 +190,14 @@ export const EmployeeBrandAssignmentView = () => {
       </div>
 
       {loading ? (
-        <div className="text-center py-8 text-slate-500 font-medium">Loading assignments...</div>
+        <InlineLoader message="Loading assignments..." />
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-800">
-              <thead className="bg-slate-50 text-xs uppercase font-extrabold text-slate-500 border-b border-slate-200">
-                <tr>
-                  <th className="px-6 py-4">Employee</th>
-                  <th className="px-6 py-4">Assigned Brand</th>
-                  <th className="px-6 py-4">Responsibility</th>
-                  <th className="px-6 py-4">Priority</th>
-                  <th className="px-6 py-4">Assigned Date</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {assignments.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
-                      No active employee-brand assignments found.
-                    </td>
-                  </tr>
-                ) : (
-                  assignments.map((item) => {
-                    const emp = item.employeeId as any;
-                    const brand = item.brandId as any;
-                    return (
-                      <tr key={item._id} className="hover:bg-purple-50/50 transition">
-                        <td className="px-6 py-4 font-bold text-slate-900 flex items-center space-x-2">
-                          <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs border border-purple-200">
-                            <UserIcon size={14} />
-                          </div>
-                          <div>
-                            <div className="text-slate-900 font-extrabold">{emp?.name || 'N/A'}</div>
-                            <div className="text-xs text-slate-500 font-medium">{emp?.designation}</div>
-                          </div>
-                        </td>
-
-                        <td className="px-6 py-4">
-                          <div className="font-extrabold text-purple-700 flex items-center gap-1.5">
-                            <Briefcase size={14} />
-                            {brand?.brandName || 'N/A'}
-                          </div>
-                          <div className="text-xs text-slate-500 font-medium">{brand?.industry}</div>
-                        </td>
-
-                        <td className="px-6 py-4 text-slate-700 text-xs max-w-xs font-medium">
-                          {item.responsibility}
-                        </td>
-
-                        <td className="px-6 py-4">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                            item.priority === 'Urgent' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
-                            item.priority === 'High' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-purple-50 text-purple-700 border border-purple-200'
-                          }`}>
-                            {item.priority}
-                          </span>
-                        </td>
-
-                        <td className="px-6 py-4 text-xs text-slate-600 font-semibold font-mono">
-                          {new Date(item.startDate).toLocaleDateString()}
-                        </td>
-
-                        <td className="px-6 py-4">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${item.status === 'Active' ? 'badge-verified' : 'badge-rejected'}`}>
-                            {item.status}
-                          </span>
-                        </td>
-
-                        <td className="px-6 py-4 text-right">
-                          {item.status === 'Active' && (
-                            <button
-                              onClick={() => handleUnassign(item._id)}
-                              className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs transition border border-rose-200 font-bold"
-                              title="Unassign Employee"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <DataTable
+          columns={columns}
+          data={assignments}
+          rowKey="_id"
+          emptyMessage="No active employee-brand assignments found."
+        />
       )}
 
       {/* Assign Modal */}
