@@ -8,14 +8,23 @@ const getHeaders = () => {
   };
 };
 
+const parseJsonResponse = async (res: Response) => {
+  const contentType = res.headers.get('content-type');
+  if (contentType && contentType.includes('application/json')) {
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'API request failed');
+    return data;
+  }
+  const text = await res.text();
+  throw new Error(`Server returned status ${res.status}: ${res.statusText || 'Non-JSON response'}`);
+};
+
 export const api = {
   async get(endpoint: string) {
     const res = await fetch(`${API_BASE_URL}${endpoint}`, {
       headers: getHeaders()
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'API request failed');
-    return data;
+    return parseJsonResponse(res);
   },
 
   async post(endpoint: string, body: any) {
@@ -24,9 +33,7 @@ export const api = {
       headers: getHeaders(),
       body: JSON.stringify(body)
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'API request failed');
-    return data;
+    return parseJsonResponse(res);
   },
 
   async put(endpoint: string, body: any) {
@@ -35,9 +42,7 @@ export const api = {
       headers: getHeaders(),
       body: JSON.stringify(body)
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'API request failed');
-    return data;
+    return parseJsonResponse(res);
   },
 
   async patch(endpoint: string, body?: any) {
@@ -46,9 +51,7 @@ export const api = {
       headers: getHeaders(),
       body: body ? JSON.stringify(body) : undefined
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'API request failed');
-    return data;
+    return parseJsonResponse(res);
   },
 
   async delete(endpoint: string) {
@@ -56,8 +59,6 @@ export const api = {
       method: 'DELETE',
       headers: getHeaders()
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'API request failed');
-    return data;
+    return parseJsonResponse(res);
   }
 };

@@ -22,10 +22,23 @@ import { ReportsView } from './views/ReportsView';
 import { SettingsView } from './views/SettingsView';
 import { URLSubmissionModal } from './components/URLSubmissionModal';
 
+import { PublicCalendarShareView } from './views/PublicCalendarShareView';
+
 export const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [targetRefreshCount, setTargetRefreshCount] = useState(0);
+
+  // Check if current hash is a public share route, e.g. #/share/token
+  const getShareTokenFromHash = () => {
+    const hash = window.location.hash;
+    if (hash.startsWith('#/share/') || hash.startsWith('#share/')) {
+      return hash.replace('#/share/', '').replace('#share/', '');
+    }
+    return null;
+  };
+
+  const [shareToken, setShareToken] = useState<string | null>(getShareTokenFromHash);
 
   // Helper to read initial active view from browser URL hash
   const getViewFromHash = () => {
@@ -52,12 +65,18 @@ export const App: React.FC = () => {
   // Sync state when browser back/forward buttons are clicked or URL changes directly
   useEffect(() => {
     const handleHashChange = () => {
+      setShareToken(getShareTokenFromHash());
       setActiveView(getViewFromHash());
       window.scrollTo(0, 0);
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
+
+  // If URL has a public share token, render public share view immediately (no login required)
+  if (shareToken) {
+    return <PublicCalendarShareView token={shareToken} />;
+  }
 
   const checkAuth = async () => {
     const token = localStorage.getItem('token');

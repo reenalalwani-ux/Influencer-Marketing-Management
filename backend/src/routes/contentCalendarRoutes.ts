@@ -9,7 +9,7 @@ const router = Router();
 // GET /api/v1/content-calendar
 router.get('/', authenticateToken, checkPermission('task.view'), async (req: AuthRequest, res: Response) => {
   try {
-    const { brandId, brandName, year, month, search, designer } = req.query;
+    const { brandId, brandName, year, month, search, designer, fortnight } = req.query;
     const filter: any = {};
 
     // 0. Employee Role Brand Filtering
@@ -52,9 +52,16 @@ router.get('/', authenticateToken, checkPermission('task.view'), async (req: Aut
     const currentMonth = month !== undefined ? Number(month) - 1 : now.getMonth();
 
     if (year || month !== undefined) {
-      const startOfMonth = new Date(currentYear, currentMonth, 1, 0, 0, 0);
-      const endOfMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
-      filter.postDate = { $gte: startOfMonth, $lte: endOfMonth };
+      let start = new Date(currentYear, currentMonth, 1, 0, 0, 0);
+      let end = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
+
+      if (fortnight === '1st-15th') {
+        end = new Date(currentYear, currentMonth, 15, 23, 59, 59);
+      } else if (fortnight === '16th-End') {
+        start = new Date(currentYear, currentMonth, 16, 0, 0, 0);
+      }
+
+      filter.postDate = { $gte: start, $lte: end };
     }
 
     if (search) {
@@ -74,6 +81,142 @@ router.get('/', authenticateToken, checkPermission('task.view'), async (req: Aut
     return res.json({ success: true, data: items });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error fetching content calendar', error });
+  }
+});
+
+// DELETE /api/v1/content-calendar/clear-all — delete all calendar entries for a specific brand + period at once
+router.delete('/clear-all', authenticateToken, checkPermission('task.delete'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { brandName, year, month, fortnight } = req.query;
+
+    const filter: any = {};
+    if (brandName && brandName !== 'All') {
+      filter.brandName = brandName;
+    }
+
+    const now = new Date();
+    const currentYear = Number(year) || now.getFullYear();
+    const currentMonth = month !== undefined ? Number(month) - 1 : now.getMonth();
+
+    if (year || month !== undefined) {
+      let start = new Date(currentYear, currentMonth, 1, 0, 0, 0);
+      let end = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
+
+      if (fortnight === '1st-15th') {
+        end = new Date(currentYear, currentMonth, 15, 23, 59, 59);
+      } else if (fortnight === '16th-End') {
+        start = new Date(currentYear, currentMonth, 16, 0, 0, 0);
+      }
+
+      filter.postDate = { $gte: start, $lte: end };
+    }
+
+    const result = await ContentCalendar.deleteMany(filter);
+
+    await logActivity({
+      userId: req.user?._id,
+      userName: req.user?.name || 'User',
+      action: 'CLEAR_ALL_CONTENT_CALENDAR',
+      module: 'Content Calendar Module',
+      entity: 'ContentCalendar',
+      newValue: { brandName, deletedCount: result.deletedCount, year: currentYear, month: currentMonth + 1 }
+    });
+
+    return res.json({
+      success: true,
+      message: `Successfully deleted ${result.deletedCount} content calendar entries`,
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Error clearing content calendar', error });
+  }
+});
+
+// POST /api/v1/content-calendar/create-cycle — Generate/Initialize a 15-day or monthly content calendar cycle
+router.post('/create-cycle', authenticateToken, checkPermission('task.create'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { brandId, brandName, year, month, fortnight, frequency, platform, assignedDesignerId, assignedDesignerName, defaultPostType } = req.body;
+
+    if (!brandName && !brandId) {
+      return res.status(400).json({ success: false, message: 'Brand is required' });
+    }
+
+    let finalBrandName = brandName || 'Kala Kurti';
+    if (brandId && !brandName) {
+      const b = await Brand.findById(brandId);
+      if (b) finalBrandName = b.brandName;
+    }
+
+    let finalDesignerName = assignedDesignerName || '';
+    if (assignedDesignerId && !assignedDesignerName) {
+      const emp = await Employee.findById(assignedDesignerId);
+      if (emp) finalDesignerName = emp.name;
+    }
+
+    const currentYear = Number(year) || new Date().getFullYear();
+    const currentMonth = month !== undefined ? Number(month) - 1 : new Date().getMonth();
+
+    // Determine start and end day numbers
+    let startDay = 1;
+    let endDay = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+    if (fortnight === '1st-15th') {
+      startDay = 1;
+      endDay = 15;
+    } else if (fortnight === '16th-End') {
+      startDay = 16;
+    }
+
+    // Determine step frequency (1 for Daily, 2 for Alternate days)
+    const step = frequency === 'Alternate' ? 2 : (frequency === 'Single' ? 99 : 1);
+
+    const createdEntries = [];
+    const postTypes = ['Intro Post', 'Product Reel', 'Brand Carousel', 'Behind The Scenes', 'Customer Review', 'Feature Highlight', 'Special Offer'];
+
+    let postTypeIdx = 0;
+    for (let day = startDay; day <= endDay; day += step) {
+      const dateObj = new Date(currentYear, currentMonth, day, 12, 0, 0);
+      const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+      const postType = defaultPostType || postTypes[postTypeIdx % postTypes.length];
+
+      const entry = await ContentCalendar.create({
+        brandId: brandId || undefined,
+        brandName: finalBrandName,
+        postDate: dateObj,
+        dayOfWeek,
+        typeOfPost: postType,
+        platform: platform || 'Instagram',
+        referenceLink: '',
+        mediaLink: '',
+        assignedDesignerId: assignedDesignerId || undefined,
+        assignedDesignerName: finalDesignerName,
+        status: 'Pending',
+        notes: `Cycle ${fortnight || 'Full Month'} post for ${day}/${currentMonth + 1}/${currentYear}`,
+        createdBy: req.user?._id
+      });
+
+      createdEntries.push(entry);
+      postTypeIdx++;
+      if (frequency === 'Single') break;
+    }
+
+    await logActivity({
+      userId: req.user?._id,
+      userName: req.user?.name || 'User',
+      action: 'CREATE_CONTENT_CALENDAR_CYCLE',
+      module: 'Content Calendar Module',
+      entity: 'ContentCalendar',
+      newValue: { brandName: finalBrandName, year: currentYear, month: currentMonth + 1, fortnight, count: createdEntries.length }
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `Successfully created ${createdEntries.length} calendar posts for ${finalBrandName} (${fortnight || 'Full Month'})`,
+      count: createdEntries.length,
+      data: createdEntries
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Error creating content calendar cycle', error });
   }
 });
 
@@ -173,6 +316,77 @@ router.delete('/:id', authenticateToken, checkPermission('task.delete'), async (
     return res.json({ success: true, message: 'Content calendar entry deleted' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error deleting content calendar entry', error });
+  }
+});
+
+// POST /api/v1/content-calendar/share — generate a shareable public token for a brand+month calendar
+router.post('/share', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { brandName, year, month } = req.body;
+    if (!brandName) {
+      return res.status(400).json({ success: false, message: 'brandName is required' });
+    }
+
+    // Build a deterministic token from brand + year + month so same share link is reused
+    const tokenPayload = `${brandName}|${year || new Date().getFullYear()}|${month || new Date().getMonth() + 1}`;
+    const token = Buffer.from(tokenPayload).toString('base64url');
+
+    return res.json({
+      success: true,
+      token,
+      message: 'Share token generated successfully'
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Error generating share token', error });
+  }
+});
+
+// GET /api/v1/content-calendar/public/:token — public read-only access, no auth required
+router.get('/public/:token', async (req, res: Response) => {
+  try {
+    const { token } = req.params;
+
+    // Decode token to get brand + year + month
+    let tokenPayload: string;
+    try {
+      tokenPayload = Buffer.from(token, 'base64url').toString('utf8');
+    } catch {
+      return res.status(400).json({ success: false, message: 'Invalid share token' });
+    }
+
+    const parts = tokenPayload.split('|');
+    if (parts.length < 3) {
+      return res.status(400).json({ success: false, message: 'Malformed share token' });
+    }
+
+    const [brandName, yearStr, monthStr] = parts;
+    const year = Number(yearStr);
+    const month = Number(monthStr) - 1; // 0-indexed month
+
+    const startOfMonth = new Date(year, month, 1, 0, 0, 0);
+    const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59);
+
+    const items = await ContentCalendar.find({
+      brandName: { $regex: new RegExp(`^${brandName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+      postDate: { $gte: startOfMonth, $lte: endOfMonth }
+    })
+      .populate('brandId', 'brandName')
+      .populate('assignedDesignerId', 'name designation')
+      .sort({ postDate: 1 });
+
+    return res.json({
+      success: true,
+      data: items,
+      meta: {
+        brandName,
+        year,
+        month: month + 1,
+        monthName: new Date(year, month, 1).toLocaleString('en-US', { month: 'long' }),
+        generatedAt: new Date()
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Error fetching shared calendar', error });
   }
 });
 
