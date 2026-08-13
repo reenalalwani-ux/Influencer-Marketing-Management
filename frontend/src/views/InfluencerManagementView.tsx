@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Sparkles, Plus, Search, Filter, DollarSign, User, Trash2, Edit2, ArrowUpRight, ArrowDownRight, ExternalLink, Video, Link2, ChevronDown, Receipt } from 'lucide-react';
+import { Sparkles, Plus, Search, Filter, DollarSign, User, Trash2, Edit2, ArrowUpRight, ArrowDownRight, ExternalLink, Video, Link2, ChevronDown, Receipt, Eye, ShoppingBag } from 'lucide-react';
 import { api } from '../services/api';
 import { InfluencerTransaction, Brand, PaymentLogItem } from '../types';
 import { Modal } from '../components/Modal';
@@ -128,6 +128,8 @@ export const InfluencerManagementView: React.FC = () => {
   const [status, setStatus] = useState<'Pending' | 'Completed' | 'Settled' | 'Approved'>('Completed');
   const [contentLink, setContentLink] = useState('');
   const [adsCode, setAdsCode] = useState('');
+  const [viewsCount, setViewsCount] = useState<number | ''>(0);
+  const [ordersCount, setOrdersCount] = useState<number | ''>(0);
   const [isApproved, setIsApproved] = useState(true);
   const [transactionDate, setTransactionDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
@@ -224,6 +226,8 @@ export const InfluencerManagementView: React.FC = () => {
     setStatus('Completed');
     setContentLink('');
     setAdsCode('');
+    setViewsCount(0);
+    setOrdersCount(0);
     setIsApproved(true);
     setTransactionDate(new Date().toISOString().split('T')[0]);
     setNotes('');
@@ -255,6 +259,8 @@ export const InfluencerManagementView: React.FC = () => {
     setStatus(item.status || 'Completed');
     setContentLink(item.contentLink || '');
     setAdsCode(item.adsCode || '');
+    setViewsCount(item.viewsCount || 0);
+    setOrdersCount(item.ordersCount || 0);
     setIsApproved(item.isApproved !== undefined ? item.isApproved : true);
     setTransactionDate(item.transactionDate ? item.transactionDate.split('T')[0] : new Date().toISOString().split('T')[0]);
     setNotes(item.notes || '');
@@ -291,6 +297,8 @@ export const InfluencerManagementView: React.FC = () => {
         status,
         contentLink,
         adsCode,
+        viewsCount: Number(viewsCount) || 0,
+        ordersCount: Number(ordersCount) || 0,
         isApproved,
         transactionDate,
         notes,
@@ -711,6 +719,10 @@ export const InfluencerManagementView: React.FC = () => {
                       <th className="px-3 py-3 border-b border-r border-slate-700 min-w-[100px]">Phone</th>
                       <th className="px-3 py-3 border-b border-r border-slate-700 min-w-[80px]">Type</th>
 
+                      {/* Performance Views & Orders */}
+                      <th className="px-3 py-3 border-b border-r border-slate-700 bg-purple-900 text-purple-100 text-right min-w-[90px]">Views</th>
+                      <th className="px-3 py-3 border-b border-r border-slate-700 bg-emerald-900 text-emerald-100 text-right min-w-[85px]">Orders</th>
+
                       {/* Brand Breakdown */}
                       <th className="px-3 py-3 border-b border-r border-slate-700 bg-sky-900 text-sky-100 text-right min-w-[95px]">Brand Onboard</th>
                       <th className="px-3 py-3 border-b border-r border-slate-700 bg-emerald-900 text-emerald-100 text-right min-w-[90px]">Received</th>
@@ -730,7 +742,7 @@ export const InfluencerManagementView: React.FC = () => {
                   <tbody className="divide-y divide-slate-200">
                     {filteredInfluencers.length === 0 ? (
                       <tr>
-                        <td colSpan={16} className="px-6 py-12 text-center text-slate-500 font-semibold">
+                        <td colSpan={18} className="px-6 py-12 text-center text-slate-500 font-semibold">
                           No influencer records found matching your filters. Click "Add Influencer Record" or Reset Filters.
                         </td>
                       </tr>
@@ -766,6 +778,14 @@ export const InfluencerManagementView: React.FC = () => {
                             <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${item.category === 'Paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'}`}>
                               {item.category}
                             </span>
+                          </td>
+
+                          {/* Performance Views & Orders */}
+                          <td className="px-3 py-2.5 text-right font-extrabold text-purple-700 bg-purple-50/20 border-r border-slate-200">
+                            👁️ {(item.viewsCount || 0).toLocaleString()}
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-extrabold text-emerald-700 bg-emerald-50/20 border-r border-slate-200">
+                            📦 {(item.ordersCount || 0).toLocaleString()}
                           </td>
 
                           {/* Brand Breakdown */}
@@ -833,6 +853,8 @@ export const InfluencerManagementView: React.FC = () => {
                       <th className="px-3 py-3 border-b border-r border-slate-700">Product Link</th>
                       <th className="px-3 py-3 border-b border-r border-slate-700">Video Type</th>
                       <th className="px-3 py-3 border-b border-r border-slate-700">Order ID</th>
+                      <th className="px-3 py-3 border-b border-r border-slate-700 text-right">Reel Views</th>
+                      <th className="px-3 py-3 border-b border-r border-slate-700 text-right">Orders Driven</th>
                       <th className="px-3 py-3 border-b border-r border-slate-700">Status</th>
                       <th className="px-3 py-3 border-b border-r border-slate-700">Content Reel</th>
                       <th className="px-3 py-3 border-b border-r border-slate-700">Ads Code</th>
@@ -843,7 +865,7 @@ export const InfluencerManagementView: React.FC = () => {
                   <tbody className="divide-y divide-slate-200">
                     {filteredInfluencers.length === 0 ? (
                       <tr>
-                        <td colSpan={11} className="px-6 py-12 text-center text-slate-500 font-semibold">
+                        <td colSpan={13} className="px-6 py-12 text-center text-slate-500 font-semibold">
                           No deliverables found matching your filters.
                         </td>
                       </tr>
@@ -871,6 +893,12 @@ export const InfluencerManagementView: React.FC = () => {
                           </td>
                           <td className="px-3 py-2.5 border-r border-slate-200 font-mono text-xs font-bold text-slate-800">
                             {item.orderId || '-'}
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-black text-purple-700 bg-purple-50/30 border-r border-slate-200">
+                            👁️ {(item.viewsCount || 0).toLocaleString()}
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-black text-emerald-700 bg-emerald-50/30 border-r border-slate-200">
+                            📦 {(item.ordersCount || 0).toLocaleString()}
                           </td>
                           <td className="px-3 py-2 text-center border-r border-slate-200">
                             <StatusPillDropdown
@@ -1262,6 +1290,37 @@ export const InfluencerManagementView: React.FC = () => {
                   onChange={(e) => setAdsCode(e.target.value)}
                   placeholder="e.g. IG-ADS-9982"
                   className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 font-bold"
+                />
+              </div>
+            </div>
+
+            {/* Performance Tracking: Views & Orders Driven */}
+            <div className="bg-white p-3 rounded-xl border border-purple-200 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-purple-900 font-extrabold uppercase mb-1 flex items-center gap-1 text-[11px]">
+                  <Eye size={14} className="text-purple-600" /> Reel Views (Total Views)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={viewsCount}
+                  onChange={(e) => setViewsCount(e.target.value === '' ? '' : Number(e.target.value))}
+                  placeholder="e.g. 50000"
+                  className="w-full bg-purple-50/50 border border-purple-200 focus:border-purple-500 rounded-xl px-3 py-1.5 font-bold text-purple-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-emerald-900 font-extrabold uppercase mb-1 flex items-center gap-1 text-[11px]">
+                  <ShoppingBag size={14} className="text-emerald-600" /> Orders Generated / Sales Count
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={ordersCount}
+                  onChange={(e) => setOrdersCount(e.target.value === '' ? '' : Number(e.target.value))}
+                  placeholder="e.g. 25"
+                  className="w-full bg-emerald-50/50 border border-emerald-200 focus:border-emerald-500 rounded-xl px-3 py-1.5 font-bold text-emerald-900"
                 />
               </div>
             </div>

@@ -95,7 +95,7 @@ router.post('/', authenticateToken, checkPermission('influencer.create'), async 
       influencerName, influencerManager, brandId, brandName, phone, profileLink, category,
       brandOnboardingAmt, brandReceivedAmt, influencerOnboardingAmt, influencerPaidAmt, finalPaymentReceived,
       inAmount, outAmount, productLink, videoType, videoDescription, refVideoLink, orderId, orderDate,
-      platform, status, contentLink, adsCode, isApproved, notes, remark, transactionDate
+      platform, status, contentLink, adsCode, viewsCount, ordersCount, isApproved, notes, remark, transactionDate
     } = req.body;
 
     if (!influencerName) {
@@ -157,6 +157,8 @@ router.post('/', authenticateToken, checkPermission('influencer.create'), async 
       status: status || 'Completed',
       contentLink: contentLink || '',
       adsCode: adsCode || '',
+      viewsCount: Number(viewsCount) || 0,
+      ordersCount: Number(ordersCount) || 0,
       isApproved: isApproved !== undefined ? !!isApproved : true,
       notes: notes || '',
       remark: remark || '',
@@ -219,7 +221,7 @@ router.put('/:id', authenticateToken, checkPermission('influencer.update'), asyn
       influencerName, influencerManager, brandId, brandName, phone, profileLink, category,
       brandOnboardingAmt, brandReceivedAmt, influencerOnboardingAmt, influencerPaidAmt, finalPaymentReceived,
       inAmount, outAmount, productLink, videoType, videoDescription, refVideoLink, orderId, orderDate,
-      platform, status, contentLink, adsCode, isApproved, notes, remark, transactionDate
+      platform, status, contentLink, adsCode, viewsCount, ordersCount, isApproved, notes, remark, transactionDate
     } = req.body;
 
     const record = await Influencer.findById(req.params.id);
@@ -259,6 +261,8 @@ router.put('/:id', authenticateToken, checkPermission('influencer.update'), asyn
     if (status) record.status = status;
     if (contentLink !== undefined) record.contentLink = contentLink;
     if (adsCode !== undefined) record.adsCode = adsCode;
+    if (viewsCount !== undefined) record.viewsCount = Number(viewsCount) || 0;
+    if (ordersCount !== undefined) record.ordersCount = Number(ordersCount) || 0;
     if (isApproved !== undefined) record.isApproved = !!isApproved;
     if (notes !== undefined) record.notes = notes;
     if (remark !== undefined) record.remark = remark;

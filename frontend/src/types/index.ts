@@ -183,6 +183,8 @@ export interface InfluencerTransaction {
   status: 'Pending' | 'Completed' | 'Settled' | 'Approved';
   contentLink?: string;
   adsCode?: string;
+  viewsCount?: number;
+  ordersCount?: number;
   isApproved?: boolean;
   notes?: string;
   remark?: string;
