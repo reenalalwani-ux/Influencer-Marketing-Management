@@ -163,12 +163,14 @@ export const PostingCalendarView: React.FC = () => {
     <div className="space-y-6 animate-fade-in">
       {/* Header Controls */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2.5">
-            <CalendarIcon className="text-purple-600" />
-            Posting Calendar Workspace
-          </h2>
-          <p className="text-sm font-medium text-slate-600 mt-1">Day-wise brand posting tracking matrix & schedule</p>
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold shrink-0">
+            <CalendarIcon size={22} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Posting Calendar</h2>
+            <p className="text-xs font-semibold text-slate-500 mt-0.5">Day-wise brand posting tracking matrix & schedule.</p>
+          </div>
         </div>
 
         <div className="flex items-center space-x-3">

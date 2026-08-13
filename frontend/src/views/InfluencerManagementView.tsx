@@ -505,20 +505,22 @@ export const InfluencerManagementView: React.FC = () => {
     <div className="space-y-6 animate-fade-in">
       {/* Top Header */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2.5">
-            <Sparkles className="text-purple-600" />
-            Influencer Operations & Ledger Workspace
-          </h2>
-          <p className="text-sm font-medium text-slate-600 mt-1">
-            Day-wise creator onboarding, paid & barter finances, payment audit logs, and deliverables
-          </p>
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold shrink-0">
+            <Sparkles size={22} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Influencer Module</h2>
+            <p className="text-xs font-semibold text-slate-500 mt-0.5">
+              Day-wise creator onboarding, paid & barter finances, payment audit logs, and deliverables.
+            </p>
+          </div>
         </div>
 
         {viewMode === 'Payment Audit Logs' ? (
           <button
             onClick={openPaymentModal}
-            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm flex items-center space-x-2 shadow-md hover:shadow-lg transition"
+            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm flex items-center space-x-2 shadow-md hover:shadow-lg transition self-start sm:self-auto shrink-0"
           >
             <Receipt size={18} />
             <span>Record Payment Entry</span>
@@ -526,7 +528,7 @@ export const InfluencerManagementView: React.FC = () => {
         ) : (
           <button
             onClick={openAddModal}
-            className="px-5 py-2.5 btn-gradient-primary rounded-xl font-bold text-sm flex items-center space-x-2 shadow-md hover:shadow-lg transition"
+            className="px-5 py-2.5 btn-gradient-primary rounded-xl font-bold text-sm flex items-center space-x-2 shadow-md hover:shadow-lg transition self-start sm:self-auto shrink-0"
           >
             <Plus size={18} />
             <span>Add Influencer Record</span>

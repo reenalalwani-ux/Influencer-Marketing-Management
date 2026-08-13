@@ -273,25 +273,23 @@ export const TargetManagementView: React.FC<TargetManagementViewProps> = ({ user
   return (
     <div className="space-y-6 animate-fade-in">
       {/* View Header */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center space-x-2">
-            <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
-              <Target size={22} />
-            </div>
-            <div>
-              <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Target Management Module</h2>
-              <p className="text-xs font-semibold text-slate-500 mt-0.5">
-                Set revenue goals, track employee sales performance & display real-time targets across system headers.
-              </p>
-            </div>
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold shrink-0">
+            <Target size={22} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Target Management Module</h2>
+            <p className="text-xs font-semibold text-slate-500 mt-0.5">
+              Set revenue goals, track employee sales performance & display real-time targets across system headers.
+            </p>
           </div>
         </div>
 
         {isManagerOrAdmin && (
           <button
             onClick={handleOpenCreateModal}
-            className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition shadow-lg shadow-purple-500/20 flex items-center space-x-2 shrink-0"
+            className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition shadow-lg shadow-purple-500/20 flex items-center space-x-2 shrink-0 self-start sm:self-auto"
           >
             <Plus size={18} />
             <span>Set New Target</span>

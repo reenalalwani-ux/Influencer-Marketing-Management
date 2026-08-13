@@ -66,12 +66,14 @@ export const DailyPostingView: React.FC<DailyPostingViewProps> = ({ refreshTrigg
     <div className="space-y-6 animate-fade-in">
       {/* Header & Date Selector */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <Clock className="text-purple-600" size={24} />
-            <h2 className="text-2xl font-extrabold text-slate-900">Daily Posting Operations</h2>
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold shrink-0">
+            <Clock size={22} />
           </div>
-          <p className="text-sm font-medium text-slate-600 mt-1">Real-time daily content tracking workspace for internal staff</p>
+          <div>
+            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Daily Posting</h2>
+            <p className="text-xs font-semibold text-slate-500 mt-0.5">Real-time daily content tracking workspace for internal staff.</p>
+          </div>
         </div>
 
         <div className="flex items-center space-x-2">

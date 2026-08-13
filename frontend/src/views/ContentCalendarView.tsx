@@ -465,24 +465,26 @@ export const ContentCalendarView: React.FC = () => {
     <div className="space-y-6 animate-fade-in">
       {/* Top Banner Header with Integrated Brand Selector */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2.5">
-              <FileSpreadsheet className="text-pink-600" />
-              Content Calendar Workspace 📜
-            </h2>
-
-            {/* Searchable Brand Selection Dropdown with Search Bar */}
-            <SearchableBrandDropdown
-              brands={uniqueBrands}
-              selectedBrand={selectedBrandFilter}
-              onSelect={(b) => setSelectedBrandFilter(b)}
-            />
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold shrink-0">
+            <FileSpreadsheet size={22} />
           </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Content Calendar</h2>
 
-          <p className="text-sm font-medium text-slate-600 mt-1">
-            Dedicated day-wise social media content planning, reference links, POC assignments, and media assets for <strong className="text-pink-700 font-extrabold">{selectedBrandFilter}</strong>
-          </p>
+              {/* Searchable Brand Selection Dropdown with Search Bar */}
+              <SearchableBrandDropdown
+                brands={uniqueBrands}
+                selectedBrand={selectedBrandFilter}
+                onSelect={(b) => setSelectedBrandFilter(b)}
+              />
+            </div>
+
+            <p className="text-xs font-semibold text-slate-500 mt-0.5">
+              Dedicated day-wise social media content planning, reference links, POC assignments, and media assets for <strong className="text-purple-700 font-extrabold">{selectedBrandFilter}</strong>.
+            </p>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">

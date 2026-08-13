@@ -121,13 +121,15 @@ export const EmployeeManagementView: React.FC = () => {
   return (
     <div className="space-y-4 animate-fade-in">
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2.5">
-            <Users className="text-purple-600" />
-            Employee Management
-          </h2>
-          <p className="text-sm text-slate-500 mt-1">Manage internal company staff, designations, and roles</p>
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold shrink-0">
+            <Users size={22} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Employees Directory</h2>
+            <p className="text-xs font-semibold text-slate-500 mt-0.5">Manage internal company staff, designations, and roles.</p>
+          </div>
         </div>
         <button
           onClick={() => setShowAddModal(true)}

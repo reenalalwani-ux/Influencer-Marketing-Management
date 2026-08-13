@@ -84,21 +84,20 @@ export const DatabaseView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/80 p-5 rounded-2xl border border-slate-800 backdrop-blur-md">
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-3">
-          <div className="p-3 bg-blue-600/20 border border-blue-500/30 rounded-xl text-blue-400">
-            <Database size={24} />
+          <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold shrink-0">
+            <Database size={22} />
           </div>
           <div>
-            <h1 className="text-2xl font-extrabold text-slate-900 flex items-center gap-3">
-              <Database className="text-purple-600" size={28} />
-              <span>MongoDB Inspector</span>
+            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+              MongoDB Inspector
               <span className="text-xs px-2.5 py-0.5 rounded-full badge-verified font-bold">
                 Live MongoDB
               </span>
-            </h1>
-            <p className="text-sm font-medium text-slate-600 mt-1">
-              Inspect collections, Mongoose models, and real-time MongoDB database documents
+            </h2>
+            <p className="text-xs font-semibold text-slate-500 mt-0.5">
+              Inspect collections, Mongoose models, and real-time MongoDB database documents.
             </p>
           </div>
         </div>
