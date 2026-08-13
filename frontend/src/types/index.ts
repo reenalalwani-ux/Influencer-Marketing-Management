@@ -72,6 +72,8 @@ export interface TaskItem {
   verifiedAt?: string;
   rejectionReason?: string;
   comments?: string;
+  isMainTask?: boolean;
+  parentTaskId?: TaskItem | any;
 }
 
 export interface NotificationItem {

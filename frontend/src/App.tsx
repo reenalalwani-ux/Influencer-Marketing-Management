@@ -187,15 +187,18 @@ export const App: React.FC = () => {
           )}
 
           {activeView === 'daily-posting' && (
-            <DailyPostingView
-              refreshTrigger={taskRefreshCount}
-              onOpenSubmitUrlModal={(task) => setSubmitUrlTask(task)}
-            />
+            <DailyPostingView refreshTrigger={taskRefreshCount} />
           )}
 
           {activeView === 'calendar' && <PostingCalendarView />}
           {activeView === 'content-calendar' && <ContentCalendarView />}
-          {activeView === 'verification' && <VerificationQueueView />}
+          {activeView === 'verification' && (
+            <TaskManagementView
+              currentUser={user}
+              refreshTrigger={taskRefreshCount}
+              onOpenSubmitUrlModal={(task) => setSubmitUrlTask(task)}
+            />
+          )}
           {activeView === 'performance' && <EmployeePerformanceView />}
           {activeView === 'reports' && <ReportsView />}
           {activeView === 'audit-logs' && <AuditLogView />}

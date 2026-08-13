@@ -49,6 +49,7 @@ router.get('/', authenticateToken, checkPermission('task.view'), async (req: Aut
       .populate('employeeId', 'name employeeId designation department')
       .populate('brandId', 'brandName brandId logo industry')
       .populate('verifiedBy', 'name role')
+      .populate('parentTaskId', 'taskId title brandId platform contentType')
       .sort({ scheduledDate: 1, scheduledTime: 1 });
 
     return res.json({ success: true, count: tasks.length, data: tasks });
@@ -63,7 +64,8 @@ router.get('/:id', authenticateToken, checkPermission('task.view'), async (req: 
     const task = await Task.findById(req.params.id)
       .populate('employeeId', 'name employeeId email designation department')
       .populate('brandId', 'brandName brandId logo industry')
-      .populate('verifiedBy', 'name email role');
+      .populate('verifiedBy', 'name email role')
+      .populate('parentTaskId', 'taskId title brandId platform contentType');
 
     if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
     return res.json({ success: true, data: task });
@@ -74,10 +76,10 @@ router.get('/:id', authenticateToken, checkPermission('task.view'), async (req: 
 
 // POST /api/v1/tasks
 router.post('/', authenticateToken, checkPermission('task.create'), async (req: AuthRequest, res: Response) => {
-  let { employeeId, brandId, platform, contentType, title, description, priority, scheduledDate, scheduledTime, deadline } = req.body;
+  let { employeeId, brandId, platform, contentType, title, description, priority, scheduledDate, scheduledTime, deadline, isMainTask, parentTaskId } = req.body;
 
-  // Force employeeId to self if user has Employee role
-  if (req.user?.role?.toLowerCase() === 'employee') {
+  // Force employeeId to self if user has Employee role and not a main task
+  if (!isMainTask && req.user?.role?.toLowerCase() === 'employee') {
     const empDoc = await Employee.findOne({
       $or: [{ email: req.user?.email }, { name: req.user?.name }]
     });
@@ -86,28 +88,37 @@ router.post('/', authenticateToken, checkPermission('task.create'), async (req: 
     }
   }
 
-  if (!employeeId || !brandId || !platform || !contentType || !title || !scheduledDate || !scheduledTime || !deadline) {
-    return res.status(400).json({ success: false, message: 'Required task fields missing' });
+  if (isMainTask) {
+    if (!platform) platform = 'All Platforms';
+    if (!contentType) contentType = 'Master Campaign';
+    if (!scheduledTime) scheduledTime = '09:00 AM';
+    if (!deadline) deadline = scheduledDate || new Date().toISOString();
+  }
+
+  if (!brandId || !title || !scheduledDate) {
+    return res.status(400).json({ success: false, message: 'Required task fields missing (brandId, title, scheduledDate)' });
   }
 
   try {
     const count = await Task.countDocuments();
-    const taskId = `TSK-${10000 + count + 1}`;
+    const taskId = isMainTask ? `MAIN-${10000 + count + 1}` : `TSK-${10000 + count + 1}`;
 
     const task = await Task.create({
       taskId,
-      employeeId,
+      employeeId: employeeId || undefined,
       brandId,
-      platform,
-      contentType,
+      platform: platform || 'Instagram',
+      contentType: contentType || 'Reel',
       title,
       description,
       priority: priority || 'Medium',
       scheduledDate: new Date(scheduledDate),
-      scheduledTime,
-      deadline: new Date(deadline),
+      scheduledTime: scheduledTime || '10:00 AM',
+      deadline: deadline ? new Date(deadline) : new Date(scheduledDate),
       status: 'Pending',
-      verificationStatus: 'Unsubmitted'
+      verificationStatus: 'Unsubmitted',
+      isMainTask: !!isMainTask,
+      parentTaskId: parentTaskId || undefined
     });
 
     // Send notification to employee
@@ -218,6 +229,35 @@ router.post('/:id/submit-url', authenticateToken, async (req: AuthRequest, res: 
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to submit published URL', error });
+  }
+});
+
+// DELETE /api/v1/tasks/:id
+router.delete('/:id', authenticateToken, checkPermission('task.delete'), async (req: AuthRequest, res: Response) => {
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
+
+    // Delete sub-tasks if main task
+    if (task.isMainTask) {
+      await Task.deleteMany({ parentTaskId: task._id });
+    }
+
+    await Task.findByIdAndDelete(req.params.id);
+
+    await logActivity({
+      userId: req.user?._id,
+      userName: req.user?.name || 'System',
+      action: 'DELETE_TASK',
+      module: 'Task Management',
+      entity: 'Task',
+      entityId: req.params.id,
+      oldValue: task.toObject()
+    });
+
+    return res.json({ success: true, message: 'Task deleted successfully' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to delete task', error });
   }
 });
 

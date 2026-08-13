@@ -7,10 +7,10 @@ import { InlineLoader } from '../components/PageLoader';
 
 interface DailyPostingViewProps {
   refreshTrigger?: number;
-  onOpenSubmitUrlModal: (task: TaskItem) => void;
+  onOpenSubmitUrlModal?: (task: TaskItem) => void;
 }
 
-export const DailyPostingView: React.FC<DailyPostingViewProps> = ({ refreshTrigger, onOpenSubmitUrlModal }) => {
+export const DailyPostingView: React.FC<DailyPostingViewProps> = ({ refreshTrigger }) => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [metrics, setMetrics] = useState<any>({ total: 0, completed: 0, pending: 0, delayed: 0, missed: 0 });
@@ -218,16 +218,6 @@ export const DailyPostingView: React.FC<DailyPostingViewProps> = ({ refreshTrigg
                         }`}>
                         {t.status}
                       </span>
-
-                      {t.status === 'Pending' && (
-                        <button
-                          onClick={() => onOpenSubmitUrlModal(t)}
-                          className="px-3.5 py-2 btn-gradient-primary rounded-xl text-xs font-bold shadow-md flex items-center space-x-1.5"
-                        >
-                          <Send size={13} />
-                          <span>Submit Published URL</span>
-                        </button>
-                      )}
 
                       {t.publishedUrl && (
                         <a

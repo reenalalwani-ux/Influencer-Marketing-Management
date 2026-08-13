@@ -139,7 +139,7 @@ const EmployeeBrandSchema = new Schema<IEmployeeBrand>({
 // 7. Task / Content Schema
 export interface ITask extends Document {
   taskId: string;
-  employeeId: mongoose.Types.ObjectId;
+  employeeId?: mongoose.Types.ObjectId;
   brandId: mongoose.Types.ObjectId;
   platform: string;
   contentType: string;
@@ -157,11 +157,13 @@ export interface ITask extends Document {
   verifiedAt?: Date;
   rejectionReason?: string;
   comments?: string;
+  isMainTask?: boolean;
+  parentTaskId?: mongoose.Types.ObjectId;
 }
 
 const TaskSchema = new Schema<ITask>({
   taskId: { type: String, required: true, unique: true },
-  employeeId: { type: Schema.Types.ObjectId, ref: 'Employee', required: true },
+  employeeId: { type: Schema.Types.ObjectId, ref: 'Employee', required: false },
   brandId: { type: Schema.Types.ObjectId, ref: 'Brand', required: true },
   platform: { type: String, required: true },
   contentType: { type: String, required: true },
@@ -186,7 +188,9 @@ const TaskSchema = new Schema<ITask>({
   verifiedBy: { type: Schema.Types.ObjectId, ref: 'User' },
   verifiedAt: { type: Date },
   rejectionReason: { type: String },
-  comments: { type: String }
+  comments: { type: String },
+  isMainTask: { type: Boolean, default: false },
+  parentTaskId: { type: Schema.Types.ObjectId, ref: 'Task' }
 }, { timestamps: true });
 
 // 10. Notification Schema

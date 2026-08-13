@@ -58,7 +58,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
         { id: 'daily-posting', label: 'Daily Posting', icon: Clock, badge: 'Core' },
         { id: 'calendar', label: 'Posting Calendar', icon: Calendar },
         { id: 'content-calendar', label: 'Content Calendar', icon: FileSpreadsheet },
-        ...(!isEmployee ? [{ id: 'verification', label: 'Verification Queue', icon: CheckCircle }] : []),
       ]
     },
     {
