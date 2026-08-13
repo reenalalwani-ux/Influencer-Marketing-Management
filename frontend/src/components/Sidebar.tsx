@@ -34,7 +34,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
   ];
 
   return (
-    <aside className="w-64 bg-white/90 border-r border-slate-200/80 flex flex-col shrink-0 min-h-[calc(100vh-4rem)] h-full p-4 space-y-1 backdrop-blur-xl">
+    <aside className="w-64 bg-white/90 border-r border-slate-200/80 flex flex-col shrink-0 h-full p-4 space-y-1 backdrop-blur-xl overflow-y-auto">
       <div className="px-3 py-2 text-[11px] font-extrabold uppercase tracking-widest text-purple-600">
         Navigation Menu
       </div>
