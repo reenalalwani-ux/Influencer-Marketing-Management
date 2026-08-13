@@ -1,10 +1,40 @@
 import { Router, Response } from 'express';
-import { Influencer, Brand, PaymentLog, Employee, EmployeeBrand } from '../models/allModels';
+import { Influencer, Brand, PaymentLog, Employee, EmployeeBrand, Target } from '../models/allModels';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 import { logActivity } from '../middleware/auditLog';
 
 const router = Router();
+
+// Helper to keep active targets in sync with transactions
+const triggerTargetSync = async () => {
+  try {
+    const targets = await Target.find({ status: 'Active', autoSync: true });
+    for (const target of targets) {
+      const now = new Date();
+      const startDate = target.startDate || new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+      const endDate = target.endDate || new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+      if (target.targetType === 'Barter') {
+        const count = await Influencer.countDocuments({
+          category: 'Barter',
+          transactionDate: { $gte: startDate, $lte: endDate }
+        });
+        target.achievedCount = count;
+        target.achievedAmount = count;
+      } else {
+        const paidRecords = await Influencer.find({
+          category: 'Paid',
+          transactionDate: { $gte: startDate, $lte: endDate }
+        });
+        target.achievedAmount = paidRecords.reduce((acc, curr) => acc + (curr.ad2shipMargin || 0), 0);
+      }
+      await target.save();
+    }
+  } catch (err) {
+    console.error('Target sync error:', err);
+  }
+};
 
 // GET /api/v1/influencers
 router.get('/', authenticateToken, checkPermission('influencer.view'), async (req: AuthRequest, res: Response) => {
@@ -208,6 +238,8 @@ router.post('/', authenticateToken, checkPermission('influencer.create'), async 
       newValue: { influencerName, brandName: finalBrandName, category, balance }
     });
 
+    await triggerTargetSync();
+
     return res.status(201).json({ success: true, message: 'Influencer entry created successfully', data: newRecord });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error creating influencer record', error });
@@ -280,6 +312,8 @@ router.put('/:id', authenticateToken, checkPermission('influencer.update'), asyn
       newValue: { influencerName: record.influencerName, balance: record.balance }
     });
 
+    await triggerTargetSync();
+
     return res.json({ success: true, message: 'Influencer record updated', data: record });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error updating influencer record', error });
@@ -302,6 +336,8 @@ router.delete('/:id', authenticateToken, checkPermission('influencer.delete'), a
       entity: 'InfluencerTransaction',
       entityId: (record._id as any).toString()
     });
+
+    await triggerTargetSync();
 
     return res.json({ success: true, message: 'Influencer record deleted' });
   } catch (error) {

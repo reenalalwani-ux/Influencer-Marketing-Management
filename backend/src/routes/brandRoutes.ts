@@ -126,4 +126,28 @@ router.put('/:id', authenticateToken, checkPermission('brand.update'), async (re
   }
 });
 
+// DELETE /api/v1/brands/:id
+router.delete('/:id', authenticateToken, checkPermission('brand.delete'), async (req: AuthRequest, res: Response) => {
+  try {
+    const brand = await Brand.findByIdAndDelete(req.params.id);
+    if (!brand) return res.status(404).json({ success: false, message: 'Brand not found' });
+
+    await EmployeeBrand.deleteMany({ brandId: req.params.id });
+
+    await logActivity({
+      userId: req.user?._id,
+      userName: req.user?.name || 'System',
+      action: 'DELETE_BRAND',
+      module: 'Brand Management',
+      entity: 'Brand',
+      entityId: req.params.id,
+      oldValue: brand.toObject()
+    });
+
+    return res.json({ success: true, message: 'Brand deleted successfully' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to delete brand', error });
+  }
+});
+
 export default router;

@@ -111,4 +111,98 @@ router.patch('/:id/unassign', authenticateToken, checkPermission('brand.assign')
   }
 });
 
+// PUT /api/v1/employee-brands/:id
+router.put('/:id', authenticateToken, checkPermission('brand.assign'), async (req: AuthRequest, res: Response) => {
+  try {
+    const assignment = await EmployeeBrand.findById(req.params.id);
+    if (!assignment) return res.status(404).json({ success: false, message: 'Assignment not found' });
+
+    const oldValue = { ...assignment.toObject() };
+    const { employeeId, brandId, responsibility, priority, status } = req.body;
+
+    if (employeeId) assignment.employeeId = employeeId;
+    if (brandId) assignment.brandId = brandId;
+    if (responsibility) assignment.responsibility = responsibility;
+    if (priority) assignment.priority = priority;
+    if (status) assignment.status = status;
+
+    await assignment.save();
+
+    const populated = await EmployeeBrand.findById(assignment._id)
+      .populate('employeeId', 'name employeeId designation department email')
+      .populate('brandId', 'brandName brandId logo industry');
+
+    await logActivity({
+      userId: req.user?._id,
+      userName: req.user?.name || 'System',
+      action: 'UPDATE_EMPLOYEE_BRAND',
+      module: 'Employee-Brand Assignment',
+      entity: 'EmployeeBrand',
+      entityId: req.params.id,
+      oldValue,
+      newValue: assignment.toObject()
+    });
+
+    return res.json({ success: true, message: 'Assignment updated successfully', data: populated });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to update assignment', error });
+  }
+});
+
+// POST /api/v1/employee-brands/sync-employee
+router.post('/sync-employee', authenticateToken, checkPermission('brand.assign'), async (req: AuthRequest, res: Response) => {
+  const { employeeId, brandIds, responsibility, priority } = req.body;
+
+  if (!employeeId || !Array.isArray(brandIds)) {
+    return res.status(400).json({ success: false, message: 'Employee ID and array of Brand IDs are required' });
+  }
+
+  try {
+    // Delete active assignments for brands not in brandIds
+    await EmployeeBrand.deleteMany({
+      employeeId,
+      brandId: { $nin: brandIds }
+    });
+
+    // Create or update assignments for selected brandIds
+    for (const bId of brandIds) {
+      const existing = await EmployeeBrand.findOne({ employeeId, brandId: bId });
+      if (existing) {
+        existing.status = 'Active';
+        if (responsibility) existing.responsibility = responsibility;
+        if (priority) existing.priority = priority;
+        await existing.save();
+      } else {
+        await EmployeeBrand.create({
+          employeeId,
+          brandId: bId,
+          assignedBy: req.user?._id,
+          responsibility: responsibility || 'Brand Operations & Content Posting',
+          priority: priority || 'High',
+          startDate: new Date(),
+          status: 'Active'
+        });
+      }
+    }
+
+    const updatedAssignments = await EmployeeBrand.find({ employeeId, status: 'Active' })
+      .populate('employeeId', 'name employeeId designation department email')
+      .populate('brandId', 'brandName brandId logo industry');
+
+    return res.json({ success: true, message: 'Employee brand assignments updated successfully', data: updatedAssignments });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to sync employee brand assignments', error });
+  }
+});
+
+// DELETE /api/v1/employee-brands/employee/:employeeId
+router.delete('/employee/:employeeId', authenticateToken, checkPermission('brand.assign'), async (req: AuthRequest, res: Response) => {
+  try {
+    await EmployeeBrand.deleteMany({ employeeId: req.params.employeeId });
+    return res.json({ success: true, message: 'All brand assignments removed for employee' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to delete assignments', error });
+  }
+});
+
 export default router;

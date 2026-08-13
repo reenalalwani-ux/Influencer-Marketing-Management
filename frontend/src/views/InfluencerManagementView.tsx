@@ -1,12 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import { Sparkles, Plus, Search, Filter, DollarSign, User, Trash2, Edit2, ArrowUpRight, ArrowDownRight, ExternalLink, Video, Link2, ChevronDown, Receipt, Eye, ShoppingBag, ChevronUp, ChevronsUpDown } from 'lucide-react';
+import { 
+  Sparkles, Plus, Search, Filter, DollarSign, User, Trash2, Edit2, 
+  ArrowUpRight, ArrowDownRight, ExternalLink, Video, Link2, ChevronDown, 
+  Receipt, Eye, ShoppingBag, ChevronUp, ChevronsUpDown, Target, TrendingUp,
+  Award, Clock, AlertCircle, CheckCircle2, ShieldCheck, Layers, RefreshCw
+} from 'lucide-react';
 import { api } from '../services/api';
-import { InfluencerTransaction, Brand, PaymentLogItem } from '../types';
+import { InfluencerTransaction, Brand, PaymentLogItem, TargetItem } from '../types';
 import { Modal } from '../components/Modal';
 import { Pagination } from '../components/Pagination';
 import { InlineLoader } from '../components/PageLoader';
 
-// Custom Attractive Pill Select for Status
+interface InfluencerManagementViewProps {
+  userRole?: string;
+  initialTab?: 'targets' | 'paid' | 'barter' | 'payments' | 'all';
+  onTargetUpdated?: () => void;
+}
+
+// Custom Pill Select for Status
 const StatusPillDropdown: React.FC<{
   currentStatus: string;
   onSelect: (newStatus: string) => void;
@@ -16,14 +27,15 @@ const StatusPillDropdown: React.FC<{
       <select
         value={currentStatus || 'Completed'}
         onChange={(e) => onSelect(e.target.value)}
-        className={`appearance-none pl-3 pr-7 py-1 rounded-xl text-[11px] font-extrabold focus:outline-none cursor-pointer border shadow-2xs transition ${currentStatus === 'Completed'
-          ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
-          : currentStatus === 'Approved'
-            ? 'bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200'
-            : currentStatus === 'Settled'
-              ? 'bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-200'
-              : 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200'
-          }`}
+        className={`appearance-none pl-3 pr-7 py-1 rounded-xl text-[11px] font-extrabold focus:outline-none cursor-pointer border shadow-2xs transition ${
+          currentStatus === 'Completed'
+            ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
+            : currentStatus === 'Approved'
+              ? 'bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200'
+              : currentStatus === 'Settled'
+                ? 'bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-200'
+                : 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200'
+        }`}
       >
         <option value="Completed" className="bg-white text-slate-900 font-bold py-1">🟢 Completed</option>
         <option value="Approved" className="bg-white text-slate-900 font-bold py-1">🔵 Approved</option>
@@ -35,7 +47,7 @@ const StatusPillDropdown: React.FC<{
   );
 };
 
-// Custom Attractive Pill Select for Approval
+// Custom Pill Select for Approval
 const ApprovalPillDropdown: React.FC<{
   isApproved: boolean;
   onSelect: (newApproved: boolean) => void;
@@ -45,10 +57,11 @@ const ApprovalPillDropdown: React.FC<{
       <select
         value={isApproved ? 'Yes' : 'No'}
         onChange={(e) => onSelect(e.target.value === 'Yes')}
-        className={`appearance-none pl-3 pr-7 py-1 rounded-xl text-[11px] font-extrabold focus:outline-none cursor-pointer border shadow-2xs transition ${isApproved
-          ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
-          : 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200'
-          }`}
+        className={`appearance-none pl-3 pr-7 py-1 rounded-xl text-[11px] font-extrabold focus:outline-none cursor-pointer border shadow-2xs transition ${
+          isApproved
+            ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
+            : 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200'
+        }`}
       >
         <option value="Yes" className="bg-white text-slate-900 font-bold py-1">✅ Yes (Approved)</option>
         <option value="No" className="bg-white text-slate-900 font-bold py-1">⏳ Pending / No</option>
@@ -58,25 +71,34 @@ const ApprovalPillDropdown: React.FC<{
   );
 };
 
-export const InfluencerManagementView: React.FC = () => {
+export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> = ({
+  userRole,
+  initialTab = 'paid',
+  onTargetUpdated
+}) => {
   const [influencers, setInfluencers] = useState<InfluencerTransaction[]>([]);
   const [paymentLogs, setPaymentLogs] = useState<PaymentLogItem[]>([]);
+  const [targets, setTargets] = useState<TargetItem[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Filters & Tabs
+  // Tab View Mode State
+  const mapInitialTab = (tab: string) => {
+    if (tab === 'targets') return 'Targets & Goals';
+    if (tab === 'barter') return 'Barter Collaborations';
+    if (tab === 'payments') return 'Payment Audit Logs';
+    if (tab === 'all') return 'All Collaborations';
+    return 'Paid Collaborations';
+  };
+
+  const [viewMode, setViewMode] = useState<'Targets & Goals' | 'Paid Collaborations' | 'Barter Collaborations' | 'Payment Audit Logs' | 'All Collaborations'>(mapInitialTab(initialTab));
+  
+  // Category Filter State
   const [activeCategory, setActiveCategory] = useState<'All' | 'Paid' | 'Barter'>('All');
   const [timeframe, setTimeframe] = useState<'today' | 'monthly' | 'yearly' | 'all'>('monthly');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState<'Financial Ledger' | 'Content Deliverables' | 'Payment Audit Logs'>('Financial Ledger');
   const [selectedPayLogType, setSelectedPayLogType] = useState<'All' | 'IN' | 'OUT'>('All');
-
-  // Dropdown Filter States
-  const [selectedBrandFilter, setSelectedBrandFilter] = useState('All');
-  const [selectedManagerFilter, setSelectedManagerFilter] = useState('All');
-  const [selectedStatusFilter, setSelectedStatusFilter] = useState('All');
-  const [selectedPlatformFilter, setSelectedPlatformFilter] = useState('All');
 
   // Metrics
   const [metrics, setMetrics] = useState({
@@ -99,44 +121,7 @@ export const InfluencerManagementView: React.FC = () => {
     }
   };
 
-  const SortHeader = ({
-    field,
-    label,
-    align = 'left',
-    bgClass = 'bg-slate-800 text-slate-200',
-    className = ''
-  }: {
-    field: string;
-    label: string;
-    align?: 'left' | 'right' | 'center';
-    bgClass?: string;
-    className?: string;
-  }) => {
-    const isSorted = sortKey === field;
-    const activeClass = isSorted
-      ? 'bg-purple-950 text-purple-200 font-extrabold border-b-2 border-purple-400'
-      : bgClass;
-
-    return (
-      <th
-        onClick={() => handleSort(field)}
-        className={`px-3.5 py-3 border-b border-r border-slate-700/80 select-none cursor-pointer hover:bg-slate-700/90 transition-colors ${activeClass} ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'} ${className}`}
-      >
-        <div className={`flex items-center gap-1.5 ${align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : 'justify-start'}`}>
-          <span className="truncate">{label}</span>
-          {isSorted ? (
-            sortDir === 'asc' ? (
-              <ChevronUp size={13} className="text-purple-300 shrink-0 font-bold" />
-            ) : (
-              <ChevronDown size={13} className="text-purple-300 shrink-0 font-bold" />
-            )
-          ) : (
-            <ChevronsUpDown size={11} className="text-slate-400 opacity-40 shrink-0 hover:opacity-100 transition" />
-          )}
-        </div>
-      </th>
-    );
-  };
+  const isManagerOrAdmin = userRole === 'Super Admin' || userRole === 'Admin' || userRole === 'Marketing Manager' || userRole === 'Team Leader';
 
   // Modal State — Influencer Record
   const [showModal, setShowModal] = useState(false);
@@ -154,7 +139,27 @@ export const InfluencerManagementView: React.FC = () => {
   const [payLogDate, setPayLogDate] = useState(new Date().toISOString().split('T')[0]);
   const [payLogNotes, setPayLogNotes] = useState('');
 
-  // Form Fields (Exact Google Sheet Columns)
+  // Modal State — Target Record
+  const [showTargetModal, setShowTargetModal] = useState(false);
+  const [editingTarget, setEditingTarget] = useState<TargetItem | null>(null);
+  const [targetFormData, setTargetFormData] = useState({
+    title: '',
+    targetType: 'Paid' as 'Paid' | 'Barter',
+    targetMetric: 'Margin' as 'Margin' | 'Revenue' | 'Count',
+    targetAmount: '500000',
+    targetCount: '120',
+    currency: '₹',
+    period: `${new Date().toLocaleString('default', { month: 'long' })} ${new Date().getFullYear()}`,
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: '',
+    description: '',
+    isActive: true,
+    autoSync: true,
+    status: 'Active'
+  });
+  const [savingTarget, setSavingTarget] = useState(false);
+
+  // Form Fields (Influencer Record)
   const [influencerManager, setInfluencerManager] = useState('');
   const [influencerName, setInfluencerName] = useState('');
   const [selectedBrandId, setSelectedBrandId] = useState('');
@@ -187,9 +192,11 @@ export const InfluencerManagementView: React.FC = () => {
   const [transactionDate, setTransactionDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
   const [remark, setRemark] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8;
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Fetch Brands
   const fetchBrands = async () => {
     try {
       const res = await api.get('/brands');
@@ -199,6 +206,19 @@ export const InfluencerManagementView: React.FC = () => {
     }
   };
 
+  // Fetch Targets
+  const fetchTargets = async () => {
+    try {
+      const res = await api.get('/targets');
+      if (res.success) {
+        setTargets(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch targets', err);
+    }
+  };
+
+  // Fetch Influencers
   const fetchInfluencers = async () => {
     setLoading(true);
     try {
@@ -206,7 +226,6 @@ export const InfluencerManagementView: React.FC = () => {
       const month = currentDate.getMonth() + 1;
 
       let url = `/influencers?timeframe=${timeframe}&year=${year}&month=${month}`;
-      if (activeCategory !== 'All') url += `&category=${activeCategory}`;
       if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
 
       const res = await api.get(url);
@@ -223,6 +242,7 @@ export const InfluencerManagementView: React.FC = () => {
     }
   };
 
+  // Fetch Payment Audit Logs
   const fetchPaymentLogs = async () => {
     setLoading(true);
     try {
@@ -245,17 +265,130 @@ export const InfluencerManagementView: React.FC = () => {
 
   useEffect(() => {
     fetchBrands();
+    fetchTargets();
   }, []);
 
   useEffect(() => {
     if (viewMode === 'Payment Audit Logs') {
       fetchPaymentLogs();
+    } else if (viewMode === 'Targets & Goals') {
+      fetchTargets();
+      fetchInfluencers();
     } else {
       fetchInfluencers();
     }
   }, [activeCategory, timeframe, currentDate, searchTerm, viewMode, selectedPayLogType]);
 
-  const openAddModal = () => {
+  // Target Action Handlers
+  const handleOpenCreateTargetModal = (defaultType: 'Paid' | 'Barter' = 'Paid') => {
+    const defaultPeriod = `${currentDate.toLocaleString('default', { month: 'long' })} ${currentDate.getFullYear()}`;
+    setTargetFormData({
+      title: defaultType === 'Barter' ? `Barter Target - ${defaultPeriod}` : `Monthly Revenue Target - ${defaultPeriod}`,
+      targetType: defaultType,
+      targetMetric: defaultType === 'Barter' ? 'Count' : 'Margin',
+      targetAmount: '',
+      targetCount: '',
+      currency: defaultType === 'Barter' ? 'Collabs' : '₹',
+      period: defaultPeriod,
+      startDate: new Date().toISOString().split('T')[0],
+      endDate: '',
+      description: defaultType === 'Barter' 
+        ? 'Monthly barter collaboration target set by AD2ship.'
+        : 'Monthly AD2ship profit margin target (Brand Quoted Price - Influencer Cost).',
+      isActive: true,
+      autoSync: true,
+      status: 'Active'
+    });
+    setEditingTarget(null);
+    setShowTargetModal(true);
+  };
+
+  const handleOpenEditTargetModal = (target: TargetItem) => {
+    setEditingTarget(target);
+    setTargetFormData({
+      title: target.title,
+      targetType: target.targetType || 'Paid',
+      targetMetric: target.targetMetric || (target.targetType === 'Barter' ? 'Count' : 'Margin'),
+      targetAmount: (target.targetAmount || 0).toString(),
+      targetCount: (target.targetCount || target.targetAmount || 0).toString(),
+      currency: target.currency || (target.targetType === 'Barter' ? 'Collabs' : '₹'),
+      period: target.period,
+      startDate: target.startDate ? new Date(target.startDate).toISOString().split('T')[0] : '',
+      endDate: target.endDate ? new Date(target.endDate).toISOString().split('T')[0] : '',
+      description: target.description || '',
+      isActive: target.isActive,
+      autoSync: target.autoSync !== false,
+      status: target.status
+    });
+    setShowTargetModal(true);
+  };
+
+  const handleSaveTarget = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingTarget(true);
+    try {
+      const payload = {
+        title: targetFormData.title,
+        targetType: targetFormData.targetType,
+        targetMetric: targetFormData.targetMetric,
+        targetAmount: Number(targetFormData.targetAmount),
+        targetCount: Number(targetFormData.targetCount || targetFormData.targetAmount),
+        currency: targetFormData.currency,
+        period: targetFormData.period,
+        startDate: targetFormData.startDate || undefined,
+        endDate: targetFormData.endDate || undefined,
+        description: targetFormData.description,
+        isActive: targetFormData.isActive,
+        autoSync: targetFormData.autoSync,
+        status: targetFormData.status
+      };
+
+      let res;
+      if (editingTarget) {
+        res = await api.put(`/targets/${editingTarget._id}`, payload);
+      } else {
+        res = await api.post('/targets', payload);
+      }
+
+      if (res.success) {
+        setShowTargetModal(false);
+        fetchTargets();
+        if (onTargetUpdated) onTargetUpdated();
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to save target');
+    } finally {
+      setSavingTarget(false);
+    }
+  };
+
+  const handleSetActiveTarget = async (id: string) => {
+    try {
+      const res = await api.patch(`/targets/${id}/active`);
+      if (res.success) {
+        fetchTargets();
+        if (onTargetUpdated) onTargetUpdated();
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to set active target');
+    }
+  };
+
+  const handleDeleteTarget = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this target record?')) return;
+    try {
+      const res = await api.delete(`/targets/${id}`);
+      if (res.success) {
+        fetchTargets();
+        if (onTargetUpdated) onTargetUpdated();
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete target');
+    }
+  };
+
+  // Influencer Record Handlers
+  const openAddModal = (defaultCategory: 'Paid' | 'Barter' = 'Paid') => {
     setEditingItem(null);
     setInfluencerManager('');
     setInfluencerName('');
@@ -263,11 +396,11 @@ export const InfluencerManagementView: React.FC = () => {
     setCustomBrandName('');
     setPhone('');
     setProfileLink('');
-    setCategory(activeCategory === 'Barter' ? 'Barter' : 'Paid');
-    setBrandOnboardingAmt(0);
-    setBrandReceivedAmt(0);
-    setInfluencerOnboardingAmt(0);
-    setInfluencerPaidAmt(0);
+    setCategory(defaultCategory);
+    setBrandOnboardingAmt('');
+    setBrandReceivedAmt('');
+    setInfluencerOnboardingAmt('');
+    setInfluencerPaidAmt('');
     setFinalPaymentReceived(false);
     setProductLink('');
     setVideoType('Single Product Video');
@@ -279,8 +412,8 @@ export const InfluencerManagementView: React.FC = () => {
     setStatus('Completed');
     setContentLink('');
     setAdsCode('');
-    setViewsCount(0);
-    setOrdersCount(0);
+    setViewsCount('');
+    setOrdersCount('');
     setIsApproved(true);
     setTransactionDate(new Date().toISOString().split('T')[0]);
     setNotes('');
@@ -321,11 +454,11 @@ export const InfluencerManagementView: React.FC = () => {
     setShowModal(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmitInfluencer = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const brandObj = brands.find(b => b._id === selectedBrandId);
-      const bName = brandObj ? brandObj.brandName : (customBrandName || 'General');
+      const bName = brandObj ? brandObj.brandName : (customBrandName || 'Bunaiwala');
 
       const payload = {
         influencerManager,
@@ -368,22 +501,29 @@ export const InfluencerManagementView: React.FC = () => {
       if (res.success) {
         setShowModal(false);
         fetchInfluencers();
+        fetchTargets();
+        if (onTargetUpdated) onTargetUpdated();
       }
     } catch (err: any) {
       alert(err.message || 'Failed to save influencer record');
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteInfluencer = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this influencer record?')) return;
     try {
       const res = await api.delete(`/influencers/${id}`);
-      if (res.success) fetchInfluencers();
+      if (res.success) {
+        fetchInfluencers();
+        fetchTargets();
+        if (onTargetUpdated) onTargetUpdated();
+      }
     } catch (err: any) {
       alert(err.message || 'Failed to delete record');
     }
   };
 
+  // Payment Log Handlers
   const openPaymentModal = () => {
     setPayLogInfluencerName('');
     setPayLogBrandName('');
@@ -402,7 +542,7 @@ export const InfluencerManagementView: React.FC = () => {
     try {
       const res = await api.post('/influencers/payment-logs', {
         influencerName: payLogInfluencerName,
-        brandName: payLogBrandName,
+        brandName: payLogBrandName || 'Bunaiwala',
         type: payLogType,
         amount: Number(payLogAmount) || 0,
         paymentMode: payLogMode,
@@ -430,7 +570,7 @@ export const InfluencerManagementView: React.FC = () => {
     }
   };
 
-  // Quick Inline Table Update Handlers
+  // Inline table update handlers
   const handleStatusChange = async (id: string, newStatus: string) => {
     setInfluencers(prev => prev.map(i => i._id === id ? { ...i, status: newStatus as any } : i));
     try {
@@ -451,1137 +591,1455 @@ export const InfluencerManagementView: React.FC = () => {
     }
   };
 
-  const handleFinalPaymentToggle = async (id: string, currentVal: boolean) => {
-    const newVal = !currentVal;
-    setInfluencers(prev => prev.map(i => i._id === id ? { ...i, finalPaymentReceived: newVal } : i));
-    try {
-      await api.put(`/influencers/${id}`, { finalPaymentReceived: newVal });
-    } catch (err) {
-      console.error('Failed to update final payment status', err);
-      fetchInfluencers();
-    }
-  };
-
-  // Derived Google Sheet calculations for Form Preview
-  const calcBrandOnboard = Number(brandOnboardingAmt) || 0;
-  const calcBrandReceived = Number(brandReceivedAmt) || 0;
-  const calcBrandPending = calcBrandOnboard - calcBrandReceived;
-
-  const calcInfOnboard = Number(influencerOnboardingAmt) || 0;
-  const calcInfPaid = Number(influencerPaidAmt) || 0;
-  const calcInfPending = calcInfOnboard - calcInfPaid;
-
-  const calcMargin = calcBrandOnboard - calcInfOnboard;
-  const calcNetBalance = calcBrandReceived - calcInfPaid;
-
-  // Unique dropdown lists
-  const uniqueManagers = Array.from(new Set(influencers.map(i => i.influencerManager).filter(Boolean)));
-  const uniqueBrandNames = Array.from(new Set([...brands.map(b => b.brandName), ...influencers.map(i => i.brandName).filter(Boolean)]));
-
-  // Multi-dropdown filtered list
-  const filteredInfluencers = influencers.filter((item) => {
-    if (selectedBrandFilter !== 'All' && item.brandName !== selectedBrandFilter) return false;
-    if (selectedManagerFilter !== 'All' && item.influencerManager !== selectedManagerFilter) return false;
-    if (selectedStatusFilter !== 'All' && item.status !== selectedStatusFilter) return false;
-    if (selectedPlatformFilter !== 'All' && item.platform !== selectedPlatformFilter) return false;
+  // Filtered & Sorted Influencers
+  const filteredInfluencers = influencers.filter(i => {
+    if (viewMode === 'Paid Collaborations' && i.category !== 'Paid') return false;
+    if (viewMode === 'Barter Collaborations' && i.category !== 'Barter') return false;
     return true;
   });
 
-  const sortedInfluencers = React.useMemo(() => {
-    if (!sortKey) return filteredInfluencers;
-    return [...filteredInfluencers].sort((a: any, b: any) => {
-      let aVal = a[sortKey] ?? '';
-      let bVal = b[sortKey] ?? '';
-      if (typeof aVal === 'string') {
-        const cmp = aVal.localeCompare(String(bVal), undefined, { numeric: true });
-        return sortDir === 'asc' ? cmp : -cmp;
-      }
-      const cmp = (Number(aVal) || 0) - (Number(bVal) || 0);
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-  }, [filteredInfluencers, sortKey, sortDir]);
+  // Calculate Metrics from Current View
+  const paidCollabs = influencers.filter(i => i.category === 'Paid');
+  const barterCollabs = influencers.filter(i => i.category === 'Barter');
+
+  const totalBrandBilling = paidCollabs.reduce((acc, curr) => acc + (curr.brandOnboardingAmt || curr.inAmount || 0), 0);
+  const totalInfluencerCost = paidCollabs.reduce((acc, curr) => acc + (curr.influencerOnboardingAmt || curr.outAmount || 0), 0);
+  const netAd2shipMargin = totalBrandBilling - totalInfluencerCost;
+  const marginPercentage = totalBrandBilling > 0 ? Math.round((netAd2shipMargin / totalBrandBilling) * 100) : 0;
+
+  const totalBrandReceived = paidCollabs.reduce((acc, curr) => acc + (curr.brandReceivedAmt || curr.inAmount || 0), 0);
+  const totalInfluencerPaid = paidCollabs.reduce((acc, curr) => acc + (curr.influencerPaidAmt || curr.outAmount || 0), 0);
+  const cashflowBalance = totalBrandReceived - totalInfluencerPaid;
+
+  const totalBarterViews = barterCollabs.reduce((acc, curr) => acc + (curr.viewsCount || 0), 0);
+  const totalBarterOrders = barterCollabs.reduce((acc, curr) => acc + (curr.ordersCount || 0), 0);
+
+  // Active Target Calculations
+  const activePaidTarget = targets.find(t => t.isActive && (t.targetType === 'Paid' || !t.targetType)) || targets.find(t => (t.targetType === 'Paid' || !t.targetType));
+  const activeBarterTarget = targets.find(t => t.isActive && t.targetType === 'Barter') || targets.find(t => t.targetType === 'Barter');
+
+  const paidAchieved = activePaidTarget ? activePaidTarget.achievedAmount : netAd2shipMargin;
+  const paidGoal = activePaidTarget ? activePaidTarget.targetAmount : 0;
+  const paidPct = paidGoal > 0 ? Math.min(100, Math.round((paidAchieved / paidGoal) * 100)) : 0;
+
+  const barterAchieved = activeBarterTarget ? (activeBarterTarget.achievedCount || activeBarterTarget.achievedAmount || 0) : barterCollabs.length;
+  const barterGoal = activeBarterTarget ? (activeBarterTarget.targetCount || activeBarterTarget.targetAmount || 0) : 0;
+  const barterPct = barterGoal > 0 ? Math.min(100, Math.round((barterAchieved / barterGoal) * 100)) : 0;
+
+  // Pagination
+  const totalPages = Math.ceil(filteredInfluencers.length / itemsPerPage) || 1;
+  const paginatedInfluencers = filteredInfluencers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const SortHeader = ({ field, label, align = 'left' }: { field: string; label: string; align?: 'left' | 'right' | 'center' }) => {
+    const isSorted = sortKey === field;
+    return (
+      <th
+        onClick={() => handleSort(field)}
+        className={`px-3.5 py-3 border-b border-r border-slate-700/80 select-none cursor-pointer hover:bg-slate-700/90 transition-colors bg-slate-800 text-slate-200 text-xs font-bold ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'}`}
+      >
+        <div className={`flex items-center gap-1.5 ${align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : 'justify-start'}`}>
+          <span className="truncate">{label}</span>
+          {isSorted ? (
+            sortDir === 'asc' ? <ChevronUp size={13} className="text-purple-300" /> : <ChevronDown size={13} className="text-purple-300" />
+          ) : (
+            <ChevronsUpDown size={11} className="text-slate-400 opacity-40 hover:opacity-100" />
+          )}
+        </div>
+      </th>
+    );
+  };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Top Header */}
+    <div className="space-y-6 animate-fade-in pb-12">
+      {/* Top Header Banner */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold shrink-0">
             <Sparkles size={22} />
           </div>
           <div>
-            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Influencer Module</h2>
+            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Influencer & Revenue Management</h2>
             <p className="text-xs font-semibold text-slate-500 mt-0.5">
-              Day-wise creator onboarding, paid & barter finances, payment audit logs, and deliverables.
+              Paid Collaboration Profit Margins, Barter Collaboration Count Goals, and Complete Payment In/Out Ledger.
             </p>
           </div>
         </div>
 
-        {viewMode === 'Payment Audit Logs' ? (
+        {/* Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-auto">
+          {isManagerOrAdmin && (
+            <button
+              onClick={() => handleOpenCreateTargetModal('Paid')}
+              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-xl font-bold text-xs flex items-center space-x-2 transition"
+            >
+              <Target size={16} className="text-purple-600" />
+              <span>Set Target</span>
+            </button>
+          )}
+
           <button
-            onClick={openPaymentModal}
-            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm flex items-center space-x-2 shadow-md hover:shadow-lg transition self-start sm:self-auto shrink-0"
+            onClick={() => openAddModal('Paid')}
+            className="px-4 py-2.5 btn-gradient-primary text-white rounded-xl font-bold text-xs flex items-center space-x-2 shadow-md transition"
           >
-            <Receipt size={18} />
-            <span>Record Payment Entry</span>
+            <Plus size={16} />
+            <span>Add Collaboration</span>
           </button>
-        ) : (
-          <button
-            onClick={openAddModal}
-            className="px-5 py-2.5 btn-gradient-primary rounded-xl font-bold text-sm flex items-center space-x-2 shadow-md hover:shadow-lg transition self-start sm:self-auto shrink-0"
-          >
-            <Plus size={18} />
-            <span>Add Influencer Record</span>
-          </button>
-        )}
+        </div>
       </div>
 
-      {/* Toolbar — All tabs in one single row, full width */}
-      <div className="bg-white px-5 py-3 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between w-full gap-3">
-
-        {/* Category Filter: All / Paid / Barter */}
-        <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-extrabold">
+      {/* Main Navigation Tabs */}
+      <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto">
           <button
-            onClick={() => setActiveCategory('All')}
-            className={`px-3 py-1.5 rounded-lg transition ${activeCategory === 'All' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+            onClick={() => setViewMode('Targets & Goals')}
+            className={`px-4 py-2.5 rounded-xl font-extrabold text-xs flex items-center space-x-2 transition ${
+              viewMode === 'Targets & Goals'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-bold'
+            }`}
           >
-            All
-          </button>
-          <button
-            onClick={() => setActiveCategory('Paid')}
-            className={`px-3 py-1.5 rounded-lg transition ${activeCategory === 'Paid' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
-          >
-            💳 Paid
-          </button>
-          <button
-            onClick={() => setActiveCategory('Barter')}
-            className={`px-3 py-1.5 rounded-lg transition ${activeCategory === 'Barter' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
-          >
-            🎁 Barter
-          </button>
-        </div>
-
-        {/* Divider */}
-        <div className="w-px h-6 bg-slate-200 hidden sm:block" />
-
-        {/* View Mode: Financial / Deliverables / Payment Logs */}
-        <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-bold">
-          {(['Financial Ledger', 'Content Deliverables', 'Payment Audit Logs'] as const).map((vm) => (
-            <button
-              key={vm}
-              onClick={() => setViewMode(vm)}
-              className={`px-3 py-1.5 rounded-lg transition ${viewMode === vm
-                  ? vm === 'Payment Audit Logs' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-purple-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-                }`}
-            >
-              {vm === 'Financial Ledger' ? '📊 Financial Ledger' : vm === 'Content Deliverables' ? '🎬 Deliverables & Links' : '📜 Payment Logs'}
-            </button>
-          ))}
-        </div>
-
-        {/* Divider */}
-        <div className="w-px h-6 bg-slate-200 hidden sm:block" />
-
-        {/* Timeframe Filter */}
-        <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-bold">
-          {(['today', 'monthly', 'yearly', 'all'] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTimeframe(t)}
-              className={`px-3 py-1.5 rounded-lg transition uppercase ${timeframe === t ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
-            >
-              {t === 'today' ? 'Today' : t === 'monthly' ? 'Monthly' : t === 'yearly' ? 'Yearly' : 'All'}
-            </button>
-          ))}
-        </div>
-
-      </div>
-
-      {/* Financial Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Brand Received */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Brand Received (IN)</span>
-            <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center font-black">
-              <ArrowUpRight size={20} />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-black text-emerald-600">₹{metrics.totalIn.toLocaleString()}</div>
-            <p className="text-[11px] font-semibold text-slate-500 mt-1">Inward payment collected</p>
-          </div>
-        </div>
-
-        {/* Influencer Paid */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Influencer Paid (OUT)</span>
-            <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center font-black">
-              <ArrowDownRight size={20} />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-black text-rose-600">₹{metrics.totalOut.toLocaleString()}</div>
-            <p className="text-[11px] font-semibold text-slate-500 mt-1">Outward creator payout</p>
-          </div>
-        </div>
-
-        {/* Net Balance */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Net Balance</span>
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black ${metrics.netBalance >= 0 ? 'bg-purple-100 text-purple-600' : 'bg-amber-100 text-amber-600'}`}>
-              <DollarSign size={20} />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className={`text-2xl font-black ${metrics.netBalance >= 0 ? 'text-purple-700' : 'text-amber-600'}`}>
-              ₹{metrics.netBalance.toLocaleString()}
-            </div>
-            <p className="text-[11px] font-semibold text-slate-500 mt-1">Brand Received − Influencer Paid</p>
-          </div>
-        </div>
-
-        {/* Total Records / Entries */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              {viewMode === 'Payment Audit Logs' ? 'Payment Log Entries' : 'Total Records'}
+            <Target size={15} />
+            <span>Targets & Goals</span>
+            <span className={`px-2 py-0.5 text-[10px] rounded-full font-black ${
+              viewMode === 'Targets & Goals' ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-700'
+            }`}>
+              {targets.length}
             </span>
-            <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-black">
-              {viewMode === 'Payment Audit Logs' ? <Receipt size={20} /> : <User size={20} />}
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-black text-slate-900">
-              {viewMode === 'Payment Audit Logs' ? paymentLogs.length : filteredInfluencers.length} Entries
-            </div>
-            <p className="text-[11px] font-semibold text-slate-500 mt-1">Matching current filters</p>
+          </button>
+
+          <button
+            onClick={() => setViewMode('Paid Collaborations')}
+            className={`px-4 py-2.5 rounded-xl font-extrabold text-xs flex items-center space-x-2 transition ${
+              viewMode === 'Paid Collaborations'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-bold'
+            }`}
+          >
+            <DollarSign size={15} />
+            <span>Paid Collaborations</span>
+            <span className={`px-2 py-0.5 text-[10px] rounded-full font-black ${
+              viewMode === 'Paid Collaborations' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-800'
+            }`}>
+              {paidCollabs.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setViewMode('Barter Collaborations')}
+            className={`px-4 py-2.5 rounded-xl font-extrabold text-xs flex items-center space-x-2 transition ${
+              viewMode === 'Barter Collaborations'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-bold'
+            }`}
+          >
+            <ShoppingBag size={15} />
+            <span>Barter Collaborations</span>
+            <span className={`px-2 py-0.5 text-[10px] rounded-full font-black ${
+              viewMode === 'Barter Collaborations' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-800'
+            }`}>
+              {barterCollabs.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setViewMode('Payment Audit Logs')}
+            className={`px-4 py-2.5 rounded-xl font-extrabold text-xs flex items-center space-x-2 transition ${
+              viewMode === 'Payment Audit Logs'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-bold'
+            }`}
+          >
+            <Receipt size={15} />
+            <span>Payment Audit Logs</span>
+          </button>
+
+          <button
+            onClick={() => setViewMode('All Collaborations')}
+            className={`px-4 py-2.5 rounded-xl font-extrabold text-xs flex items-center space-x-2 transition ${
+              viewMode === 'All Collaborations'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-bold'
+            }`}
+          >
+            <Layers size={15} />
+            <span>All Records</span>
+            <span className={`px-2 py-0.5 text-[10px] rounded-full font-black ${
+              viewMode === 'All Collaborations' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+            }`}>
+              {influencers.length}
+            </span>
+          </button>
+        </div>
+
+        {/* Global Filters */}
+        <div className="flex items-center space-x-2 text-xs font-bold">
+          <select
+            value={timeframe}
+            onChange={(e: any) => setTimeframe(e.target.value)}
+            className="px-3 py-1.5 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500 font-extrabold"
+          >
+            <option value="monthly">This Month</option>
+            <option value="today">Today</option>
+            <option value="yearly">This Year</option>
+            <option value="all">All Time</option>
+          </select>
+
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search influencer / brand..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-8 pr-3 py-1.5 rounded-xl border border-slate-300 bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 text-xs font-medium w-48"
+            />
           </div>
         </div>
       </div>
 
-      {/* Search & Multi-Dropdown Filter Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        {/* Search Bar */}
-        <div className="relative w-full sm:w-72">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search influencer, manager, or brand..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl pl-10 pr-4 py-2 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-none"
-          />
-        </div>
+      {/* VIEW 1: TARGETS & REVENUE GOALS */}
+      {viewMode === 'Targets & Goals' && (
+        <div className="space-y-4">
+          {/* Dual Compact Active Target Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Card 1: Paid Target (AD2ship Margin) */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold border border-emerald-100">
+                    <DollarSign size={18} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                      Paid Revenue Target
+                    </span>
+                    <h3 className="text-sm font-extrabold text-slate-900 mt-0.5">
+                      {activePaidTarget ? activePaidTarget.title : 'Monthly Revenue Target'}
+                    </h3>
+                  </div>
+                </div>
+                <span className="text-[11px] font-semibold text-slate-400 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
+                  {activePaidTarget ? activePaidTarget.period : `${currentDate.toLocaleString('default', { month: 'long' })} ${currentDate.getFullYear()}`}
+                </span>
+              </div>
 
-        {/* Dropdown Filters Group */}
-        {viewMode === 'Payment Audit Logs' ? (
-          <div className="flex items-center space-x-2">
-            <Receipt size={14} className="text-emerald-600 shrink-0" />
-            <span className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">Payment Flow:</span>
-            <select
-              value={selectedPayLogType}
-              onChange={(e) => setSelectedPayLogType(e.target.value as any)}
-              className="bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500 cursor-pointer"
-            >
-              <option value="All">🔄 All Payments</option>
-              <option value="IN">📥 IN — Brand Received</option>
-              <option value="OUT">📤 OUT — Influencer Paid</option>
-            </select>
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-            <div className="flex items-center space-x-1">
-              <Filter size={14} className="text-purple-600 shrink-0" />
-              <span className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">Filters:</span>
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase">Target Margin</p>
+                  <p className="text-lg font-black text-slate-900 mt-0.5">
+                    ₹{new Intl.NumberFormat().format(paidGoal)}
+                  </p>
+                </div>
+                <div className="bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-100">
+                  <p className="text-[10px] font-bold text-emerald-700 uppercase">Achieved Margin</p>
+                  <p className="text-lg font-black text-emerald-600 mt-0.5">
+                    ₹{new Intl.NumberFormat().format(paidAchieved)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs font-bold">
+                  <span className="text-slate-700 flex items-center gap-1">
+                    <TrendingUp size={12} className="text-emerald-600" /> {paidPct}% Progress
+                  </span>
+                  <span className="text-slate-400">
+                    Remaining: ₹{new Intl.NumberFormat().format(Math.max(0, paidGoal - paidAchieved))}
+                  </span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                    style={{ width: `${paidPct}%` }}
+                  />
+                </div>
+              </div>
+
+              {isManagerOrAdmin && (
+                <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-xs">
+                  <span className="text-slate-400 text-[11px]">Auto-Sync: <strong className="text-emerald-600">{activePaidTarget?.autoSync !== false ? 'Active' : 'Off'}</strong></span>
+                  {activePaidTarget ? (
+                    <button
+                      onClick={() => handleOpenEditTargetModal(activePaidTarget)}
+                      className="px-3 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold rounded-lg transition text-xs flex items-center gap-1"
+                    >
+                      <Edit2 size={12} /> Edit Target
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleOpenCreateTargetModal('Paid')}
+                      className="px-3 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold rounded-lg transition text-xs flex items-center gap-1"
+                    >
+                      <Plus size={12} /> Create Target
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* 1. Brand Dropdown */}
-            <select
-              value={selectedBrandFilter}
-              onChange={(e) => setSelectedBrandFilter(e.target.value)}
-              className="bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none focus:border-purple-500 hover:bg-purple-50 transition cursor-pointer"
-            >
-              <option value="All">🏢 All Brands</option>
-              {uniqueBrandNames.map(b => (
-                <option key={b} value={b}>{b}</option>
-              ))}
-            </select>
+            {/* Card 2: Barter Target (120 Collabs) */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold border border-purple-100">
+                    <ShoppingBag size={18} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                      Barter Collabs Goal
+                    </span>
+                    <h3 className="text-sm font-extrabold text-slate-900 mt-0.5">
+                      {activeBarterTarget ? activeBarterTarget.title : 'Monthly Barter Target'}
+                    </h3>
+                  </div>
+                </div>
+                <span className="text-[11px] font-semibold text-slate-400 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
+                  {activeBarterTarget ? activeBarterTarget.period : `${currentDate.toLocaleString('default', { month: 'long' })} ${currentDate.getFullYear()}`}
+                </span>
+              </div>
 
-            {/* 2. Manager Dropdown */}
-            <select
-              value={selectedManagerFilter}
-              onChange={(e) => setSelectedManagerFilter(e.target.value)}
-              className="bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none focus:border-purple-500 hover:bg-purple-50 transition cursor-pointer"
-            >
-              <option value="All">👤 All Managers</option>
-              {uniqueManagers.map(m => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase">Target Collab Volume</p>
+                  <p className="text-lg font-black text-slate-900 mt-0.5">
+                    {barterGoal} <span className="text-xs font-normal text-slate-400">Collabs</span>
+                  </p>
+                </div>
+                <div className="bg-purple-50/50 p-2.5 rounded-xl border border-purple-100">
+                  <p className="text-[10px] font-bold text-purple-700 uppercase">Achieved Barter Deals</p>
+                  <p className="text-lg font-black text-purple-600 mt-0.5">
+                    {barterAchieved} <span className="text-xs font-normal text-slate-400">Done</span>
+                  </p>
+                </div>
+              </div>
 
-            {/* 3. Status Dropdown */}
-            <select
-              value={selectedStatusFilter}
-              onChange={(e) => setSelectedStatusFilter(e.target.value)}
-              className="bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none focus:border-purple-500 hover:bg-purple-50 transition cursor-pointer"
-            >
-              <option value="All">⚡ All Statuses</option>
-              <option value="Completed">Completed</option>
-              <option value="Approved">Approved</option>
-              <option value="Pending">Pending</option>
-              <option value="Settled">Settled</option>
-            </select>
+              {/* Progress Bar */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs font-bold">
+                  <span className="text-slate-700 flex items-center gap-1">
+                    <Award size={12} className="text-purple-600" /> {barterPct}% Completed
+                  </span>
+                  <span className="text-slate-400">
+                    Remaining: {Math.max(0, barterGoal - barterAchieved)} Collabs
+                  </span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="bg-purple-600 h-full rounded-full transition-all duration-500"
+                    style={{ width: `${barterPct}%` }}
+                  />
+                </div>
+              </div>
 
-            {/* 4. Platform Dropdown */}
-            <select
-              value={selectedPlatformFilter}
-              onChange={(e) => setSelectedPlatformFilter(e.target.value)}
-              className="bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none focus:border-purple-500 hover:bg-purple-50 transition cursor-pointer"
-            >
-              <option value="All">🌐 All Platforms</option>
-              <option value="Instagram">Instagram</option>
-              <option value="YouTube">YouTube</option>
-              <option value="TikTok">TikTok</option>
-              <option value="X (Twitter)">X (Twitter)</option>
-            </select>
-
-            {/* Reset Filters Button */}
-            {(selectedBrandFilter !== 'All' || selectedManagerFilter !== 'All' || selectedStatusFilter !== 'All' || selectedPlatformFilter !== 'All') && (
-              <button
-                onClick={() => {
-                  setSelectedBrandFilter('All');
-                  setSelectedManagerFilter('All');
-                  setSelectedStatusFilter('All');
-                  setSelectedPlatformFilter('All');
-                  setSearchTerm('');
-                }}
-                className="px-2.5 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-xl text-xs font-extrabold transition border border-rose-200"
-              >
-                Reset Filters
-              </button>
-            )}
+              {isManagerOrAdmin && (
+                <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-xs">
+                  <span className="text-slate-400 text-[11px]">Auto-Sync: <strong className="text-purple-600">{activeBarterTarget?.autoSync !== false ? 'Active' : 'Off'}</strong></span>
+                  {activeBarterTarget ? (
+                    <button
+                      onClick={() => handleOpenEditTargetModal(activeBarterTarget)}
+                      className="px-3 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold rounded-lg transition text-xs flex items-center gap-1"
+                    >
+                      <Edit2 size={12} /> Edit Target
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleOpenCreateTargetModal('Barter')}
+                      className="px-3 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold rounded-lg transition text-xs flex items-center gap-1"
+                    >
+                      <Plus size={12} /> Create Target
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        )}
-      </div>
 
-      {/* Google Sheets Spreadsheet Data Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-        {loading ? (
-          <InlineLoader message="Loading ledger records..." />
-        ) : (
-          <div className="overflow-x-auto max-h-[600px]">
-            <table className="w-full text-left text-xs border-collapse">
-              {/* VIEW MODE 1: Financial Ledger View */}
-              {viewMode === 'Financial Ledger' && (
-                <>
-                  <thead className="bg-slate-800 text-white font-extrabold uppercase text-[10px] sticky top-0 z-20">
+          {/* Full Target Records Table */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <Target size={20} className="text-purple-600" />
+                  Target Records Directory
+                </h3>
+                <p className="text-xs text-slate-500 font-semibold mt-0.5">
+                  All active & historical AD2ship monthly targets stored in MongoDB.
+                </p>
+              </div>
+
+              {isManagerOrAdmin && (
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleOpenCreateTargetModal('Paid')}
+                    className="px-3.5 py-2 bg-purple-100 text-purple-700 hover:bg-purple-200 rounded-xl font-extrabold text-xs transition flex items-center gap-1.5"
+                  >
+                    <Plus size={14} /> Set Paid Target
+                  </button>
+                  <button
+                    onClick={() => handleOpenCreateTargetModal('Barter')}
+                    className="px-3.5 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-xl font-extrabold text-xs transition flex items-center gap-1.5"
+                  >
+                    <Plus size={14} /> Set Barter Target
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-800 text-slate-200 font-bold">
+                    <th className="p-3 border-b border-r border-slate-700">Target Title</th>
+                    <th className="p-3 border-b border-r border-slate-700">Type</th>
+                    <th className="p-3 border-b border-r border-slate-700 text-right">Target Goal</th>
+                    <th className="p-3 border-b border-r border-slate-700 text-right">Achieved</th>
+                    <th className="p-3 border-b border-r border-slate-700">Progress</th>
+                    <th className="p-3 border-b border-r border-slate-700">Period</th>
+                    <th className="p-3 border-b border-r border-slate-700 text-center">Status</th>
+                    <th className="p-3 border-b border-slate-700 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 font-medium text-slate-800">
+                  {targets.length === 0 ? (
                     <tr>
-                      <th className="px-3 py-3 border-b border-r border-slate-700 min-w-[40px] text-center bg-slate-800">#</th>
-                      <SortHeader field="transactionDate" label="Date" className="min-w-[90px]" />
-                      <SortHeader field="influencerManager" label="Manager" className="min-w-[120px]" />
-                      <SortHeader field="brandName" label="Brand" className="min-w-[140px]" />
-                      <SortHeader field="influencerName" label="Influencer Name" className="min-w-[160px]" />
-                      <th className="px-3 py-3 border-b border-r border-slate-700 min-w-[100px] bg-slate-800">Phone</th>
-                      <SortHeader field="category" label="Type" className="min-w-[80px]" />
-
-                      {/* Performance Views & Orders */}
-                      <SortHeader field="viewsCount" label="Views" align="right" bgClass="bg-purple-900 text-purple-100" className="min-w-[90px]" />
-                      <SortHeader field="ordersCount" label="Orders" align="right" bgClass="bg-emerald-900 text-emerald-100" className="min-w-[85px]" />
-
-                      {/* Brand Breakdown */}
-                      <SortHeader field="brandOnboardingAmt" label="Brand Onboard" align="right" bgClass="bg-sky-900 text-sky-100" className="min-w-[95px]" />
-                      <SortHeader field="brandReceivedAmt" label="Received" align="right" bgClass="bg-emerald-900 text-emerald-100" className="min-w-[90px]" />
-                      <SortHeader field="brandPendingAmt" label="Pending" align="right" bgClass="bg-amber-900 text-amber-100" className="min-w-[85px]" />
-
-                      {/* Influencer Payout Breakdown */}
-                      <SortHeader field="influencerOnboardingAmt" label="Inf Onboard" align="right" bgClass="bg-purple-900 text-purple-100" className="min-w-[95px]" />
-                      <SortHeader field="influencerPaidAmt" label="Paid" align="right" bgClass="bg-rose-900 text-rose-100" className="min-w-[85px]" />
-                      <SortHeader field="influencerPendingAmt" label="Pending" align="right" bgClass="bg-amber-900 text-amber-100" className="min-w-[85px]" />
-
-                      {/* Margin & Final Payment */}
-                      <SortHeader field="ad2shipMargin" label="Margin" align="right" bgClass="bg-emerald-900 text-emerald-100" className="min-w-[95px]" />
-                      <SortHeader field="finalPaymentReceived" label="Paid?" align="center" className="min-w-[60px]" />
-                      <th className="px-3 py-3 border-b border-slate-700 text-right min-w-[70px] bg-slate-800">Actions</th>
+                      <td colSpan={8} className="p-6 text-center text-slate-400 font-semibold">
+                        No targets created yet. Click "+ Set Monthly Target" to get started.
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {sortedInfluencers.length === 0 ? (
-                      <tr>
-                        <td colSpan={18} className="px-6 py-12 text-center text-slate-500 font-semibold">
-                          No influencer records found matching your filters. Click "Add Influencer Record" or Reset Filters.
-                        </td>
-                      </tr>
-                    ) : (
-                      sortedInfluencers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((item, idx) => (
-                        <tr key={item._id} className="hover:bg-purple-50/40 transition">
-                          <td className="px-3 py-2.5 text-center font-mono font-bold text-slate-400 border-r border-slate-200">
-                            {item.sNo || idx + 1}
+                  ) : (
+                    targets.map((t) => {
+                      const isBarter = t.targetType === 'Barter';
+                      const goalVal = isBarter ? (t.targetCount || t.targetAmount) : t.targetAmount;
+                      const achVal = isBarter ? (t.achievedCount || t.achievedAmount || 0) : t.achievedAmount;
+                      const pct = Math.min(100, Math.round(((achVal || 0) / (goalVal || 1)) * 100));
+
+                      return (
+                        <tr key={t._id} className={`hover:bg-slate-50 transition ${t.isActive ? 'bg-purple-50/40 font-semibold' : ''}`}>
+                          <td className="p-3 border-r border-slate-100">
+                            <div className="font-extrabold text-slate-900 flex items-center gap-1.5">
+                              {t.isActive && <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Active Banner Target" />}
+                              <span>{t.title}</span>
+                            </div>
+                            <span className="text-[10px] text-slate-500 font-medium line-clamp-1">{t.description || 'Monthly AD2ship Target'}</span>
                           </td>
-                          <td className="px-3 py-2.5 font-mono text-[11px] text-slate-600 border-r border-slate-200">
-                            {new Date(item.transactionDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+
+                          <td className="p-3 border-r border-slate-100">
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase border ${
+                              isBarter ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-purple-100 text-purple-800 border-purple-200'
+                            }`}>
+                              {t.targetType || 'Paid'}
+                            </span>
                           </td>
-                          <td className="px-3 py-2.5 font-semibold text-slate-700 border-r border-slate-200 truncate max-w-[110px]">
-                            {item.influencerManager || 'Manager'}
+
+                          <td className="p-3 border-r border-slate-100 text-right font-extrabold text-slate-900">
+                            {isBarter ? `${goalVal} Collabs` : `₹${new Intl.NumberFormat().format(goalVal)}`}
                           </td>
-                          <td className="px-4 py-2.5 font-extrabold text-slate-900 border-r border-slate-200 truncate max-w-[130px]">
-                            {item.brandName}
+
+                          <td className="p-3 border-r border-slate-100 text-right font-extrabold text-emerald-600">
+                            {isBarter ? `${achVal} Collabs` : `₹${new Intl.NumberFormat().format(achVal)}`}
                           </td>
-                          <td className="px-4 py-2.5 font-bold text-purple-700 border-r border-slate-200">
-                            <div className="flex items-center justify-between">
-                              <span className="truncate max-w-[140px]">{item.influencerName}</span>
-                              {item.profileLink && (
-                                <a href={item.profileLink} target="_blank" rel="noreferrer" className="text-purple-500 hover:text-purple-700">
-                                  <ExternalLink size={12} />
-                                </a>
-                              )}
+
+                          <td className="p-3 border-r border-slate-100 min-w-[140px]">
+                            <div className="flex items-center gap-2">
+                              <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${isBarter ? 'bg-blue-500' : 'bg-purple-600'}`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              <span className="text-[11px] font-extrabold shrink-0 text-slate-700">{pct}%</span>
                             </div>
                           </td>
-                          <td className="px-3 py-2.5 font-mono text-slate-600 border-r border-slate-200">
-                            {item.phone || '-'}
+
+                          <td className="p-3 border-r border-slate-100 font-semibold text-slate-600">
+                            {t.period}
                           </td>
-                          <td className="px-3 py-2.5 border-r border-slate-200">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${item.category === 'Paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'}`}>
+
+                          <td className="p-3 border-r border-slate-100 text-center">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold ${
+                              t.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {t.status}
+                            </span>
+                          </td>
+
+                          <td className="p-3 text-center space-x-1 whitespace-nowrap">
+                            {isManagerOrAdmin && (
+                              <>
+                                {!t.isActive && (
+                                  <button
+                                    onClick={() => handleSetActiveTarget(t._id)}
+                                    className="px-2 py-1 bg-slate-100 hover:bg-purple-100 text-slate-700 hover:text-purple-700 rounded-lg text-[10px] font-bold transition"
+                                    title="Set as Top Banner Active Target"
+                                  >
+                                    Set Active
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleOpenEditTargetModal(t)}
+                                  className="p-1 rounded-lg text-purple-600 hover:bg-purple-50 transition"
+                                  title="Edit Target"
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteTarget(t._id)}
+                                  className="p-1 rounded-lg text-red-600 hover:bg-red-50 transition"
+                                  title="Delete Target"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW 2 & VIEW 3 & VIEW 5: PAID / BARTER / ALL COLLABORATIONS */}
+      {(viewMode === 'Paid Collaborations' || viewMode === 'Barter Collaborations' || viewMode === 'All Collaborations') && (
+        <div className="space-y-6">
+          {/* Summary Metric Cards */}
+          {viewMode === 'Barter Collaborations' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">Barter Collabs Done</p>
+                  <h4 className="text-2xl font-black text-slate-900 mt-1">{barterCollabs.length}</h4>
+                  <p className="text-[11px] text-purple-600 font-semibold mt-0.5">Completed Product Deals</p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
+                  <ShoppingBag size={24} />
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">Monthly Goal Progress</p>
+                  <h4 className="text-2xl font-black text-slate-900 mt-1">
+                    {barterAchieved} {barterGoal > 0 ? `/ ${barterGoal}` : ''}
+                  </h4>
+                  <p className="text-[11px] text-blue-600 font-bold mt-0.5">
+                    {barterGoal > 0 ? `${barterPct}% Goal Achieved` : 'No Active Goal'}
+                  </p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                  <Award size={24} />
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">Total Views Generated</p>
+                  <h4 className="text-2xl font-black text-slate-900 mt-1">{new Intl.NumberFormat().format(totalBarterViews)}</h4>
+                  <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">Sum of Content Views</p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                  <Eye size={24} />
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">Total Orders Driven</p>
+                  <h4 className="text-2xl font-black text-slate-900 mt-1">{new Intl.NumberFormat().format(totalBarterOrders)}</h4>
+                  <p className="text-[11px] text-indigo-600 font-semibold mt-0.5">Conversion Product Orders</p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                  <TrendingUp size={24} />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">Brand Onboarding (IN)</p>
+                  <h4 className="text-2xl font-black text-slate-900 mt-1">₹{new Intl.NumberFormat().format(totalBrandBilling)}</h4>
+                  <p className="text-[11px] text-slate-400 font-semibold mt-0.5">Client Agreed Revenue</p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
+                  <ArrowDownRight size={24} />
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">Creator Cost (OUT)</p>
+                  <h4 className="text-2xl font-black text-slate-900 mt-1">₹{new Intl.NumberFormat().format(totalInfluencerCost)}</h4>
+                  <p className="text-[11px] text-slate-400 font-semibold mt-0.5">Real Influencer Payout</p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-pink-100 text-pink-700 flex items-center justify-center font-bold">
+                  <ArrowUpRight size={24} />
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-5 rounded-2xl text-white shadow-md flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-emerald-100">AD2ship Profit Margin</p>
+                  <h4 className="text-2xl font-black text-white mt-1">₹{new Intl.NumberFormat().format(netAd2shipMargin)}</h4>
+                  <p className="text-[11px] text-emerald-100 font-bold mt-0.5">Margin: {marginPercentage}% Profit</p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold backdrop-blur-xs">
+                  <DollarSign size={24} />
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">Cashflow Balance</p>
+                  <h4 className={`text-2xl font-black mt-1 ${cashflowBalance >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                    ₹{new Intl.NumberFormat().format(cashflowBalance)}
+                  </h4>
+                  <p className="text-[11px] text-slate-400 font-semibold mt-0.5">Received IN - Paid OUT</p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                  <Receipt size={24} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Main Table */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  {viewMode === 'Paid Collaborations' && <DollarSign className="text-emerald-600" size={20} />}
+                  {viewMode === 'Barter Collaborations' && <ShoppingBag className="text-blue-600" size={20} />}
+                  {viewMode === 'All Collaborations' && <Layers className="text-purple-600" size={20} />}
+                  {viewMode} Ledger
+                </h3>
+                <p className="text-xs text-slate-500 font-semibold mt-0.5">
+                  Showing {filteredInfluencers.length} records • Real-time AD2ship financial margins and deliverable metrics.
+                </p>
+              </div>
+
+              <button
+                onClick={() => openAddModal(viewMode === 'Barter Collaborations' ? 'Barter' : 'Paid')}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-extrabold text-xs flex items-center gap-1.5 shadow-sm transition"
+              >
+                <Plus size={15} /> Add Record
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-800 text-slate-200 font-bold">
+                    <SortHeader field="sNo" label="#" align="center" />
+                    <SortHeader field="transactionDate" label="Date" />
+                    <SortHeader field="influencerManager" label="Manager" />
+                    <SortHeader field="brandName" label="Brand" />
+                    <SortHeader field="influencerName" label="Influencer" />
+                    <SortHeader field="category" label="Category" align="center" />
+                    
+                    {/* Paid Financial Headers */}
+                    {(viewMode === 'Paid Collaborations' || viewMode === 'All Collaborations') && (
+                      <>
+                        <SortHeader field="brandOnboardingAmt" label="Brand Price (IN)" align="right" />
+                        <SortHeader field="influencerOnboardingAmt" label="Creator Price (OUT)" align="right" />
+                        <SortHeader field="ad2shipMargin" label="AD2ship Margin" align="right" />
+                      </>
+                    )}
+
+                    {/* Barter Deliverable Headers */}
+                    {(viewMode === 'Barter Collaborations' || viewMode === 'All Collaborations') && (
+                      <>
+                        <SortHeader field="videoType" label="Deliverable" />
+                        <SortHeader field="viewsCount" label="Views / Orders" align="right" />
+                      </>
+                    )}
+
+                    <SortHeader field="status" label="Status" align="center" />
+                    <SortHeader field="isApproved" label="Approved" align="center" />
+                    <th className="p-3 border-b border-slate-700 text-center">Actions</th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-slate-200 font-medium text-slate-800">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={12} className="p-12 text-center">
+                        <InlineLoader message="Loading influencer ledger data..." />
+                      </td>
+                    </tr>
+                  ) : paginatedInfluencers.length === 0 ? (
+                    <tr>
+                      <td colSpan={12} className="p-12 text-center text-slate-400 font-semibold">
+                        No records match the selected filters. Click "+ Add Record" to enter new collaborations.
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedInfluencers.map((item, idx) => {
+                      const isPaid = item.category === 'Paid';
+                      const margin = (item.brandOnboardingAmt || item.inAmount || 0) - (item.influencerOnboardingAmt || item.outAmount || 0);
+
+                      return (
+                        <tr key={item._id} className="hover:bg-slate-50 transition">
+                          <td className="p-3 border-r border-slate-100 text-center font-extrabold text-slate-400">
+                            {item.sNo || (currentPage - 1) * itemsPerPage + idx + 1}
+                          </td>
+
+                          <td className="p-3 border-r border-slate-100 font-semibold whitespace-nowrap text-slate-600">
+                            {new Date(item.transactionDate).toLocaleDateString()}
+                          </td>
+
+                          <td className="p-3 border-r border-slate-100 font-semibold text-slate-700">
+                            {item.influencerManager || 'Staff'}
+                          </td>
+
+                          <td className="p-3 border-r border-slate-100 font-extrabold text-slate-900">
+                            {item.brandName}
+                          </td>
+
+                          <td className="p-3 border-r border-slate-100">
+                            <div className="font-extrabold text-purple-700">{item.influencerName}</div>
+                            {item.phone && <div className="text-[10px] text-slate-400 font-medium">{item.phone}</div>}
+                          </td>
+
+                          <td className="p-3 border-r border-slate-100 text-center">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${
+                              isPaid ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-blue-100 text-blue-800 border-blue-300'
+                            }`}>
                               {item.category}
                             </span>
                           </td>
 
-                          {/* Performance Views & Orders */}
-                          <td className="px-3 py-2.5 text-right font-extrabold text-purple-700 bg-purple-50/20 border-r border-slate-200">
-                            👁️ {(item.viewsCount || 0).toLocaleString()}
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-extrabold text-emerald-700 bg-emerald-50/20 border-r border-slate-200">
-                            📦 {(item.ordersCount || 0).toLocaleString()}
-                          </td>
+                          {/* Financial Columns */}
+                          {(viewMode === 'Paid Collaborations' || viewMode === 'All Collaborations') && (
+                            <>
+                              <td className="p-3 border-r border-slate-100 text-right font-black text-slate-900">
+                                ₹{new Intl.NumberFormat().format(item.brandOnboardingAmt || item.inAmount || 0)}
+                              </td>
 
-                          {/* Brand Breakdown */}
-                          <td className="px-3 py-2.5 text-right font-bold text-slate-800 bg-sky-50/50 border-r border-slate-200">
-                            ₹{(item.brandOnboardingAmt || item.inAmount || 0).toLocaleString()}
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-black text-emerald-600 bg-emerald-50/50 border-r border-slate-200">
-                            ₹{(item.brandReceivedAmt || item.inAmount || 0).toLocaleString()}
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-bold text-amber-600 bg-amber-50/30 border-r border-slate-200">
-                            ₹{(item.brandPendingAmt || 0).toLocaleString()}
-                          </td>
+                              <td className="p-3 border-r border-slate-100 text-right font-black text-slate-700">
+                                ₹{new Intl.NumberFormat().format(item.influencerOnboardingAmt || item.outAmount || 0)}
+                              </td>
 
-                          {/* Influencer Payout Breakdown */}
-                          <td className="px-3 py-2.5 text-right font-bold text-purple-800 bg-purple-50/40 border-r border-slate-200">
-                            ₹{(item.influencerOnboardingAmt || item.outAmount || 0).toLocaleString()}
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-black text-rose-600 bg-rose-50/50 border-r border-slate-200">
-                            ₹{(item.influencerPaidAmt || item.outAmount || 0).toLocaleString()}
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-bold text-amber-600 bg-amber-50/30 border-r border-slate-200">
-                            ₹{(item.influencerPendingAmt || 0).toLocaleString()}
-                          </td>
-
-                          {/* Margin & Final Payment */}
-                          <td className="px-3 py-2.5 text-right font-black text-purple-700 bg-emerald-50/60 border-r border-slate-200">
-                            ₹{(item.ad2shipMargin || 0).toLocaleString()}
-                          </td>
-                          <td className="px-3 py-2.5 text-center border-r border-slate-200">
-                            <button
-                              onClick={() => handleFinalPaymentToggle(item._id, !!item.finalPaymentReceived)}
-                              className={`px-2 py-0.5 rounded-lg font-extrabold text-[10px] transition cursor-pointer border shadow-2xs ${item.finalPaymentReceived
-                                ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
-                                : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
-                                }`}
-                              title="Click to toggle payment received status"
-                            >
-                              {item.finalPaymentReceived ? '☑ Yes' : '☐ No'}
-                            </button>
-                          </td>
-
-                          <td className="px-3 py-2.5 text-right space-x-1">
-                            <button onClick={() => openEditModal(item)} className="p-1 hover:bg-purple-100 text-purple-600 rounded">
-                              <Edit2 size={14} />
-                            </button>
-                            <button onClick={() => handleDelete(item._id)} className="p-1 hover:bg-rose-100 text-rose-600 rounded">
-                              <Trash2 size={14} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </>
-              )}
-
-              {/* VIEW MODE 2: Content Deliverables View */}
-              {viewMode === 'Content Deliverables' && (
-                <>
-                  <thead className="bg-slate-800 text-white font-extrabold uppercase text-[10px] sticky top-0 z-20">
-                    <tr>
-                      <SortHeader field="transactionDate" label="Date" className="min-w-[85px]" />
-                      <SortHeader field="brandName" label="Brand" className="min-w-[140px]" />
-                      <SortHeader field="influencerName" label="Influencer" className="min-w-[150px]" />
-                      <th className="px-3 py-3 border-b border-r border-slate-700">Product Link</th>
-                      <SortHeader field="videoType" label="Video Type" className="min-w-[140px]" />
-                      <SortHeader field="orderId" label="Order ID" className="min-w-[100px]" />
-                      <SortHeader field="viewsCount" label="Reel Views" align="right" className="min-w-[90px]" />
-                      <SortHeader field="ordersCount" label="Orders Driven" align="right" className="min-w-[95px]" />
-                      <SortHeader field="status" label="Status" align="center" className="min-w-[100px]" />
-                      <th className="px-3 py-3 border-b border-r border-slate-700">Content Reel</th>
-                      <th className="px-3 py-3 border-b border-r border-slate-700">Ads Code</th>
-                      <SortHeader field="isApproved" label="Approved?" align="center" className="min-w-[100px]" />
-                      <th className="px-3 py-3 border-b border-slate-700 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {sortedInfluencers.length === 0 ? (
-                      <tr>
-                        <td colSpan={13} className="px-6 py-12 text-center text-slate-500 font-semibold">
-                          No deliverables found matching your filters.
-                        </td>
-                      </tr>
-                    ) : (
-                      sortedInfluencers.map((item) => (
-                        <tr key={item._id} className="hover:bg-purple-50/40 transition">
-                          <td className="px-3 py-2.5 font-mono text-slate-600 border-r border-slate-200">
-                            {new Date(item.transactionDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                          </td>
-                          <td className="px-4 py-2.5 font-extrabold text-slate-900 border-r border-slate-200">
-                            {item.brandName}
-                          </td>
-                          <td className="px-4 py-2.5 font-bold text-purple-700 border-r border-slate-200">
-                            {item.influencerName}
-                          </td>
-                          <td className="px-3 py-2.5 border-r border-slate-200">
-                            {item.productLink ? (
-                              <a href={item.productLink} target="_blank" rel="noreferrer" className="text-purple-600 hover:underline flex items-center gap-1 font-semibold truncate max-w-[120px]">
-                                <Link2 size={12} /> Product
-                              </a>
-                            ) : '-'}
-                          </td>
-                          <td className="px-3 py-2.5 border-r border-slate-200 font-medium text-slate-700">
-                            {item.videoType || 'Single Product Video'}
-                          </td>
-                          <td className="px-3 py-2.5 border-r border-slate-200 font-mono text-xs font-bold text-slate-800">
-                            {item.orderId || '-'}
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-black text-purple-700 bg-purple-50/30 border-r border-slate-200">
-                            👁️ {(item.viewsCount || 0).toLocaleString()}
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-black text-emerald-700 bg-emerald-50/30 border-r border-slate-200">
-                            📦 {(item.ordersCount || 0).toLocaleString()}
-                          </td>
-                          <td className="px-3 py-2 text-center border-r border-slate-200">
-                            <StatusPillDropdown
-                              currentStatus={item.status || 'Completed'}
-                              onSelect={(newStatus) => handleStatusChange(item._id, newStatus)}
-                            />
-                          </td>
-                          <td className="px-3 py-2.5 border-r border-slate-200">
-                            {item.contentLink ? (
-                              <a href={item.contentLink} target="_blank" rel="noreferrer" className="text-purple-600 hover:underline flex items-center gap-1 font-bold">
-                                <Video size={12} /> Reel Link
-                              </a>
-                            ) : '-'}
-                          </td>
-                          <td className="px-3 py-2.5 border-r border-slate-200 font-mono font-bold text-xs text-purple-700">
-                            {item.adsCode || '-'}
-                          </td>
-                          <td className="px-3 py-2 text-center border-r border-slate-200">
-                            <ApprovalPillDropdown
-                              isApproved={!!item.isApproved}
-                              onSelect={(newApproved) => handleApprovalChange(item._id, newApproved)}
-                            />
-                          </td>
-                          <td className="px-3 py-2.5 text-right space-x-1">
-                            <button onClick={() => openEditModal(item)} className="p-1 hover:bg-purple-100 text-purple-600 rounded">
-                              <Edit2 size={14} />
-                            </button>
-                            <button onClick={() => handleDelete(item._id)} className="p-1 hover:bg-rose-100 text-rose-600 rounded">
-                              <Trash2 size={14} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </>
-              )}
-            </table>
-
-            {/* VIEW MODE 3: Payment Audit Logs */}
-            {viewMode === 'Payment Audit Logs' && (
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-slate-800 text-white font-extrabold uppercase text-[10px] sticky top-0 z-20">
-                  <tr>
-                    <th className="px-3 py-3 border-b border-r border-slate-700 text-center min-w-[40px]">#</th>
-                    <th className="px-3 py-3 border-b border-r border-slate-700 min-w-[85px]">Date</th>
-                    <th className="px-3 py-3 border-b border-r border-slate-700 text-center min-w-[130px]">Flow</th>
-                    <th className="px-4 py-3 border-b border-r border-slate-700 min-w-[150px]">Influencer</th>
-                    <th className="px-4 py-3 border-b border-r border-slate-700 min-w-[130px]">Brand</th>
-                    <th className="px-4 py-3 border-b border-r border-slate-700 text-right min-w-[110px]">Amount (₹)</th>
-                    <th className="px-3 py-3 border-b border-r border-slate-700 min-w-[110px]">Mode</th>
-                    <th className="px-3 py-3 border-b border-r border-slate-700 min-w-[130px]">Ref / Txn No</th>
-                    <th className="px-3 py-3 border-b border-r border-slate-700 min-w-[120px]">Handled By</th>
-                    <th className="px-4 py-3 border-b border-r border-slate-700 min-w-[200px]">Notes</th>
-                    <th className="px-3 py-3 border-b border-slate-700 text-right min-w-[60px]">Del</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {paymentLogs.length === 0 ? (
-                    <tr>
-                      <td colSpan={11} className="px-6 py-16 text-center text-slate-500 font-semibold">
-                        <div className="flex flex-col items-center gap-3">
-                          <Receipt size={36} className="text-slate-300" />
-                          <div>No payment audit logs yet.</div>
-                          <div className="text-xs text-slate-400">Click <span className="font-bold text-emerald-600">Record Payment Entry</span> to log the first payment.</div>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    paymentLogs.map((log, idx) => (
-                      <tr key={log._id} className={`transition ${log.type === 'IN' ? 'hover:bg-emerald-50/30' : 'hover:bg-rose-50/30'}`}>
-                        <td className="px-3 py-2.5 text-center font-mono font-bold text-slate-400 border-r border-slate-200">{idx + 1}</td>
-                        <td className="px-3 py-2.5 font-mono text-[11px] text-slate-600 border-r border-slate-200">
-                          {new Date(log.transactionDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}
-                        </td>
-                        <td className="px-3 py-2.5 text-center border-r border-slate-200">
-                          {log.type === 'IN' ? (
-                            <span className="px-2.5 py-1 rounded-xl bg-emerald-100 text-emerald-800 font-extrabold text-[10px] border border-emerald-300 inline-flex items-center gap-1">
-                              📥 IN
-                            </span>
-                          ) : (
-                            <span className="px-2.5 py-1 rounded-xl bg-rose-100 text-rose-800 font-extrabold text-[10px] border border-rose-300 inline-flex items-center gap-1">
-                              📤 OUT
-                            </span>
+                              <td className="p-3 border-r border-slate-100 text-right font-black text-emerald-600 bg-emerald-50/30">
+                                ₹{new Intl.NumberFormat().format(margin)}
+                              </td>
+                            </>
                           )}
-                        </td>
-                        <td className="px-4 py-2.5 font-extrabold text-purple-700 border-r border-slate-200">{log.influencerName}</td>
-                        <td className="px-4 py-2.5 font-extrabold text-slate-900 border-r border-slate-200">{log.brandName}</td>
-                        <td className={`px-4 py-2.5 text-right font-black border-r border-slate-200 text-sm ${log.type === 'IN' ? 'text-emerald-600 bg-emerald-50/40' : 'text-rose-600 bg-rose-50/40'}`}>
-                          {log.type === 'IN' ? `+₹${log.amount.toLocaleString()}` : `-₹${log.amount.toLocaleString()}`}
-                        </td>
-                        <td className="px-3 py-2.5 border-r border-slate-200">
-                          <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-bold text-[10px]">{log.paymentMode || 'UPI'}</span>
-                        </td>
-                        <td className="px-3 py-2.5 font-mono font-bold text-slate-700 border-r border-slate-200 text-[11px]">{log.referenceNo || '—'}</td>
-                        <td className="px-3 py-2.5 font-bold text-slate-800 border-r border-slate-200">{log.handledBy || 'Admin'}</td>
-                        <td className="px-4 py-2.5 text-slate-500 border-r border-slate-200 max-w-[200px] truncate">{log.notes || '—'}</td>
-                        <td className="px-3 py-2.5 text-right">
-                          <button onClick={() => handleDeletePaymentLog(log._id)} className="p-1 hover:bg-rose-100 text-rose-500 rounded" title="Delete log">
-                            <Trash2 size={14} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+
+                          {/* Barter Columns */}
+                          {(viewMode === 'Barter Collaborations' || viewMode === 'All Collaborations') && (
+                            <>
+                              <td className="p-3 border-r border-slate-100">
+                                <span className="font-semibold text-slate-800">{item.videoType || 'Product Video'}</span>
+                                {item.contentLink && (
+                                  <a href={item.contentLink} target="_blank" rel="noreferrer" className="block text-[10px] text-purple-600 font-bold hover:underline truncate max-w-[120px]">
+                                    🔗 Link
+                                  </a>
+                                )}
+                              </td>
+
+                              <td className="p-3 border-r border-slate-100 text-right font-bold text-slate-700">
+                                {item.viewsCount || 0} views / {item.ordersCount || 0} orders
+                              </td>
+                            </>
+                          )}
+
+                          <td className="p-3 border-r border-slate-100 text-center">
+                            <StatusPillDropdown
+                              currentStatus={item.status}
+                              onSelect={(newStat) => handleStatusChange(item._id, newStat)}
+                            />
+                          </td>
+
+                          <td className="p-3 border-r border-slate-100 text-center">
+                            <ApprovalPillDropdown
+                              isApproved={item.isApproved !== false}
+                              onSelect={(newAppr) => handleApprovalChange(item._id, newAppr)}
+                            />
+                          </td>
+
+                          <td className="p-3 text-center space-x-1.5 whitespace-nowrap">
+                            <button
+                              onClick={() => openEditModal(item)}
+                              className="p-1.5 rounded-lg text-purple-600 hover:bg-purple-50 transition"
+                              title="Edit Record"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteInfluencer(item._id)}
+                              className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 transition"
+                              title="Delete Record"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="p-4 border-t border-slate-100">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={filteredInfluencers.length}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={(p) => setCurrentPage(p)}
+                />
+              </div>
             )}
           </div>
-        )}
-
-        <div className="p-4 bg-slate-50 border-t border-slate-200">
-          <Pagination
-            currentPage={currentPage}
-            totalPages={Math.ceil((viewMode === 'Payment Audit Logs' ? paymentLogs.length : filteredInfluencers.length) / itemsPerPage)}
-            totalItems={viewMode === 'Payment Audit Logs' ? paymentLogs.length : filteredInfluencers.length}
-            itemsPerPage={itemsPerPage}
-            onPageChange={setCurrentPage}
-          />
         </div>
-      </div>
+      )}
 
-      {/* Add / Edit Full Google Sheet Form Modal */}
+      {/* VIEW 4: PAYMENT AUDIT LOGS */}
+      {viewMode === 'Payment Audit Logs' && (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-3 border-b border-slate-100">
+            <div>
+              <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                <Receipt className="text-purple-600" size={20} />
+                Payment In/Out Audit Logs
+              </h3>
+              <p className="text-xs text-slate-500 font-semibold mt-0.5">
+                Exact log of all payments received from client brands (IN) and payouts disbursed to creators (OUT).
+              </p>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <select
+                value={selectedPayLogType}
+                onChange={(e: any) => setSelectedPayLogType(e.target.value)}
+                className="px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-extrabold bg-slate-50"
+              >
+                <option value="All">All Types (IN & OUT)</option>
+                <option value="IN">Payments IN (From Brand)</option>
+                <option value="OUT">Payments OUT (To Creator)</option>
+              </select>
+
+              <button
+                onClick={openPaymentModal}
+                className="px-3.5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-extrabold text-xs flex items-center gap-1.5 shadow-sm transition"
+              >
+                <Plus size={14} /> Log New Payment
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-2xl border border-slate-200">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-800 text-slate-200 font-bold">
+                  <th className="p-3 border-b border-r border-slate-700">Date</th>
+                  <th className="p-3 border-b border-r border-slate-700 text-center">Type</th>
+                  <th className="p-3 border-b border-r border-slate-700">Brand Name</th>
+                  <th className="p-3 border-b border-r border-slate-700">Influencer Name</th>
+                  <th className="p-3 border-b border-r border-slate-700 text-right">Amount</th>
+                  <th className="p-3 border-b border-r border-slate-700">Mode & Ref #</th>
+                  <th className="p-3 border-b border-r border-slate-700">Handled By</th>
+                  <th className="p-3 border-b border-slate-700 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 font-medium text-slate-800">
+                {paymentLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="p-8 text-center text-slate-400 font-semibold">
+                      No payment log entries recorded yet. Click "Log New Payment" to record a transaction.
+                    </td>
+                  </tr>
+                ) : (
+                  paymentLogs.map((log) => (
+                    <tr key={log._id} className="hover:bg-slate-50 transition">
+                      <td className="p-3 border-r border-slate-100 font-semibold whitespace-nowrap text-slate-600">
+                        {new Date(log.transactionDate).toLocaleDateString()}
+                      </td>
+
+                      <td className="p-3 border-r border-slate-100 text-center">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
+                          log.type === 'IN' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-pink-100 text-pink-800 border border-pink-300'
+                        }`}>
+                          {log.type === 'IN' ? '📥 Payments IN' : '📤 Payments OUT'}
+                        </span>
+                      </td>
+
+                      <td className="p-3 border-r border-slate-100 font-extrabold text-slate-900">
+                        {log.brandName}
+                      </td>
+
+                      <td className="p-3 border-r border-slate-100 font-extrabold text-purple-700">
+                        {log.influencerName}
+                      </td>
+
+                      <td className={`p-3 border-r border-slate-100 text-right font-black ${
+                        log.type === 'IN' ? 'text-emerald-700' : 'text-rose-600'
+                      }`}>
+                        {log.type === 'IN' ? '+' : '-'}₹{new Intl.NumberFormat().format(log.amount)}
+                      </td>
+
+                      <td className="p-3 border-r border-slate-100">
+                        <div className="font-bold text-slate-800">{log.paymentMode}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">Ref: {log.referenceNo || 'N/A'}</div>
+                      </td>
+
+                      <td className="p-3 border-r border-slate-100 font-semibold text-slate-700">
+                        {log.handledBy || 'Admin'}
+                      </td>
+
+                      <td className="p-3 text-center">
+                        <button
+                          onClick={() => handleDeletePaymentLog(log._id)}
+                          className="p-1 rounded-lg text-red-600 hover:bg-red-50 transition"
+                          title="Delete Audit Log"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 1: ADD / EDIT INFLUENCER COLLABORATION */}
       <Modal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
-        title={editingItem ? 'Edit Influencer Record' : 'Add New Influencer Record'}
-        maxWidth="max-w-3xl"
+        title={editingItem ? 'Edit Collaboration Record' : 'New Influencer Collaboration'}
+        maxWidth="max-w-2xl"
       >
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs font-semibold text-slate-700">
-          {/* Section 1: General Info */}
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
-            <h4 className="font-extrabold text-purple-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-              <User size={14} /> 1. Influencer & Brand Info
-            </h4>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-slate-800 font-extrabold uppercase mb-1">Transaction Date</label>
-                <input
-                  type="date"
-                  required
-                  value={transactionDate}
-                  onChange={(e) => setTransactionDate(e.target.value)}
-                  className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-800 font-extrabold uppercase mb-1">Manager Name</label>
-                <input
-                  type="text"
-                  value={influencerManager}
-                  onChange={(e) => setInfluencerManager(e.target.value)}
-                  placeholder="e.g. Yash / Lakshita"
-                  className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-800 font-extrabold uppercase mb-1">Category</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value as any)}
-                  className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 font-bold"
-                >
-                  <option value="Paid">💳 Paid Partnership</option>
-                  <option value="Barter">🎁 Barter Exchange</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-slate-800 font-extrabold uppercase mb-1">Brand</label>
-                <select
-                  value={selectedBrandId}
-                  onChange={(e) => {
-                    setSelectedBrandId(e.target.value);
-                    if (e.target.value) setCustomBrandName('');
-                  }}
-                  className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 font-bold"
-                >
-                  <option value="">-- Select Brand --</option>
-                  {brands.map((b) => (
-                    <option key={b._id} value={b._id}>{b.brandName}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-800 font-extrabold uppercase mb-1">Influencer Name</label>
-                <input
-                  type="text"
-                  required
-                  value={influencerName}
-                  onChange={(e) => setInfluencerName(e.target.value)}
-                  placeholder="e.g. Archi Thakur"
-                  className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-800 font-extrabold uppercase mb-1">Phone Number</label>
-                <input
-                  type="text"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="e.g. 8894105116"
-                  className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 font-bold"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-slate-800 font-extrabold uppercase mb-1">Instagram Profile Link</label>
-              <input
-                type="url"
-                value={profileLink}
-                onChange={(e) => setProfileLink(e.target.value)}
-                placeholder="https://www.instagram.com/archithakur"
-                className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 font-medium"
-              />
-            </div>
-          </div>
-
-          {/* Section 2: Financial Onboarding & Payout Breakdown */}
-          <div className="bg-purple-50/50 p-4 rounded-2xl border border-purple-200 space-y-3">
-            <h4 className="font-extrabold text-purple-800 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-              <DollarSign size={14} /> 2. Financial Breakdown & Margin Calculations
-            </h4>
-
-            {/* Brand Payment Breakdown */}
-            <div className="bg-white p-3 rounded-xl border border-purple-100 space-y-2">
-              <span className="text-[10px] font-extrabold text-sky-700 uppercase">📥 Brand Payment Breakdown (IN)</span>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-slate-600 font-bold mb-1">Total Brand Deal Value (₹)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={brandOnboardingAmt}
-                    onChange={(e) => setBrandOnboardingAmt(e.target.value === '' ? '' : Number(e.target.value))}
-                    placeholder="10000"
-                    className="w-full border border-sky-300 focus:border-sky-500 rounded-xl px-3 py-1.5 text-sm font-black text-sky-800"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-600 font-bold mb-1">Brand Amount Received (₹)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={brandReceivedAmt}
-                    onChange={(e) => setBrandReceivedAmt(e.target.value === '' ? '' : Number(e.target.value))}
-                    placeholder="10000"
-                    className="w-full border border-emerald-300 focus:border-emerald-500 rounded-xl px-3 py-1.5 text-sm font-black text-emerald-700"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-600 font-bold mb-1">Brand Amount Pending (₹)</label>
-                  <div className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-1.5 text-sm font-black text-amber-700">
-                    ₹{calcBrandPending.toLocaleString()}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Influencer Payout Breakdown */}
-            <div className="bg-white p-3 rounded-xl border border-purple-100 space-y-2">
-              <span className="text-[10px] font-extrabold text-purple-700 uppercase">📤 Influencer Payout Breakdown (OUT)</span>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-slate-600 font-bold mb-1">Influencer Agreed Payout (₹)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={influencerOnboardingAmt}
-                    onChange={(e) => setInfluencerOnboardingAmt(e.target.value === '' ? '' : Number(e.target.value))}
-                    placeholder="6000"
-                    className="w-full border border-purple-300 focus:border-purple-500 rounded-xl px-3 py-1.5 text-sm font-black text-purple-800"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-600 font-bold mb-1">Influencer Amount Paid (₹)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={influencerPaidAmt}
-                    onChange={(e) => setInfluencerPaidAmt(e.target.value === '' ? '' : Number(e.target.value))}
-                    placeholder="3000"
-                    className="w-full border border-rose-300 focus:border-rose-500 rounded-xl px-3 py-1.5 text-sm font-black text-rose-700"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-600 font-bold mb-1">Influencer Payout Pending (₹)</label>
-                  <div className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-1.5 text-sm font-black text-amber-700">
-                    ₹{calcInfPending.toLocaleString()}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Margin & Final Payment Checkbox */}
-            <div className="bg-white p-3 rounded-xl border border-purple-100 flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <span className="text-slate-500 font-bold">Agency Gross Margin: </span>
-                <span className="text-base font-black text-emerald-600">₹{calcMargin.toLocaleString()}</span>
-              </div>
-
-              <div>
-                <span className="text-slate-500 font-bold">Net Cash Flow Balance: </span>
-                <span className={`text-base font-black ${calcNetBalance >= 0 ? 'text-purple-700' : 'text-amber-600'}`}>₹{calcNetBalance.toLocaleString()}</span>
-              </div>
-
-              <label className="flex items-center space-x-2 cursor-pointer font-extrabold text-slate-800">
-                <input
-                  type="checkbox"
-                  checked={finalPaymentReceived}
-                  onChange={(e) => setFinalPaymentReceived(e.target.checked)}
-                  className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
-                />
-                <span>Full Payment Settled ☑</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Section 3: Deliverables & Links */}
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
-            <h4 className="font-extrabold text-slate-800 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-              <Video size={14} /> 3. Deliverables, Order & Ad Codes
-            </h4>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-slate-800 font-extrabold uppercase mb-1">Product Link</label>
-                <input
-                  type="url"
-                  value={productLink}
-                  onChange={(e) => setProductLink(e.target.value)}
-                  placeholder="https://loomista.com/collections/..."
-                  className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 font-medium"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-800 font-extrabold uppercase mb-1">Type of Video</label>
-                <input
-                  type="text"
-                  value={videoType}
-                  onChange={(e) => setVideoType(e.target.value)}
-                  placeholder="Single Product Video / Reel"
-                  className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 font-bold"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-slate-800 font-extrabold uppercase mb-1">Order ID</label>
-                <input
-                  type="text"
-                  value={orderId}
-                  onChange={(e) => setOrderId(e.target.value)}
-                  placeholder="#VAASVA16200"
-                  className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-800 font-extrabold uppercase mb-1">Published Content Link</label>
-                <input
-                  type="url"
-                  value={contentLink}
-                  onChange={(e) => setContentLink(e.target.value)}
-                  placeholder="https://www.instagram.com/reel/..."
-                  className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 font-medium"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-800 font-extrabold uppercase mb-1">Ads Code</label>
-                <input
-                  type="text"
-                  value={adsCode}
-                  onChange={(e) => setAdsCode(e.target.value)}
-                  placeholder="e.g. IG-ADS-9982"
-                  className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 font-bold"
-                />
-              </div>
-            </div>
-
-            {/* Performance Tracking: Views & Orders Driven */}
-            <div className="bg-white p-3 rounded-xl border border-purple-200 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-purple-900 font-extrabold uppercase mb-1 flex items-center gap-1 text-[11px]">
-                  <Eye size={14} className="text-purple-600" /> Reel Views (Total Views)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={viewsCount}
-                  onChange={(e) => setViewsCount(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="e.g. 50000"
-                  className="w-full bg-purple-50/50 border border-purple-200 focus:border-purple-500 rounded-xl px-3 py-1.5 font-bold text-purple-900"
-                />
-              </div>
-
-              <div>
-                <label className="block text-emerald-900 font-extrabold uppercase mb-1 flex items-center gap-1 text-[11px]">
-                  <ShoppingBag size={14} className="text-emerald-600" /> Orders Generated / Sales Count
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={ordersCount}
-                  onChange={(e) => setOrdersCount(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="e.g. 25"
-                  className="w-full bg-emerald-50/50 border border-emerald-200 focus:border-emerald-500 rounded-xl px-3 py-1.5 font-bold text-emerald-900"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-slate-800 font-extrabold uppercase mb-1">Remarks / Notes</label>
-              <textarea
-                rows={2}
-                value={remark}
-                onChange={(e) => setRemark(e.target.value)}
-                placeholder="Enter remarks e.g. RECEIVED BY LAKSHITA..."
-                className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl p-2.5 font-medium"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={() => setShowModal(false)}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition text-xs border border-slate-200"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 btn-gradient-primary text-white rounded-xl font-bold transition text-xs shadow-md"
-            >
-              {editingItem ? 'Update Record' : 'Save Record'}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Modal 2: Record Payment Audit Log Entry */}
-      <Modal
-        isOpen={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
-        title="📜 Record Payment Audit Log Entry"
-        maxWidth="max-w-lg"
-      >
-        <form onSubmit={handlePaymentLogSubmit} className="space-y-4 text-xs font-semibold text-slate-700">
-
-          {/* Flow Type + Date Row */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-slate-800 font-extrabold uppercase mb-1.5">Payment Flow</label>
-              <div className="flex rounded-xl overflow-hidden border border-slate-200 shadow-xs">
-                <button
-                  type="button"
-                  onClick={() => setPayLogType('IN')}
-                  className={`flex-1 py-2.5 text-xs font-extrabold flex items-center justify-center gap-1.5 transition ${payLogType === 'IN' ? 'bg-emerald-600 text-white' : 'bg-slate-50 text-slate-600 hover:bg-emerald-50'}`}
-                >
-                  📥 IN (Brand Paid Us)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPayLogType('OUT')}
-                  className={`flex-1 py-2.5 text-xs font-extrabold flex items-center justify-center gap-1.5 transition ${payLogType === 'OUT' ? 'bg-rose-600 text-white' : 'bg-slate-50 text-slate-600 hover:bg-rose-50'}`}
-                >
-                  📤 OUT (We Paid Influencer)
-                </button>
-              </div>
-            </div>
-            <div>
-              <label className="block text-slate-800 font-extrabold uppercase mb-1.5">Transaction Date</label>
-              <input
-                type="date"
-                required
-                value={payLogDate}
-                onChange={(e) => setPayLogDate(e.target.value)}
-                className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 font-bold focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Influencer + Brand */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-slate-800 font-extrabold uppercase mb-1.5">Influencer Name</label>
-              <input
-                type="text"
-                required
-                value={payLogInfluencerName}
-                onChange={(e) => setPayLogInfluencerName(e.target.value)}
-                placeholder="e.g. Archi Thakur"
-                className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 font-bold focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-slate-800 font-extrabold uppercase mb-1.5">Brand Name</label>
-              <input
-                type="text"
-                required
-                value={payLogBrandName}
-                onChange={(e) => setPayLogBrandName(e.target.value)}
-                placeholder="e.g. Loomista / Vaasva"
-                className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 font-bold focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Amount + Mode */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-slate-800 font-extrabold uppercase mb-1.5">Amount (₹)</label>
-              <input
-                type="number"
-                required
-                min="1"
-                value={payLogAmount}
-                onChange={(e) => setPayLogAmount(e.target.value === '' ? '' : Number(e.target.value))}
-                placeholder="10000"
-                className={`w-full bg-white border focus:outline-none rounded-xl px-3 py-2 font-black text-sm ${payLogType === 'IN' ? 'border-emerald-300 focus:border-emerald-500 text-emerald-700' : 'border-rose-300 focus:border-rose-500 text-rose-700'}`}
-              />
-            </div>
-            <div>
-              <label className="block text-slate-800 font-extrabold uppercase mb-1.5">Payment Mode</label>
-              <select
-                value={payLogMode}
-                onChange={(e) => setPayLogMode(e.target.value)}
-                className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 font-bold focus:outline-none"
+        <form onSubmit={handleSubmitInfluencer} className="space-y-4 text-xs font-bold">
+          {/* Category Selector */}
+          <div className="p-3 bg-purple-50 rounded-2xl border border-purple-100 flex items-center justify-between">
+            <span className="text-slate-700 font-black">Collaboration Type:</span>
+            <div className="flex space-x-2">
+              <button
+                type="button"
+                onClick={() => setCategory('Paid')}
+                className={`px-4 py-2 rounded-xl text-xs font-black transition ${
+                  category === 'Paid' ? 'bg-purple-600 text-white shadow-md' : 'bg-white text-slate-700 border border-slate-200'
+                }`}
               >
-                <option value="Bank Transfer">🏦 Bank Transfer (IMPS/NEFT)</option>
-                <option value="UPI">📱 UPI Payment</option>
-                <option value="Cash">💵 Cash</option>
-                <option value="Cheque">📑 Cheque</option>
+                💼 Paid Collaboration
+              </button>
+              <button
+                type="button"
+                onClick={() => setCategory('Barter')}
+                className={`px-4 py-2 rounded-xl text-xs font-black transition ${
+                  category === 'Barter' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-700 border border-slate-200'
+                }`}
+              >
+                🎁 Barter Collaboration
+              </button>
+            </div>
+          </div>
+
+          {/* General Details */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-700 mb-1">Influencer Name *</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Rahul Sharma"
+                value={influencerName}
+                onChange={(e) => setInfluencerName(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-700 mb-1">Brand Name *</label>
+              <select
+                value={selectedBrandId}
+                onChange={(e) => {
+                  setSelectedBrandId(e.target.value);
+                  const found = brands.find(b => b._id === e.target.value);
+                  if (found) setCustomBrandName(found.brandName);
+                }}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-bold"
+              >
+                <option value="">-- Select Brand --</option>
+                {brands.map(b => (
+                  <option key={b._id} value={b._id}>{b.brandName}</option>
+                ))}
               </select>
             </div>
           </div>
 
-          {/* Ref No + Handled By */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-slate-800 font-extrabold uppercase mb-1.5">Ref / Txn No.</label>
+              <label className="block text-slate-700 mb-1">Manager Name</label>
               <input
                 type="text"
-                value={payLogRefNo}
-                onChange={(e) => setPayLogRefNo(e.target.value)}
-                placeholder="e.g. TXN-LOM-9921"
-                className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 font-bold focus:outline-none"
+                placeholder="e.g. Vikram Sethi"
+                value={influencerManager}
+                onChange={(e) => setInfluencerManager(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
               />
             </div>
+
             <div>
-              <label className="block text-slate-800 font-extrabold uppercase mb-1.5">Handled By</label>
+              <label className="block text-slate-700 mb-1">Phone Number</label>
               <input
                 type="text"
-                value={payLogHandledBy}
-                onChange={(e) => setPayLogHandledBy(e.target.value)}
-                placeholder="e.g. Yash / Lakshita"
-                className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 font-bold focus:outline-none"
+                placeholder="+91 98765 43210"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-700 mb-1">Transaction Date</label>
+              <input
+                type="date"
+                value={transactionDate}
+                onChange={(e) => setTransactionDate(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
               />
             </div>
           </div>
 
-          {/* Notes */}
-          <div>
-            <label className="block text-slate-800 font-extrabold uppercase mb-1.5">Payment Notes</label>
-            <textarea
-              rows={2}
-              value={payLogNotes}
-              onChange={(e) => setPayLogNotes(e.target.value)}
-              placeholder="e.g. 50% advance payout cleared for Loomista reel campaign..."
-              className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-xl p-2.5 font-medium focus:outline-none resize-none"
-            />
-          </div>
+          {/* FINANCIAL BREAKDOWN SECTION (PAID COLLABS) */}
+          {category === 'Paid' && (
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+              <h4 className="font-black text-slate-900 flex items-center justify-between">
+                <span>Financial Breakdown (AD2ship Margin Engine)</span>
+                <span className="text-[11px] text-purple-700 font-extrabold bg-purple-100 px-2 py-0.5 rounded-md">
+                  Auto-Calculated Margin
+                </span>
+              </h4>
 
-          {/* Amount Preview */}
-          {payLogAmount !== '' && Number(payLogAmount) > 0 && (
-            <div className={`p-3 rounded-xl text-center font-black text-lg border ${payLogType === 'IN' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-rose-50 border-rose-200 text-rose-700'}`}>
-              {payLogType === 'IN' ? '📥 +' : '📤 -'}₹{Number(payLogAmount).toLocaleString()} — {payLogType === 'IN' ? 'Brand Payment IN' : 'Influencer Payout OUT'}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Brand Payment (IN) */}
+                <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
+                  <span className="text-[11px] font-black text-slate-500 uppercase tracking-wider">Client Brand Payment (IN)</span>
+                  <div>
+                    <label className="block text-[10px] text-slate-600">Quoted Price to Brand (IN) ₹</label>
+                    <input
+                      type="number"
+                      placeholder="20000"
+                      value={brandOnboardingAmt}
+                      onChange={(e) => setBrandOnboardingAmt(e.target.value === '' ? '' : Number(e.target.value))}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-black text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-600">Actual Amount Received (IN) ₹</label>
+                    <input
+                      type="number"
+                      placeholder="20000"
+                      value={brandReceivedAmt}
+                      onChange={(e) => setBrandReceivedAmt(e.target.value === '' ? '' : Number(e.target.value))}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-black text-emerald-700"
+                    />
+                  </div>
+                </div>
+
+                {/* Creator Payout (OUT) */}
+                <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
+                  <span className="text-[11px] font-black text-slate-500 uppercase tracking-wider">Influencer Payout (OUT)</span>
+                  <div>
+                    <label className="block text-[10px] text-slate-600">Cost Paid to Creator (OUT) ₹</label>
+                    <input
+                      type="number"
+                      placeholder="10000"
+                      value={influencerOnboardingAmt}
+                      onChange={(e) => setInfluencerOnboardingAmt(e.target.value === '' ? '' : Number(e.target.value))}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-black text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-600">Actual Amount Disbursed (OUT) ₹</label>
+                    <input
+                      type="number"
+                      placeholder="10000"
+                      value={influencerPaidAmt}
+                      onChange={(e) => setInfluencerPaidAmt(e.target.value === '' ? '' : Number(e.target.value))}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-black text-pink-700"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Real-time AD2ship Margin Preview */}
+              <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-3 rounded-xl text-white flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-emerald-100">Calculated AD2ship Profit Margin</span>
+                  <p className="text-base font-black">
+                    ₹{new Intl.NumberFormat().format(Number(brandOnboardingAmt || 0) - Number(influencerOnboardingAmt || 0))}
+                  </p>
+                </div>
+                <span className="text-xs font-black bg-white/20 px-3 py-1 rounded-lg">
+                  {Number(brandOnboardingAmt || 0) > 0 
+                    ? `${Math.round(((Number(brandOnboardingAmt || 0) - Number(influencerOnboardingAmt || 0)) / Number(brandOnboardingAmt || 1)) * 100)}% Profit`
+                    : '0%'}
+                </span>
+              </div>
             </div>
           )}
 
-          <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+          {/* DELIVERABLES SECTION (BARTER & CONTENT) */}
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+            <h4 className="font-black text-slate-900">Deliverable & Video Details</h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-slate-700 mb-1">Deliverable Video Type</label>
+                <select
+                  value={videoType}
+                  onChange={(e) => setVideoType(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
+                >
+                  <option value="Single Product Video">Single Product Video</option>
+                  <option value="Instagram Reel (2 Reels)">Instagram Reel (2 Reels)</option>
+                  <option value="Story Promotion">Story Promotion</option>
+                  <option value="YouTube Integration">YouTube Integration</option>
+                  <option value="Unboxing & Review">Unboxing & Review</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 mb-1">Platform</label>
+                <select
+                  value={platform}
+                  onChange={(e) => setPlatform(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
+                >
+                  <option value="Instagram">Instagram</option>
+                  <option value="YouTube">YouTube</option>
+                  <option value="X (Twitter)">X (Twitter)</option>
+                  <option value="Facebook">Facebook</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-slate-700 mb-1">Product Link</label>
+                <input
+                  type="text"
+                  placeholder="https://..."
+                  value={productLink}
+                  onChange={(e) => setProductLink(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 mb-1">Content Post Link</label>
+                <input
+                  type="text"
+                  placeholder="https://instagram.com/p/..."
+                  value={contentLink}
+                  onChange={(e) => setContentLink(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-slate-700 mb-1">Views Count</label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={viewsCount}
+                  onChange={(e) => setViewsCount(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 mb-1">Orders Count</label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={ordersCount}
+                  onChange={(e) => setOrdersCount(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Submit Buttons */}
+          <div className="pt-3 border-t border-slate-100 flex justify-end space-x-2">
             <button
               type="button"
-              onClick={() => setShowPaymentModal(false)}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition text-xs border border-slate-200"
+              onClick={() => setShowModal(false)}
+              className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-extrabold"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className={`px-5 py-2 text-white rounded-xl font-bold transition text-xs shadow-md ${payLogType === 'IN' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'}`}
+              className="px-5 py-2 btn-gradient-primary text-white rounded-xl font-extrabold shadow-md"
             >
-              Save {payLogType === 'IN' ? '📥 IN' : '📤 OUT'} Payment Log
+              {editingItem ? 'Save Changes' : 'Create Record'}
             </button>
           </div>
         </form>
       </Modal>
 
+      {/* MODAL 2: CREATE / EDIT TARGET */}
+      <Modal
+        isOpen={showTargetModal}
+        onClose={() => setShowTargetModal(false)}
+        title={editingTarget ? 'Edit Target Goal' : 'Set New AD2ship Target'}
+        maxWidth="max-w-md"
+      >
+        <form onSubmit={handleSaveTarget} className="space-y-3 text-xs font-bold">
+          <div>
+            <label className="block text-slate-700 mb-1">Target Category *</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setTargetFormData({ ...targetFormData, targetType: 'Paid', currency: '₹', targetMetric: 'Margin' })}
+                className={`py-2 px-3 rounded-xl font-black transition ${
+                  targetFormData.targetType === 'Paid' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-700'
+                }`}
+              >
+                💼 Paid Revenue Target
+              </button>
+              <button
+                type="button"
+                onClick={() => setTargetFormData({ ...targetFormData, targetType: 'Barter', currency: 'Collabs', targetMetric: 'Count', targetAmount: '' })}
+                className={`py-2 px-3 rounded-xl font-black transition ${
+                  targetFormData.targetType === 'Barter' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'
+                }`}
+              >
+                🎁 Barter Collabs Target
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-slate-700 mb-1">Target Title *</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. August 2026 Revenue Target"
+              value={targetFormData.title}
+              onChange={(e) => setTargetFormData({ ...targetFormData, title: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-700 mb-1">
+                {targetFormData.targetType === 'Barter' ? 'Target Collab Count *' : 'Target Amount (₹) *'}
+              </label>
+              <input
+                type="number"
+                required
+                min="1"
+                placeholder={targetFormData.targetType === 'Barter' ? '120' : '500000'}
+                value={targetFormData.targetAmount}
+                onChange={(e) => setTargetFormData({ ...targetFormData, targetAmount: e.target.value, targetCount: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 font-extrabold outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-700 mb-1">Target Period *</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. August 2026"
+                value={targetFormData.period}
+                onChange={(e) => setTargetFormData({ ...targetFormData, period: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-slate-700 mb-1">Description</label>
+            <textarea
+              rows={2}
+              placeholder="Notes on AD2ship monthly target..."
+              value={targetFormData.description}
+              onChange={(e) => setTargetFormData({ ...targetFormData, description: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
+            />
+          </div>
+
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={targetFormData.autoSync}
+                onChange={(e) => setTargetFormData({ ...targetFormData, autoSync: e.target.checked })}
+                className="rounded text-purple-600 focus:ring-purple-500 w-4 h-4"
+              />
+              <span className="text-slate-800 font-extrabold">Auto-Sync from Database</span>
+            </label>
+            <p className="text-[10px] text-slate-500 font-medium">
+              Automatically calculates achieved progress from actual transaction entries in MongoDB.
+            </p>
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 flex justify-end space-x-2">
+            <button
+              type="button"
+              onClick={() => setShowTargetModal(false)}
+              className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={savingTarget}
+              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-bold shadow-md"
+            >
+              {savingTarget ? 'Saving...' : 'Save Target Goal'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* MODAL 3: LOG MANUAL PAYMENT ENTRY */}
+      <Modal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        title="Log Payment Audit Entry"
+        maxWidth="max-w-md"
+      >
+        <form onSubmit={handlePaymentLogSubmit} className="space-y-3 text-xs font-bold">
+          <div>
+            <label className="block text-slate-700 mb-1">Transaction Type *</label>
+            <select
+              value={payLogType}
+              onChange={(e: any) => setPayLogType(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 font-extrabold outline-none"
+            >
+              <option value="IN">📥 Payments IN (From Client Brand)</option>
+              <option value="OUT">📤 Payments OUT (To Creator / Influencer)</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-700 mb-1">Brand Name *</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Bunaiwala"
+                value={payLogBrandName}
+                onChange={(e) => setPayLogBrandName(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-700 mb-1">Influencer Name *</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Priya Singh"
+                value={payLogInfluencerName}
+                onChange={(e) => setPayLogInfluencerName(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-700 mb-1">Amount (₹) *</label>
+              <input
+                type="number"
+                required
+                min="1"
+                placeholder="10000"
+                value={payLogAmount}
+                onChange={(e) => setPayLogAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl font-black outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-700 mb-1">Payment Date</label>
+              <input
+                type="date"
+                value={payLogDate}
+                onChange={(e) => setPayLogDate(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-700 mb-1">Payment Mode</label>
+              <select
+                value={payLogMode}
+                onChange={(e) => setPayLogMode(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none font-bold"
+              >
+                <option value="Bank Transfer">Bank Transfer (NEFT/IMPS)</option>
+                <option value="UPI">UPI / GPay / PhonePe</option>
+                <option value="Cheque">Cheque</option>
+                <option value="Cash">Cash</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-slate-700 mb-1">Ref / UTR Number</label>
+              <input
+                type="text"
+                placeholder="e.g. UTR987654"
+                value={payLogRefNo}
+                onChange={(e) => setPayLogRefNo(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-slate-700 mb-1">Notes / Description</label>
+            <input
+              type="text"
+              placeholder="Payment receipt details..."
+              value={payLogNotes}
+              onChange={(e) => setPayLogNotes(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
+            />
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 flex justify-end space-x-2">
+            <button
+              type="button"
+              onClick={() => setShowPaymentModal(false)}
+              className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 btn-gradient-primary text-white rounded-xl font-black shadow-md"
+            >
+              Save Log Entry
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

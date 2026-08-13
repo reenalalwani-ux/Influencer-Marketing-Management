@@ -133,14 +133,19 @@ export interface EmployeePerformanceData {
 export interface TargetItem {
   _id: string;
   title: string;
+  targetType?: 'Paid' | 'Barter';
+  targetMetric?: 'Margin' | 'Revenue' | 'Count';
   targetAmount: number;
   achievedAmount: number;
+  targetCount?: number;
+  achievedCount?: number;
   currency: string;
   period: string;
   startDate?: string;
   endDate?: string;
   status: 'Active' | 'Completed' | 'Archived';
   isActive: boolean;
+  autoSync?: boolean;
   description?: string;
   createdBy?: any;
   createdAt?: string;

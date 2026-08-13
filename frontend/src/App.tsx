@@ -161,15 +161,22 @@ export const App: React.FC = () => {
           )}
 
           {activeView === 'targets' && (
-            <TargetManagementView
+            <InfluencerManagementView
               userRole={user.role}
+              initialTab="targets"
               onTargetUpdated={() => setTargetRefreshCount(prev => prev + 1)}
             />
           )}
 
           {activeView === 'employees' && <EmployeeManagementView />}
           {activeView === 'brands' && <BrandManagementView />}
-          {activeView === 'influencers' && <InfluencerManagementView />}
+          {activeView === 'influencers' && (
+            <InfluencerManagementView
+              userRole={user.role}
+              initialTab="paid"
+              onTargetUpdated={() => setTargetRefreshCount(prev => prev + 1)}
+            />
+          )}
           {activeView === 'employee-brands' && <EmployeeBrandAssignmentView />}
           {activeView === 'tasks' && (
             <TaskManagementView

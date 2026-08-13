@@ -251,28 +251,38 @@ const SettingSchema = new Schema<ISetting>({
 // 13. Target Schema
 export interface ITarget extends Document {
   title: string;
+  targetType: 'Paid' | 'Barter';
+  targetMetric: 'Margin' | 'Revenue' | 'Count';
   targetAmount: number;
   achievedAmount: number;
+  targetCount: number;
+  achievedCount: number;
   currency: string;
   period: string;
   startDate?: Date;
   endDate?: Date;
   status: 'Active' | 'Completed' | 'Archived';
   isActive: boolean;
+  autoSync: boolean;
   description?: string;
   createdBy?: mongoose.Types.ObjectId;
 }
 
 const TargetSchema = new Schema<ITarget>({
   title: { type: String, required: true },
+  targetType: { type: String, enum: ['Paid', 'Barter'], default: 'Paid' },
+  targetMetric: { type: String, enum: ['Margin', 'Revenue', 'Count'], default: 'Margin' },
   targetAmount: { type: Number, required: true, default: 0 },
   achievedAmount: { type: Number, required: true, default: 0 },
-  currency: { type: String, default: '$' },
+  targetCount: { type: Number, default: 0 },
+  achievedCount: { type: Number, default: 0 },
+  currency: { type: String, default: '₹' },
   period: { type: String, required: true },
   startDate: { type: Date },
   endDate: { type: Date },
   status: { type: String, enum: ['Active', 'Completed', 'Archived'], default: 'Active' },
   isActive: { type: Boolean, default: true },
+  autoSync: { type: Boolean, default: true },
   description: { type: String },
   createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });

@@ -69,23 +69,45 @@ export const seedDatabase = async () => {
       console.log('[Seed] Created Marketing Manager (manager@influencer.com) in MongoDB Atlas');
     }
 
-    // Seed initial active target if none exists
+    // Seed initial active targets if none exist
     const targetCount = await Target.countDocuments();
     if (targetCount === 0) {
       await Target.create({
-        title: 'August 2026 Influencer Revenue Target',
-        targetAmount: 100000,
-        achievedAmount: 68500,
-        currency: '$',
+        title: 'August 2026 Paid Revenue Target',
+        targetType: 'Paid',
+        targetMetric: 'Margin',
+        targetAmount: 500000,
+        achievedAmount: 0,
+        currency: '₹',
         period: 'August 2026',
         startDate: new Date('2026-08-01'),
         endDate: new Date('2026-08-31'),
         status: 'Active',
         isActive: true,
-        description: 'Monthly influencer campaign revenue target for Q3 2026.',
+        autoSync: true,
+        description: 'Monthly AD2ship profit margin target (Brand Quoted Price - Influencer Cost).',
         createdBy: manager?._id || admin?._id
       });
-      console.log('[Seed] Initial Active Target ($100,000) seeded in database.');
+
+      await Target.create({
+        title: 'August 2026 Barter Collaborations Goal',
+        targetType: 'Barter',
+        targetMetric: 'Count',
+        targetAmount: 120,
+        targetCount: 120,
+        achievedAmount: 0,
+        achievedCount: 0,
+        currency: 'Collabs',
+        period: 'August 2026',
+        startDate: new Date('2026-08-01'),
+        endDate: new Date('2026-08-31'),
+        status: 'Active',
+        isActive: false,
+        autoSync: true,
+        description: 'Monthly target of 120 barter product exchange collaborations.',
+        createdBy: manager?._id || admin?._id
+      });
+      console.log('[Seed] Initial AD2ship Paid Target (₹500,000) and Barter Target (120 Collabs) seeded in database.');
     }
 
     const userCount = await User.countDocuments();

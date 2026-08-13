@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Briefcase, Plus, Globe, Mail, Phone, ExternalLink, Search, Users } from 'lucide-react';
+import { Briefcase, Plus, Globe, Mail, Phone, ExternalLink, Search, Users, Eye, Edit2, Trash2 } from 'lucide-react';
 import { api } from '../services/api';
 import { Brand } from '../types';
 import { Modal } from '../components/Modal';
@@ -12,6 +12,7 @@ export const BrandManagementView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -39,19 +40,73 @@ export const BrandManagementView: React.FC = () => {
     fetchBrands();
   }, []);
 
-  const handleCreateBrand = async (e: React.FormEvent) => {
+  const openAddBrandModal = () => {
+    setEditingBrand(null);
+    setBrandName('');
+    setIndustry('');
+    setContactPerson('');
+    setEmail('');
+    setPhone('');
+    setWebsite('');
+    setShowAddModal(true);
+  };
+
+  const openEditBrandModal = (brand: Brand) => {
+    setEditingBrand(brand);
+    setBrandName(brand.brandName || '');
+    setIndustry(brand.industry || '');
+    setContactPerson(brand.contactPerson || '');
+    setEmail(brand.email || '');
+    setPhone(brand.phone || '');
+    setWebsite(brand.website || '');
+    setShowAddModal(true);
+  };
+
+  const handleSaveBrand = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await api.post('/brands', {
-        brandName, industry, contactPerson, email, phone, website
-      });
+      let res;
+      if (editingBrand) {
+        res = await api.put(`/brands/${editingBrand._id}`, {
+          brandName, industry, contactPerson, email, phone, website
+        });
+      } else {
+        res = await api.post('/brands', {
+          brandName, industry, contactPerson, email, phone, website
+        });
+      }
+
       if (res.success) {
         setShowAddModal(false);
         fetchBrands();
         setBrandName(''); setIndustry(''); setContactPerson(''); setEmail(''); setPhone(''); setWebsite('');
+        setEditingBrand(null);
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to create brand');
+      alert(err.message || 'Failed to save brand');
+    }
+  };
+
+  const handleDeleteBrand = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this brand record?')) return;
+    try {
+      const res = await api.delete(`/brands/${id}`);
+      if (res.success) {
+        fetchBrands();
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete brand');
+    }
+  };
+
+  const handleToggleStatus = async (brand: Brand) => {
+    const newStatus = brand.status === 'Active' ? 'Inactive' : 'Active';
+    setBrands(prev => prev.map(b => b._id === brand._id ? { ...b, status: newStatus as any } : b));
+    try {
+      await api.put(`/brands/${brand._id}`, { status: newStatus });
+    } catch (err: any) {
+      console.error('Failed to update brand status', err);
+      fetchBrands();
     }
   };
 
@@ -133,22 +188,55 @@ export const BrandManagementView: React.FC = () => {
       key: 'status',
       label: 'Status',
       sortable: true,
-      render: (val) => (
-        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold badge-verified">
-          {val}
-        </span>
-      ),
+      render: (_, row) => {
+        const isActive = row.status === 'Active' || !row.status;
+        return (
+          <button
+            type="button"
+            onClick={() => handleToggleStatus(row)}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+              isActive ? 'bg-teal-600' : 'bg-slate-300'
+            }`}
+            role="switch"
+            aria-checked={isActive}
+            title={isActive ? 'Active (Click to disable)' : 'Inactive (Click to enable)'}
+          >
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                isActive ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        );
+      },
     },
     {
       key: 'actions',
       label: 'Actions',
       render: (_, row) => (
-        <button
-          onClick={() => handleViewBrandDetails(row._id)}
-          className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold transition"
-        >
-          Details
-        </button>
+        <div className="flex items-center space-x-1 whitespace-nowrap">
+          <button
+            onClick={() => handleViewBrandDetails(row._id)}
+            className="p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50 transition"
+            title="View Details"
+          >
+            <Eye size={15} />
+          </button>
+          <button
+            onClick={() => openEditBrandModal(row)}
+            className="p-1.5 rounded-lg text-purple-600 hover:bg-purple-50 transition"
+            title="Edit Brand"
+          >
+            <Edit2 size={15} />
+          </button>
+          <button
+            onClick={() => handleDeleteBrand(row._id)}
+            className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 transition"
+            title="Delete Brand"
+          >
+            <Trash2 size={15} />
+          </button>
+        </div>
       ),
     },
   ];
@@ -167,8 +255,8 @@ export const BrandManagementView: React.FC = () => {
         </div>
 
         <button
-          onClick={() => setShowAddModal(true)}
-          className="px-4 py-2.5 btn-gradient-primary rounded-xl font-bold text-sm flex items-center space-x-2 self-start sm:self-auto shadow-md"
+          onClick={openAddBrandModal}
+          className="px-4 py-2.5 btn-gradient-primary text-white rounded-xl font-bold text-sm flex items-center space-x-2 self-start sm:self-auto shadow-md"
         >
           <Plus size={18} />
           <span>Add Brand</span>
@@ -182,70 +270,93 @@ export const BrandManagementView: React.FC = () => {
           type="text"
           placeholder="Search by brand name, ID, industry, or contact person..."
           value={searchTerm}
-          onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-          className="bg-transparent border-none text-sm text-slate-900 placeholder-slate-400 focus:outline-none w-full"
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none bg-transparent"
         />
-        <span className="text-xs text-slate-400 font-medium shrink-0">{filteredBrands.length} records</span>
+        {filteredBrands.length > 0 && (
+          <span className="text-xs text-slate-400 font-semibold whitespace-nowrap">
+            {filteredBrands.length} records
+          </span>
+        )}
       </div>
 
+      {/* Table */}
       {loading ? (
         <InlineLoader message="Loading brand portfolio..." />
       ) : (
-        <div className="space-y-3">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
           <DataTable
             columns={columns}
             data={paginatedBrands}
             rowKey="_id"
-            emptyMessage="No brands found matching your search."
+            emptyMessage="No brands found matching criteria."
           />
-          <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={Math.ceil(filteredBrands.length / itemsPerPage)}
-              totalItems={filteredBrands.length}
-              itemsPerPage={itemsPerPage}
-              onPageChange={setCurrentPage}
-            />
-          </div>
+          
+          <Pagination
+            currentPage={currentPage}
+            totalPages={Math.ceil(filteredBrands.length / itemsPerPage) || 1}
+            totalItems={filteredBrands.length}
+            itemsPerPage={itemsPerPage}
+            onPageChange={(page) => setCurrentPage(page)}
+          />
         </div>
       )}
 
-      {/* Brand Details Modal */}
+      {/* View Details Modal */}
       <Modal
         isOpen={!!selectedBrand}
         onClose={() => setSelectedBrand(null)}
-        title={selectedBrand ? `${selectedBrand.brandName} (${selectedBrand.brandId})` : 'Brand Details'}
-        maxWidth="max-w-2xl"
+        title="Brand Details & Assignments"
       >
         {selectedBrand && (
-          <div className="space-y-4">
-            <p className="text-xs text-purple-700 font-extrabold -mt-2">{selectedBrand.industry} Industry</p>
-
-            <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-4 rounded-xl border border-slate-200">
-              <div><span className="text-slate-500 font-medium">Contact Person:</span> <span className="text-slate-900 font-bold block mt-0.5">{selectedBrand.contactPerson}</span></div>
-              <div><span className="text-slate-500 font-medium">Email:</span> <span className="text-slate-900 font-bold block mt-0.5">{selectedBrand.email}</span></div>
-              <div><span className="text-slate-500 font-medium">Phone:</span> <span className="text-slate-900 font-bold block mt-0.5">{selectedBrand.phone}</span></div>
-              <div><span className="text-slate-500 font-medium">Website:</span> <a href={selectedBrand.website} target="_blank" rel="noreferrer" className="text-purple-700 font-bold block mt-0.5 truncate hover:underline">{selectedBrand.website || 'N/A'}</a></div>
+          <div className="space-y-4 text-xs font-medium">
+            <div className="p-4 bg-purple-50/50 rounded-2xl border border-purple-100 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-extrabold text-purple-600 uppercase tracking-wider">{selectedBrand.brandId}</span>
+                <h3 className="text-lg font-black text-slate-900">{selectedBrand.brandName}</h3>
+                <p className="text-xs text-slate-500 font-semibold">{selectedBrand.industry}</p>
+              </div>
+              <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                {selectedBrand.status || 'Active'}
+              </span>
             </div>
 
-            {/* Assigned Employees */}
+            <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <div>
+                <span className="text-slate-400 text-[10px] uppercase font-bold">Contact Person</span>
+                <p className="font-bold text-slate-800 text-xs">{selectedBrand.contactPerson}</p>
+              </div>
+              <div>
+                <span className="text-slate-400 text-[10px] uppercase font-bold">Email</span>
+                <p className="font-bold text-slate-800 text-xs">{selectedBrand.email}</p>
+              </div>
+              <div>
+                <span className="text-slate-400 text-[10px] uppercase font-bold">Phone</span>
+                <p className="font-bold text-slate-800 text-xs">{selectedBrand.phone || 'N/A'}</p>
+              </div>
+              <div>
+                <span className="text-slate-400 text-[10px] uppercase font-bold">Website</span>
+                <p className="font-bold text-purple-600 text-xs truncate">{selectedBrand.website || 'N/A'}</p>
+              </div>
+            </div>
+
             <div>
-              <h4 className="font-extrabold text-slate-900 text-sm mb-2 flex items-center gap-1.5">
-                <Users size={16} className="text-purple-600" />
+              <h4 className="font-black text-slate-900 text-xs uppercase mb-2 flex items-center gap-1">
+                <Users size={14} className="text-purple-600" />
                 Assigned Team Members ({selectedBrand.assignedEmployees?.length || 0})
               </h4>
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-40 overflow-y-auto">
                 {selectedBrand.assignedEmployees?.length === 0 ? (
-                  <p className="text-xs text-slate-500 font-medium">No employees assigned yet.</p>
+                  <p className="text-slate-400 text-xs font-semibold italic">No team members assigned to this brand yet.</p>
                 ) : (
-                  selectedBrand.assignedEmployees?.map((empAssignment: any) => (
-                    <div key={empAssignment._id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
+                  selectedBrand.assignedEmployees?.map((assignment: any) => (
+                    <div key={assignment._id} className="p-2.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
                       <div>
-                        <div className="font-bold text-slate-900">{empAssignment.employeeId?.name}</div>
-                        <div className="text-slate-500 font-medium">{empAssignment.employeeId?.designation} • {empAssignment.responsibility}</div>
+                        <p className="font-extrabold text-slate-900 text-xs">{assignment.employeeId?.name || 'Staff'}</p>
+                        <p className="text-[10px] text-slate-400 font-semibold">{assignment.employeeId?.designation || 'Team Member'}</p>
                       </div>
-                      <span className="px-2 py-0.5 rounded text-[10px] badge-verified font-bold">
-                        {empAssignment.priority}
+                      <span className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-md">
+                        {assignment.employeeId?.employeeId}
                       </span>
                     </div>
                   ))
@@ -266,71 +377,71 @@ export const BrandManagementView: React.FC = () => {
         )}
       </Modal>
 
-      {/* Add Brand Modal */}
+      {/* Add / Edit Brand Modal */}
       <Modal
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
-        title="Add New Brand"
+        title={editingBrand ? "Edit Brand Details" : "Add New Brand"}
       >
-        <form onSubmit={handleCreateBrand} className="space-y-3.5 text-sm">
+        <form onSubmit={handleSaveBrand} className="space-y-3.5 text-sm">
           <div>
-            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Brand Name</label>
+            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Brand Name *</label>
             <input
               type="text"
               required
               value={brandName}
               onChange={(e) => setBrandName(e.target.value)}
               placeholder="e.g. Puma"
-              className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium"
+              className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium text-xs"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Industry</label>
+            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Industry *</label>
             <input
               type="text"
               required
               value={industry}
               onChange={(e) => setIndustry(e.target.value)}
               placeholder="e.g. Sportswear"
-              className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium"
+              className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium text-xs"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Contact Person</label>
+            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Contact Person *</label>
             <input
               type="text"
               required
               value={contactPerson}
               onChange={(e) => setContactPerson(e.target.value)}
               placeholder="e.g. Elena Rostova"
-              className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium"
+              className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium text-xs"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Email</label>
+              <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Email *</label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="contact@puma.com"
-                className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium"
+                className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium text-xs"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Phone</label>
+              <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Phone *</label>
               <input
                 type="text"
                 required
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+1 800 555 7862"
-                className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium"
+                className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium text-xs"
               />
             </div>
           </div>
@@ -342,7 +453,7 @@ export const BrandManagementView: React.FC = () => {
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
               placeholder="https://puma.com"
-              className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium"
+              className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium text-xs"
             />
           </div>
 
@@ -358,7 +469,7 @@ export const BrandManagementView: React.FC = () => {
               type="submit"
               className="px-4 py-2 btn-gradient-primary text-white rounded-xl font-bold transition text-xs shadow-md"
             >
-              Create Brand
+              {editingBrand ? "Save Changes" : "Create Brand"}
             </button>
           </div>
         </form>
