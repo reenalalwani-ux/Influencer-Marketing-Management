@@ -7,10 +7,12 @@
     "dev": "nodemon --watch src -e ts --exec ts-node src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "db:clear": "ts-node src/seed/clearData.ts"
+    "db:clear": "ts-node src/seed/clearData.ts",
+    "import": "ts-node src/scripts/importData.ts"
   },
   "dependencies": {
     "@types/nodemailer": "^8.0.1",
+    "@types/xlsx": "^0.0.35",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -19,6 +21,7 @@
     "mongodb-memory-server": "^9.2.0",
     "mongoose": "^8.3.1",
     "nodemailer": "^9.0.5",
+    "xlsx": "^0.18.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {

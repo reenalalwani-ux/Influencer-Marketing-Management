@@ -330,6 +330,8 @@ export interface IInfluencer extends Document {
   viewsCount?: number;
   ordersCount?: number;
   isApproved?: boolean;
+  brandManagerTeam?: string;
+  assignedExecutive?: string;
   notes?: string;
   remark?: string;
   createdBy?: mongoose.Types.ObjectId;
@@ -339,6 +341,8 @@ const InfluencerSchema = new Schema<IInfluencer>({
   sNo: { type: Number },
   transactionDate: { type: Date, default: Date.now },
   influencerManager: { type: String, default: '' },
+  brandManagerTeam: { type: String, default: '' },
+  assignedExecutive: { type: String, default: '' },
   brandId: { type: Schema.Types.ObjectId, ref: 'Brand' },
   brandName: { type: String, required: true },
   influencerName: { type: String, required: true },
@@ -384,6 +388,11 @@ export interface IPaymentLog extends Document {
   brandName: string;
   type: 'IN' | 'OUT';
   amount: number;
+  inAmount?: number;
+  outAmount?: number;
+  balance?: number;
+  month?: string;
+  paymentDate?: Date;
   paymentMode: string;
   referenceNo?: string;
   handledBy?: string;
@@ -400,6 +409,11 @@ export const PaymentLogSchema = new Schema<IPaymentLog>({
   brandName: { type: String, required: true },
   type: { type: String, enum: ['IN', 'OUT'], required: true },
   amount: { type: Number, required: true, default: 0 },
+  inAmount: { type: Number, default: 0 },
+  outAmount: { type: Number, default: 0 },
+  balance: { type: Number, default: 0 },
+  month: { type: String, default: '' },
+  paymentDate: { type: Date },
   paymentMode: { type: String, default: 'Bank Transfer' },
   referenceNo: { type: String, default: '' },
   handledBy: { type: String, default: '' },
