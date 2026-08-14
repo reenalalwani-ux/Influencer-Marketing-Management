@@ -46,9 +46,14 @@ export const EmployeeManagementView: React.FC = () => {
 
   const handleCreateEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email.toLowerCase().trim().endsWith('@ad2ship.com')) {
+      alert('Validation Error: Employee work email address must use the @ad2ship.com company domain.');
+      return;
+    }
+
     try {
       const res = await api.post('/employees', {
-        name, email, phone, department, designation, role, password
+        name, email: email.toLowerCase().trim(), phone, department, designation, role, password
       });
       if (res.success) {
         setShowAddModal(false);

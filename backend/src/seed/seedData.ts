@@ -39,34 +39,55 @@ export const seedDatabase = async () => {
       );
     }
 
-    // Ensure Super Admin & Manager are ALWAYS persisted in DB
+    // Migrate all existing non-@ad2ship.com emails in MongoDB to use @ad2ship.com domain
+    const allUsers = await User.find();
+    for (const u of allUsers) {
+      if (u.email && !u.email.endsWith('@ad2ship.com')) {
+        const username = u.email.split('@')[0];
+        const newEmail = `${username}@ad2ship.com`.toLowerCase();
+        await User.updateOne({ _id: u._id }, { $set: { email: newEmail } });
+        await Employee.updateOne({ userId: u._id }, { $set: { email: newEmail } });
+        await Employee.updateOne({ email: u.email }, { $set: { email: newEmail } });
+      }
+    }
+
+    const allEmps = await Employee.find();
+    for (const e of allEmps) {
+      if (e.email && !e.email.endsWith('@ad2ship.com')) {
+        const username = e.email.split('@')[0];
+        const newEmail = `${username}@ad2ship.com`.toLowerCase();
+        await Employee.updateOne({ _id: e._id }, { $set: { email: newEmail } });
+      }
+    }
+
+    // Ensure Super Admin & Manager are ALWAYS persisted in DB with @ad2ship.com email
     const adminPassword = await bcrypt.hash('Admin@123', 10);
     const managerPassword = await bcrypt.hash('Manager@123', 10);
 
-    let admin = await User.findOne({ email: 'admin@influencer.com' });
+    let admin = await User.findOne({ email: 'admin@ad2ship.com' });
     if (!admin) {
-      await User.create({
+      admin = await User.create({
         name: 'Super Admin',
-        email: 'admin@influencer.com',
+        email: 'admin@ad2ship.com',
         password: adminPassword,
         role: 'Super Admin',
         employeeId: 'EMP-1000',
         status: 'Active'
       });
-      console.log('[Seed] Created Super Admin (admin@influencer.com) in MongoDB Atlas');
+      console.log('[Seed] Created Super Admin (admin@ad2ship.com) in MongoDB Atlas');
     }
 
-    let manager = await User.findOne({ email: 'manager@influencer.com' });
+    let manager = await User.findOne({ email: 'manager@ad2ship.com' });
     if (!manager) {
       manager = await User.create({
         name: 'Vikram Sethi',
-        email: 'manager@influencer.com',
+        email: 'manager@ad2ship.com',
         password: managerPassword,
         role: 'Marketing Manager',
         employeeId: 'EMP-9999',
         status: 'Active'
       });
-      console.log('[Seed] Created Marketing Manager (manager@influencer.com) in MongoDB Atlas');
+      console.log('[Seed] Created Marketing Manager (manager@ad2ship.com) in MongoDB Atlas');
     }
 
     // Seed initial active targets if none exist

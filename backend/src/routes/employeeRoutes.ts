@@ -36,6 +36,13 @@ router.post('/', authenticateToken, checkPermission('employee.create'), async (r
     return res.status(400).json({ success: false, message: 'Required employee fields missing' });
   }
 
+  if (!email || !email.trim().toLowerCase().endsWith('@ad2ship.com')) {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation Error: Employee work email must use @ad2ship.com domain address.'
+    });
+  }
+
   try {
     const existingEmp = await Employee.findOne({ email: email.toLowerCase() });
     if (existingEmp) {

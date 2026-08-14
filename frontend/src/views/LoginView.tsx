@@ -43,12 +43,18 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   // Request OTP from Email Address
   const handleRequestOTP = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
     setSuccessMessage('');
 
+    if (!email.toLowerCase().trim().endsWith('@ad2ship.com')) {
+      setError('Access Restricted: Email address must end with @ad2ship.com company domain.');
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      const res = await api.post('/auth/request-otp', { email });
+      const res = await api.post('/auth/request-otp', { email: email.toLowerCase().trim() });
       if (res.success) {
         setSuccessMessage(`Security OTP sent to ${res.email}`);
         setStep('otp');
@@ -73,7 +79,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     setError('');
 
     try {
-      const res = await api.post('/auth/verify-otp', { email, otpCode });
+      const res = await api.post('/auth/verify-otp', { email: email.toLowerCase().trim(), otpCode });
       if (res.success) {
         localStorage.setItem('token', res.token);
         onLoginSuccess(res.user, res.token);
@@ -88,12 +94,17 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   // Resend OTP
   const handleResendOTP = async () => {
     if (resendTimer > 0) return;
+    if (!email.toLowerCase().trim().endsWith('@ad2ship.com')) {
+      setError('Access Restricted: Email address must end with @ad2ship.com company domain.');
+      return;
+    }
+
     setLoading(true);
     setError('');
     setSuccessMessage('');
 
     try {
-      const res = await api.post('/auth/request-otp', { email });
+      const res = await api.post('/auth/request-otp', { email: email.toLowerCase().trim() });
       if (res.success) {
         setSuccessMessage(`New OTP code sent to ${email}`);
         setResendTimer(30);
@@ -108,13 +119,19 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   // Create New Account
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
+
+    if (!signupEmail.toLowerCase().trim().endsWith('@ad2ship.com')) {
+      setError('Registration Restricted: Only @ad2ship.com company email addresses can register.');
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const res = await api.post('/auth/signup', {
         name: signupName,
-        email: signupEmail,
+        email: signupEmail.toLowerCase().trim(),
         password: signupPassword,
         phone: signupPhone,
         department: signupDepartment,
@@ -207,7 +224,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@influencer.com"
+                  placeholder="gunjan@ad2ship.com"
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-purple-500 transition font-medium"
                 />
               </div>
@@ -313,7 +330,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   required
                   value={signupEmail}
                   onChange={(e) => setSignupEmail(e.target.value)}
-                  placeholder="radhika@influencer.com"
+                  placeholder="radhika@ad2ship.com"
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-purple-500 font-medium"
                 />
               </div>

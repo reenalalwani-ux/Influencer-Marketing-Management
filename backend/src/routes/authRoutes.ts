@@ -7,12 +7,23 @@ import { sendOTPEmail } from '../services/emailService';
 
 const router = Router();
 
+const isValidCompanyEmail = (email: string) => {
+  return typeof email === 'string' && email.trim().toLowerCase().endsWith('@ad2ship.com');
+};
+
 // POST /api/v1/auth/request-otp
 router.post('/request-otp', async (req: AuthRequest, res: Response) => {
   const { email } = req.body;
 
   if (!email) {
     return res.status(400).json({ success: false, message: 'Work email address is required' });
+  }
+
+  if (!isValidCompanyEmail(email)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Access Restricted: Only @ad2ship.com company email addresses are allowed to log in.'
+    });
   }
 
   try {
@@ -55,6 +66,13 @@ router.post('/verify-otp', async (req: AuthRequest, res: Response) => {
 
   if (!email || !otpCode) {
     return res.status(400).json({ success: false, message: 'Email and OTP code are required' });
+  }
+
+  if (!isValidCompanyEmail(email)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Access Restricted: Only @ad2ship.com company email addresses are allowed.'
+    });
   }
 
   try {
@@ -116,6 +134,13 @@ router.post('/signup', async (req: AuthRequest, res: Response) => {
 
   if (!name || !email || !password) {
     return res.status(400).json({ success: false, message: 'Name, email, and password are required' });
+  }
+
+  if (!isValidCompanyEmail(email)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Registration Restricted: Only @ad2ship.com company email addresses can create an account.'
+    });
   }
 
   try {
@@ -190,6 +215,13 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
 
   if (!email || !password) {
     return res.status(400).json({ success: false, message: 'Email and password are required' });
+  }
+
+  if (!isValidCompanyEmail(email)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Access Restricted: Only @ad2ship.com company email addresses are allowed to log in.'
+    });
   }
 
   try {
