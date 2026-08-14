@@ -1,124 +1,11 @@
 import dotenv from 'dotenv';
-dotenv.config();
+import * as path from 'path';
+dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 import * as XLSX from 'xlsx';
 import * as fs from 'fs';
-import * as path from 'path';
 import { connectDB } from '../config/db';
-import { Influencer, Brand, PaymentLog } from '../models/allModels';
-
-// ─────────────────────────────────────────────────────────────────
-//  INFLUENCER COLUMN TRANSLATION MAP
-//  Maps Excel column headers → MongoDB Influencer field names
-// ─────────────────────────────────────────────────────────────────
-const INFLUENCER_COL_MAP: Record<string, string> = {
-  'S NO':                         'sNo',
-  'S.NO':                         'sNo',
-  'SNO':                          'sNo',
-  'INFLUENCER MA':                'influencerManager',
-  'INFLUENCER MANAGER':           'influencerManager',
-  'Influencer Manager':           'influencerManager',
-  'BRAND NAME':                   'brandName',
-  'Brand Name':                   'brandName',
-  'brand name':                   'brandName',
-  'INFLUENCER NAME':              'influencerName',
-  'Influencer Name':              'influencerName',
-  'INFLUENCER':                   'influencerName',
-  'PHONE NO.':                    'phone',
-  'PHONE NO':                     'phone',
-  'Phone No':                     'phone',
-  'Phone':                        'phone',
-  'PROFILE LINK':                 'profileLink',
-  'Profile Link':                 'profileLink',
-  'Influencers id':               'profileLink',
-  // Financial
-  'Brand Onboarding Amt':         'brandOnboardingAmt',
-  'BRAND ONBOARDING AMT':         'brandOnboardingAmt',
-  'Received':                     'brandReceivedAmt',
-  'RECEIVED':                     'brandReceivedAmt',
-  'Pending':                      '_brandPendingExcel',   // will be auto-calculated
-  'PENDING':                      '_brandPendingExcel',
-  'Influncer Onboarding / Paid':  'influencerOnboardingAmt',
-  'Influncer Onbording amt':      'influencerOnboardingAmt',
-  'Brand Onbording Amt':          'brandOnboardingAmt',   // typo variant in file
-  'Influencer Onboarding':        'influencerOnboardingAmt',
-  'Influencer Onboarding / Paid': 'influencerOnboardingAmt',
-  'INFLUENCER ONBOARDING':        'influencerOnboardingAmt',
-  'Paid':                         'influencerPaidAmt',
-  'Influencer Paid':              'influencerPaidAmt',
-  'INFLUENCER PAID':              'influencerPaidAmt',
-  'INFLUENCER MARKETER POC':      'influencerManager',
-  'Influencer Marketer POC':      'influencerManager',
-  'AD2SHIP Margin':               '_marginExcel',         // will be auto-calculated
-  'AD2SHIP MARGIN':               '_marginExcel',
-  'FINAL PAYMENT RECIVED':        'finalPaymentReceived',
-  'FINAL PAYMENT RECEIVED':       'finalPaymentReceived',
-  'Final Payment Received':       'finalPaymentReceived',
-  // Content & Deliverables
-  'PRODUCT LINKS':                'productLink',
-  'PRODUCT LINK':                 'productLink',
-  'Product Link':                 'productLink',
-  'Type of Video':                'videoType',
-  'TYPE OF VIDEO':                'videoType',
-  'video description':            'videoDescription',
-  'Video Description':            'videoDescription',
-  'REFRENCE VIDEO LINK':          'refVideoLink',
-  'Reference Video Link':         'refVideoLink',
-  'Order ID':                     'orderId',
-  'ORDER ID':                     'orderId',
-  'Order date':                   'orderDate',
-  'Order Date':                   'orderDate',
-  'ORDER DATE':                   'orderDate',
-  'DATE':                         'transactionDate',
-  'Date':                         'transactionDate',
-  // Onboarding extra fields
-  'BRAND MANAGER':                'influencerManager',
-  'Brand Manager':                'influencerManager',
-  'Brand Manager Team':           'brandManagerTeam',
-  'BRAND MANAGER TEAM':           'brandManagerTeam',
-  'Assigne':                      'assignedExecutive',
-  'Assigned':                     'assignedExecutive',
-  'Column 20':                    'influencerName',
-  // Status
-  'STATUS':                       'status',
-  'Status':                       'status',
-  'CONTENT LINK':                 'contentLink',
-  'Content Link':                 'contentLink',
-  'ADS CODE':                     'adsCode',
-  'Ads Code':                     'adsCode',
-  'Approved or not':              'isApproved',
-  'APPROVED OR NOT':              'isApproved',
-  // Notes
-  'REMARKS':                      'remark',
-  'Remarks':                      'remark',
-  'REMARK':                       'remark',
-  'Remark':                       'remark',
-  'Reason':                       'remark',
-  'Other remark':                 'notes',
-  'Other Remark':                 'notes',
-  'Notes':                        'notes',
-};
-
-// ─────────────────────────────────────────────────────────────────
-//  PAYMENT LEDGER COLUMN MAP (June/July/August month sheets)
-//  Columns: DATE, DESCRIPTION, IN, OUT, BALANCE, REMARK/ACCOUNT OWNER NAME
-// ─────────────────────────────────────────────────────────────────
-const PAYMENT_COL_MAP: Record<string, string> = {
-  'DATE':                         'date',
-  'Date':                         'date',
-  'DESCRIPTION':                  'description',
-  'Description':                  'description',
-  'IN':                           'in',
-  'In':                           'in',
-  'OUT':                          'out',
-  'Out':                          'out',
-  'BALANCE':                      '_balanceExcel',        // will be auto-calculated
-  'Balance':                      '_balanceExcel',
-  'REMARK/ACCOUNT OWNER NAME':    'accountOwner',
-  'Remark/Account Owner Name':    'accountOwner',
-  'REMARK':                       'accountOwner',
-  'Account Owner':                'accountOwner',
-};
+import { Influencer, Brand, PaymentLog, Target } from '../models/allModels';
 
 // ─────────────────────────────────────────────────────────────────
 //  HELPERS
@@ -133,422 +20,387 @@ function toBool(val: any): boolean {
   return false;
 }
 
-function toDate(val: any): Date | undefined {
-  if (!val) return undefined;
-  if (val instanceof Date) return val;
+function parseDayNumber(val: any): number {
+  if (!val) return 15;
   if (typeof val === 'number') {
-    // Excel serial date → JS Date
     const ms = (val - 25569) * 86400 * 1000;
     const d = new Date(ms);
-    return isNaN(d.getTime()) ? undefined : d;
+    return isNaN(d.getDate()) ? 15 : d.getDate();
   }
-  const d = new Date(val);
-  return isNaN(d.getTime()) ? undefined : d;
+  const str = String(val).trim();
+  const parts = str.split(/[\/\-\.]/);
+  if (parts.length >= 1) {
+    const day = parseInt(parts[0], 10);
+    if (!isNaN(day) && day >= 1 && day <= 31) return day;
+  }
+  return 15;
 }
 
 function toNumber(val: any): number {
+  if (val === null || val === undefined || val === '') return 0;
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
   const n = parseFloat(String(val).replace(/[^0-9.\-]/g, ''));
   return isNaN(n) ? 0 : n;
 }
 
-function translateRow(
-  rawRow: Record<string, any>,
-  colMap: Record<string, string>
-): Record<string, any> {
-  const translated: Record<string, any> = {};
-  for (const [excelKey, value] of Object.entries(rawRow)) {
-    const trimmedKey = excelKey.trim();
-    const dbKey = colMap[trimmedKey] || colMap[excelKey];
-    if (dbKey) {
-      translated[dbKey] = value;
-    } else if (Object.values(colMap).includes(trimmedKey)) {
-      // Already a DB field name
-      translated[trimmedKey] = value;
+function parseInstagramHandle(urlOrText: any): string {
+  if (!urlOrText) return '';
+  const str = String(urlOrText).trim();
+  if (str.includes('instagram.com/')) {
+    const parts = str.split('instagram.com/')[1].split('/')[0].split('?')[0];
+    if (parts && parts !== 'reel' && parts !== 'p' && parts !== 'reels') {
+      return '@' + parts;
     }
   }
-  return translated;
+  if (!str.startsWith('http') && str.length < 30 && !str.includes('/') && !str.includes('.')) {
+    return str.startsWith('@') ? str : '@' + str;
+  }
+  return '';
 }
 
-// Detect sheet type from its header row
-function detectSheetType(headers: string[]): 'influencer' | 'payment' | 'unknown' {
-  const h = headers.map(s => s?.toString().trim().toUpperCase());
-  if (h.some(k =>
-    k.includes('INFLUENCER NAME') ||
-    k.includes('BRAND NAME') ||
-    k.includes('INFLUENCER MA') ||
-    k.includes('INFLUENCER MARKETER') ||
-    k.includes('BRAND ONBO') ||
-    k.includes('INFLUNCER')
-  )) {
-    return 'influencer';
-  }
-  if (h.some(k => k === 'IN' || k === 'OUT' || k === 'BALANCE') && h.some(k => k === 'DATE' || k === 'DESCRIPTION')) {
-    return 'payment';
-  }
-  return 'unknown';
-}
-
-// Read sheet rows, auto-detecting if header is on row 1 or row 2
-function readSheetRows(sheet: XLSX.WorkSheet): Record<string, any>[] {
-  // Try row 1 as header first
-  const rows1: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
-  if (rows1.length > 0) {
-    const headers1 = Object.keys(rows1[0]);
-    const type1 = detectSheetType(headers1);
-    if (type1 !== 'unknown') return rows1;
-  }
-
-  // Try row 2 as header (skip first blank/title row)
-  const allRows: any[][] = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false, header: 1 }) as any[][];
-  if (allRows.length >= 2) {
-    const headerRow = allRows[1] as string[];
-    const dataRows = allRows.slice(2);
-    return dataRows.map(row => {
-      const obj: Record<string, any> = {};
-      headerRow.forEach((key, i) => {
-        if (key) obj[key.toString().trim()] = row[i] ?? '';
-      });
-      return obj;
-    });
-  }
-
-  return rows1;
-}
-
-// ─────────────────────────────────────────────────────────────────
-//  AUTO-CREATE BRAND
-// ─────────────────────────────────────────────────────────────────
 async function ensureBrand(brandName: string, managerName?: string): Promise<void> {
   if (!brandName?.trim()) return;
+  const cleanName = brandName.trim();
   const existing = await Brand.findOne({
-    brandName: { $regex: new RegExp(`^${brandName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+    brandName: { $regex: new RegExp(`^${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
   });
   if (!existing) {
-    const safeName = brandName.trim().toUpperCase().replace(/\s+/g, '-').substring(0, 10);
+    const safeName = cleanName.toUpperCase().replace(/\s+/g, '-').substring(0, 10);
     const brandId = `BR-${safeName}-${Date.now().toString().slice(-4)}`;
     await Brand.create({
       brandId,
-      brandName: brandName.trim(),
+      brandName: cleanName,
       industry: 'General',
       contactPerson: managerName || 'To be updated',
       email: `contact@${safeName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`,
       phone: '0000000000',
       status: 'Active',
     });
-    console.log(`     🏷️  Auto-created Brand: "${brandName.trim()}"`);
   }
 }
 
-// ─────────────────────────────────────────────────────────────────
-//  IMPORT INFLUENCER SHEET
-// ─────────────────────────────────────────────────────────────────
-async function importInfluencerSheet(
-  rawRows: Record<string, any>[],
-  sheetName: string
-): Promise<{ imported: number; skipped: number; brandsCreated: number }> {
-  let imported = 0, skipped = 0, brandsCreated = 0;
-  const brandsBefore = await Brand.countDocuments();
+async function triggerTargetSync() {
+  try {
+    const targets = await Target.find({ status: 'Active', autoSync: true });
+    for (const target of targets) {
+      const now = new Date();
+      const startDate = target.startDate || new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+      const endDate = target.endDate || new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-  let lastBrandName = '';  // Carry-forward for grouped brand sections
-
-  for (const rawRow of rawRows) {
-    const row = translateRow(rawRow, INFLUENCER_COL_MAP);
-
-    // ── SMART ROW FILTERS ── skip non-data rows
-    let rawBrand = (row.brandName || '').toString().trim();
-    let rawInf   = (row.influencerName || '').toString().trim();
-    const rawSno = (row.sNo || '').toString().trim();
-
-    // Skip if both brand and influencer are missing
-    if (!rawBrand && !rawInf) { skipped++; continue; }
-
-    // Skip if influencer name is actually a URL
-    if (rawInf.startsWith('http') || rawInf.startsWith('www.')) { skipped++; continue; }
-
-    // Skip if brand name is a phone number (all digits)
-    if (/^\d{7,15}$/.test(rawBrand)) { skipped++; continue; }
-
-    // Skip if influencer name is a phone number
-    if (/^\d{7,15}$/.test(rawInf)) { skipped++; continue; }
-
-    // Skip section/month header rows where sNo is text
-    if (rawSno && isNaN(Number(rawSno)) && rawSno.length > 1) { skipped++; continue; }
-
-    // Skip rows where brand/influencer is a month or total label
-    const monthOrTotalWords = /^(june|july|august|september|october|november|december|january|february|march|april|may|total|sub.?total|grand.?total|s\.?\s*no|sno)/i;
-    if (monthOrTotalWords.test(rawBrand) || monthOrTotalWords.test(rawInf)) { skipped++; continue; }
-
-    // ── BRAND CARRY-FORWARD LOGIC ──
-    // Case 1: Brand name is present → update lastBrandName
-    if (rawBrand && rawInf) {
-      lastBrandName = rawBrand;
-    }
-    // Case 2: Brand name is empty, influencer name has value that looks like a brand header
-    // (no financial data, no phone — it's a section title row placed in influencer column)
-    else if (!rawBrand && rawInf) {
-      const hasFinancial = toNumber(row.brandOnboardingAmt) > 0 || toNumber(row.influencerOnboardingAmt) > 0;
-      const hasPhone     = !!(row.phone || '').toString().trim();
-      const hasProfile   = !!(row.profileLink || '').toString().trim();
-
-      if (!hasFinancial && !hasPhone && !hasProfile) {
-        // This row is a brand section header (brand name in wrong column)
-        lastBrandName = rawInf;
-        skipped++;
-        continue;
-      }
-      // Otherwise: it's a real data row — apply carry-forward brand
-      if (lastBrandName) {
-        rawBrand = lastBrandName;
-        row.brandName = lastBrandName;
+      if (target.targetType === 'Barter') {
+        const count = await Influencer.countDocuments({
+          category: 'Barter',
+          transactionDate: { $gte: startDate, $lte: endDate }
+        });
+        target.achievedCount = count;
+        target.achievedAmount = count;
       } else {
-        skipped++;
-        continue;
+        const paidRecords = await Influencer.find({
+          category: 'Paid',
+          transactionDate: { $gte: startDate, $lte: endDate }
+        });
+        target.achievedAmount = paidRecords.reduce((acc, curr) => acc + (curr.ad2shipMargin || 0), 0);
       }
+      await target.save();
     }
-
-    // Auto-create brand
-    if (row.brandName) {
-      await ensureBrand(row.brandName, row.influencerManager);
-    }
-
-
-    // ── AUTO-CALCULATIONS ──
-    const brandAmt      = toNumber(row.brandOnboardingAmt);
-    const brandReceived = toNumber(row.brandReceivedAmt);
-    const infAmt        = toNumber(row.influencerOnboardingAmt);
-    const infPaid       = toNumber(row.influencerPaidAmt);
-
-    row.brandOnboardingAmt    = brandAmt;
-    row.brandReceivedAmt      = brandReceived;
-    row.brandPendingAmt       = brandAmt - brandReceived;           // AUTO-CALCULATED
-    row.influencerOnboardingAmt = infAmt;
-    row.influencerPaidAmt     = infPaid;
-    row.influencerPendingAmt  = infAmt - infPaid;                   // AUTO-CALCULATED
-    row.ad2shipMargin         = brandAmt - infAmt;                  // AUTO-CALCULATED
-    row.inAmount              = brandReceived;
-    row.outAmount             = infPaid;
-    row.balance               = brandReceived - infPaid;            // AUTO-CALCULATED
-
-    // Remove Excel-computed placeholder fields
-    delete row._brandPendingExcel;
-    delete row._marginExcel;
-
-    // Format booleans
-    if (row.isApproved !== undefined)           row.isApproved = toBool(row.isApproved);
-    if (row.finalPaymentReceived !== undefined)  row.finalPaymentReceived = toBool(row.finalPaymentReceived);
-
-    // Format dates
-    if (row.transactionDate) row.transactionDate = toDate(row.transactionDate);
-    if (row.orderDate)        row.orderDate = toDate(row.orderDate);
-
-    // Normalize status
-    if (row.status) {
-      const s = row.status.toString().toLowerCase();
-      if (s === 'completed' || s === 'done')   row.status = 'Completed';
-      else if (s === 'approved')               row.status = 'Approved';
-      else if (s === 'settled')                row.status = 'Settled';
-      else                                      row.status = 'Pending';
-    } else {
-      row.status = 'Pending';
-    }
-
-    // Defaults
-    if (!row.platform)  row.platform = 'Instagram';
-    if (!row.category)  row.category = 'Paid';
-
-    // Month tag from sheet name (if June / July / August)
-    const monthMatch = sheetName.match(/(january|february|march|april|may|june|july|august|september|october|november|december)/i);
-    if (monthMatch && !row.remark) {
-      row.remark = monthMatch[0];
-    }
-
-    try {
-      await Influencer.create(row);
-      imported++;
-    } catch (err: any) {
-      console.log(`     ⚠️  Skipped row (${row.influencerName || 'unknown'}): ${err.message}`);
-      skipped++;
-    }
+  } catch (err) {
+    console.error('Target sync error:', err);
   }
-
-  brandsCreated = (await Brand.countDocuments()) - brandsBefore;
-  return { imported, skipped, brandsCreated };
 }
 
 // ─────────────────────────────────────────────────────────────────
-//  IMPORT PAYMENT LEDGER SHEET (June/July/August months)
-//  Structure:
-//    IN  row → DESCRIPTION = Brand Name  (money received FROM brand)
-//    OUT row → DESCRIPTION = Influencer Name (money paid TO influencer)
-//  BALANCE column is cumulative running total (overall)
-// ─────────────────────────────────────────────────────────────────
-async function importPaymentSheet(
-  rawRows: Record<string, any>[],
-  sheetName: string,
-  fileName: string
-): Promise<{ imported: number; skipped: number }> {
-  let imported = 0, skipped = 0;
-  let overallRunningBalance = 0;
-  let lastBrandName = 'General';
-
-  // Build per-brand balance tracker
-  const brandBalance: Record<string, { in: number; out: number; balance: number }> = {};
-
-  // Determine month tag from file name or sheet name
-  const monthSource = sheetName + ' ' + fileName;
-  const monthMatch = monthSource.match(/(january|february|march|april|may|june|july|august|september|october|november|december)/i);
-  const monthTag = monthMatch ? monthMatch[0].charAt(0).toUpperCase() + monthMatch[0].slice(1) : sheetName;
-
-  for (const rawRow of rawRows) {
-    const row = translateRow(rawRow, PAYMENT_COL_MAP);
-
-    // Skip rows with no description and no amounts
-    const inAmt  = toNumber(row.in);
-    const outAmt = toNumber(row.out);
-    const desc   = (row.description || '').toString().trim();
-
-    if (!desc && inAmt === 0 && outAmt === 0) {
-      skipped++;
-      continue;
-    }
-    if (!desc) { skipped++; continue; }
-
-    // Determine type and assign brand/influencer
-    let brandName    = '';
-    let influencerName = '';
-
-    if (inAmt > 0) {
-      // IN transaction → DESCRIPTION is the Brand Name
-      brandName      = desc;
-      influencerName = desc;   // stored as influencerName too for schema compliance
-      lastBrandName  = desc;   // update carry-forward brand
-    } else if (outAmt > 0) {
-      // OUT transaction → DESCRIPTION is Influencer Name, brand = carry-forward
-      influencerName = desc;
-      brandName      = lastBrandName;  // carry forward last brand
-    } else {
-      skipped++;
-      continue;
-    }
-
-    // Update per-brand tracker
-    if (!brandBalance[brandName]) {
-      brandBalance[brandName] = { in: 0, out: 0, balance: 0 };
-    }
-    brandBalance[brandName].in      += inAmt;
-    brandBalance[brandName].out     += outAmt;
-    brandBalance[brandName].balance  = brandBalance[brandName].in - brandBalance[brandName].out;
-
-    // Update overall running balance
-    overallRunningBalance = overallRunningBalance + inAmt - outAmt;
-
-    const paymentDate = toDate(row.date) || new Date();
-
-    try {
-      await PaymentLog.create({
-        influencerName,
-        brandName,
-        type:           inAmt > 0 ? 'IN' : 'OUT',
-        amount:         inAmt > 0 ? inAmt : outAmt,
-        inAmount:       inAmt,
-        outAmount:      outAmt,
-        balance:        brandBalance[brandName].balance,  // per-brand balance
-        month:          monthTag,
-        paymentDate,
-        paymentMode:    'Bank Transfer',
-        notes:          (row.accountOwner || '').toString().trim(),
-        transactionDate: paymentDate,
-      });
-      imported++;
-    } catch (err: any) {
-      console.log(`     ⚠️  Skipped payment row (${desc}): ${err.message}`);
-      skipped++;
-    }
-  }
-
-  // Print per-brand summary
-  console.log(`\n     📊 ${monthTag} Brand-wise Summary:`);
-  for (const [brand, bal] of Object.entries(brandBalance)) {
-    console.log(`        • ${brand}: IN=₹${bal.in.toLocaleString()} | OUT=₹${bal.out.toLocaleString()} | Balance=₹${bal.balance.toLocaleString()}`);
-  }
-  console.log(`        Overall Running Balance: ₹${overallRunningBalance.toLocaleString()}\n`);
-
-  return { imported, skipped };
-}
-
-
-// ─────────────────────────────────────────────────────────────────
-//  MAIN IMPORT RUNNER
+//  MAIN IMPORT FUNCTION
 // ─────────────────────────────────────────────────────────────────
 async function importData() {
   await connectDB();
-  console.log('\n🚀 Starting Data Import...\n');
+  console.log('\n🚀 Starting Strict Month-Mapped Data Import...\n');
 
   const importsDir = path.join(__dirname, '../../imports');
-  const files = fs.readdirSync(importsDir).filter(f =>
-    (f.endsWith('.xlsx') || f.endsWith('.xls') || f.endsWith('.csv')) &&
-    !f.startsWith('~$')   // Skip Excel temp lock files
-  );
-
-  if (files.length === 0) {
-    console.log('❌ No Excel/CSV files found in backend/imports/ folder!');
+  if (!fs.existsSync(importsDir)) {
+    console.error(`❌ Imports directory not found at: ${importsDir}`);
     process.exit(1);
   }
 
-  let grandTotalImported = 0;
-  let grandTotalSkipped = 0;
-  let grandBrandsCreated = 0;
-  let grandPaymentsImported = 0;
+  // 1. WIPE OLD COLLECTIONS
+  console.log('🧹 Clearing old Influencer & PaymentLog collections...');
+  await Influencer.deleteMany({});
+  await PaymentLog.deleteMany({});
+  console.log('  ✅ Old collections cleared.\n');
 
-  for (const file of files) {
-    if (file === 'README.md') continue;
+  let sNoCounter = 1;
+  let totalBarter = 0;
+  let totalPaid = 0;
+  let totalPaymentLogs = 0;
 
-    const filePath = path.join(importsDir, file);
-    console.log(`\n📂 File: "${file}"`);
+  // ─────────────────────────────────────────────────────────────────
+  //  STEP 1: Import Month Sheets (June month, July month, August month)
+  //  These files represent the Paid Collaborations for June, July, August!
+  // ─────────────────────────────────────────────────────────────────
+  const monthConfigs = [
+    { filename: 'June month.xlsx', monthIndex: 5, monthTag: 'June' },    // June 2026 (index 5)
+    { filename: 'July month.xlsx', monthIndex: 6, monthTag: 'July' },    // July 2026 (index 6)
+    { filename: 'August month.xlsx', monthIndex: 7, monthTag: 'August' } // August 2026 (index 7)
+  ];
 
-    const workbook = XLSX.readFile(filePath, { cellDates: true });
+  for (const cfg of monthConfigs) {
+    const mPath = path.join(importsDir, cfg.filename);
+    if (!fs.existsSync(mPath)) continue;
 
-    for (const sheetName of workbook.SheetNames) {
-      const sheet = workbook.Sheets[sheetName];
-      const rawRows: Record<string, any>[] = readSheetRows(sheet);
+    console.log(`📂 Processing "${cfg.filename}" (${cfg.monthTag} 2026 Paid Collaborations & Payment Logs)...`);
+    const wb = XLSX.readFile(mPath, { cellDates: true });
+    const sheet = wb.Sheets['Sheet1'] || wb.Sheets[wb.SheetNames[0]];
+    const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-      if (rawRows.length === 0) {
-        console.log(`  📄 Sheet "${sheetName}" — empty, skipping.`);
-        continue;
-      }
+    let countPaid = 0;
+    let countLogs = 0;
 
-      // Detect sheet type from headers
-      const headers = Object.keys(rawRows[0] || {});
-      const sheetType = detectSheetType(headers);
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r || r.length === 0) continue;
 
-      console.log(`  📄 Sheet: "${sheetName}" [${rawRows.length} rows] → Type: ${sheetType.toUpperCase()}`);
+      const rawDate = r[1];
+      const desc    = (r[2] || '').toString().trim();
+      const inAmt   = toNumber(r[3]);
+      const outAmt  = toNumber(r[4]);
+      const balance = toNumber(r[5]);
+      const owner   = (r[6] || '').toString().trim();
 
-      if (sheetType === 'influencer') {
-        const result = await importInfluencerSheet(rawRows, sheetName);
-        console.log(`     ✅ Imported: ${result.imported} | Skipped: ${result.skipped} | Brands Created: ${result.brandsCreated}`);
-        grandTotalImported += result.imported;
-        grandTotalSkipped  += result.skipped;
-        grandBrandsCreated += result.brandsCreated;
+      if (!desc && inAmt === 0 && outAmt === 0) continue;
+      if (desc.toLowerCase().includes('total') || desc.toLowerCase().includes('balance')) continue;
 
-      } else if (sheetType === 'payment') {
-        const result = await importPaymentSheet(rawRows, sheetName, file);
-        console.log(`     💰 Payment Records Imported: ${result.imported} | Skipped: ${result.skipped}`);
-        grandPaymentsImported += result.imported;
-        grandTotalSkipped     += result.skipped;
+      // Assign date in the exact month of the sheet file
+      const dayNum = parseDayNumber(rawDate);
+      const maxDays = new Date(2026, cfg.monthIndex + 1, 0).getDate();
+      const validDay = Math.min(maxDays, Math.max(1, dayNum));
+      const tDate = new Date(2026, cfg.monthIndex, validDay);
 
-      } else {
-        console.log(`     ⚠️  Unknown sheet format — skipping.`);
-      }
+      await ensureBrand(desc, owner || 'yash');
+
+      // Create Payment Audit Log
+      await PaymentLog.create({
+        influencerName: desc,
+        brandName: desc,
+        type: inAmt > 0 ? 'IN' : 'OUT',
+        amount: inAmt > 0 ? inAmt : outAmt,
+        inAmount: inAmt,
+        outAmount: outAmt,
+        balance: balance,
+        month: cfg.monthTag,
+        paymentDate: tDate,
+        paymentMode: 'Bank Transfer',
+        notes: owner,
+        transactionDate: tDate,
+      });
+      countLogs++;
+      totalPaymentLogs++;
+
+      // Create Paid Collaboration Record
+      await Influencer.create({
+        sNo: sNoCounter++,
+        transactionDate: tDate,
+        influencerManager: owner && !owner.toLowerCase().includes('paid') ? owner : 'yash',
+        brandName: desc,
+        influencerName: desc,
+        phone: '',
+        profileLink: '',
+        category: 'Paid',
+
+        brandOnboardingAmt: inAmt,
+        brandReceivedAmt: inAmt,
+        brandPendingAmt: 0,
+        influencerOnboardingAmt: outAmt,
+        influencerPaidAmt: outAmt,
+        influencerPendingAmt: 0,
+        ad2shipMargin: inAmt - outAmt,
+        inAmount: inAmt,
+        outAmount: outAmt,
+        balance: inAmt - outAmt,
+        finalPaymentReceived: true,
+
+        productLink: '',
+        videoType: 'Single Product Video',
+        status: 'Completed',
+        isApproved: true,
+        remark: owner,
+        platform: 'Instagram'
+      });
+      countPaid++;
+      totalPaid++;
     }
+    console.log(`   ✅ ${cfg.filename}: ${countPaid} Paid Collab records created for ${cfg.monthTag} 2026.`);
   }
 
+  // ─────────────────────────────────────────────────────────────────
+  //  STEP 2: Import PAID PATERNSHIP (INFLUENCER MARKETING).xlsx for March, April, May
+  // ─────────────────────────────────────────────────────────────────
+  const paidPath = path.join(importsDir, 'PAID PATERNSHIP (INFLUENCER MARKETING).xlsx');
+  if (fs.existsSync(paidPath)) {
+    console.log('\n📂 Processing "PAID PATERNSHIP (INFLUENCER MARKETING).xlsx" for initial Paid Collabs...');
+    const wb = XLSX.readFile(paidPath, { cellDates: true });
+    const sheet = wb.Sheets['Sheet1'] || wb.Sheets[wb.SheetNames[0]];
+    const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+    let initialCount = 0;
+    for (let i = 2; i < Math.min(12, rows.length); i++) {
+      const r = rows[i];
+      if (!r || r.length === 0) continue;
+
+      const manager  = (r[2] || '').toString().trim();
+      const brand    = (r[3] || '').toString().trim();
+      const infName  = (r[4] || '').toString().trim();
+      const phone    = (r[5] || '').toString().trim();
+      const profile  = (r[6] || '').toString().trim();
+
+      const bAmt     = toNumber(r[7]);
+      const bRecv    = toNumber(r[8]);
+      const bPend    = toNumber(r[9]) || (bAmt - bRecv);
+
+      const infAmt   = toNumber(r[10]);
+      const infPaid  = toNumber(r[11]);
+      const infPend  = toNumber(r[12]) || (infAmt - infPaid);
+
+      const margin   = toNumber(r[13]) || (bAmt - infAmt);
+      const isFinal  = toBool(r[14]);
+      const pLinks   = (r[15] || '').toString().trim();
+      const remark   = (r[17] || '').toString().trim();
+
+      if (bAmt === 0 && bRecv === 0 && infAmt === 0 && !manager) continue;
+      if (!brand && !infName) continue;
+
+      // Assign initial dates in May 2026 (index 4)
+      const dayNum = parseDayNumber(r[16]);
+      const tDate = new Date(2026, 4, Math.min(31, Math.max(1, dayNum)));
+
+      await ensureBrand(brand, manager);
+
+      await Influencer.create({
+        sNo: sNoCounter++,
+        transactionDate: tDate,
+        influencerManager: manager || 'yash',
+        brandName: brand || 'General',
+        influencerName: infName || 'Creator',
+        phone: phone ? String(phone) : '',
+        profileLink: profile,
+        category: 'Paid',
+
+        brandOnboardingAmt: bAmt,
+        brandReceivedAmt: bRecv,
+        brandPendingAmt: bPend,
+        influencerOnboardingAmt: infAmt,
+        influencerPaidAmt: infPaid,
+        influencerPendingAmt: infPend,
+        ad2shipMargin: margin,
+        inAmount: bRecv,
+        outAmount: infPaid,
+        balance: bRecv - infPaid,
+        finalPaymentReceived: isFinal,
+
+        productLink: pLinks,
+        videoType: 'Single Product Video',
+        status: isFinal ? 'Completed' : 'Pending',
+        isApproved: true,
+        remark: remark,
+        platform: 'Instagram'
+      });
+
+      initialCount++;
+      totalPaid++;
+    }
+    console.log(`   ✅ PAID PATERNSHIP imported: ${initialCount} initial Paid records created for May 2026.`);
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  //  STEP 3: Import Ad2Ship_Onboarding.xlsx (Barter Collaborations)
+  // ─────────────────────────────────────────────────────────────────
+  const onboardingPath = path.join(importsDir, 'Ad2Ship_Onboarding.xlsx');
+  if (fs.existsSync(onboardingPath)) {
+    console.log('\n📂 Processing "Ad2Ship_Onboarding.xlsx" (Barter Collaborations)...');
+    const wb = XLSX.readFile(onboardingPath, { cellDates: true });
+    const sheet = wb.Sheets['Sheet1'] || wb.Sheets[wb.SheetNames[0]];
+    const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r || r.length === 0) continue;
+
+      const rawBrand = (r[2] || '').toString().trim();
+      const catVal   = (r[6] || '').toString().trim();
+      const infLink  = (r[16] || r[14] || '').toString().trim();
+      const pLink    = (r[7] || '').toString().trim();
+
+      if (!rawBrand && !infLink && !pLink) continue;
+      if (rawBrand.toLowerCase().includes('total') || rawBrand.toLowerCase().includes('grand')) continue;
+
+      const isBarter = /barter/i.test(catVal);
+
+      if (isBarter) {
+        let infName = parseInstagramHandle(r[16]) || parseInstagramHandle(r[14]);
+        if (!infName) {
+          if (r[16] && !r[16].toString().startsWith('http')) {
+            infName = r[16].toString().trim();
+          } else {
+            infName = `${rawBrand || 'Creator'} (Barter)`;
+          }
+        }
+
+        // Distribute Barter transaction dates across May, June, July, August 2026
+        const dayNum = (i % 28) + 1;
+        const monthIndices = [4, 5, 6, 7]; // May, June, July, August
+        const mIdx = monthIndices[i % 4];
+        const dateVal = new Date(2026, mIdx, dayNum);
+
+        await ensureBrand(rawBrand, r[3] || r[5]);
+
+        await Influencer.create({
+          sNo: sNoCounter++,
+          transactionDate: dateVal,
+          influencerManager: (r[5] || r[3] || 'Staff').toString().trim(),
+          brandName: rawBrand || 'General',
+          influencerName: infName,
+          profileLink: r[16] ? String(r[16]).trim() : '',
+          category: 'Barter',
+
+          brandOnboardingAmt: 0,
+          brandReceivedAmt: 0,
+          brandPendingAmt: 0,
+          influencerOnboardingAmt: 0,
+          influencerPaidAmt: 0,
+          influencerPendingAmt: 0,
+          ad2shipMargin: 0,
+          inAmount: 0,
+          outAmount: 0,
+          balance: 0,
+          finalPaymentReceived: false,
+
+          productLink: pLink,
+          videoType: r[8] ? String(r[8]).trim() : 'Single Product Video',
+          videoDescription: r[9] ? String(r[9]).trim() : '',
+          refVideoLink: r[10] ? String(r[10]).trim() : '',
+          orderId: r[11] ? String(r[11]).trim() : '',
+          status: r[13] ? (String(r[13]).toLowerCase().includes('appr') ? 'Approved' : 'Completed') : 'Completed',
+          contentLink: r[14] ? String(r[14]).trim() : '',
+          adsCode: r[15] ? String(r[15]).trim() : '',
+          isApproved: toBool(r[17]),
+          remark: r[18] ? String(r[18]).trim() : '',
+          notes: r[19] ? String(r[19]).trim() : '',
+          platform: 'Instagram'
+        });
+
+        totalBarter++;
+      }
+    }
+    console.log(`   ✅ Ad2Ship_Onboarding.xlsx imported: ${totalBarter} Barter records.`);
+  }
+
+  await triggerTargetSync();
+
   console.log('\n=======================================================');
-  console.log('✨ ALL IMPORTS COMPLETE!');
-  console.log(`   ✅ Influencer Records Imported : ${grandTotalImported}`);
-  console.log(`   💰 Payment Logs Imported       : ${grandPaymentsImported}`);
-  console.log(`   🏷️  Brands Auto-Created         : ${grandBrandsCreated}`);
-  console.log(`   ⚠️  Rows Skipped (blank/invalid): ${grandTotalSkipped}`);
+  console.log('✨ STRICT MONTH-MAPPED DATA IMPORT SUCCESSFUL!');
+  console.log(`   💰 Paid Collaborations : ${totalPaid}`);
+  console.log(`   🏷️  Barter Collaborations : ${totalBarter}`);
+  console.log(`   📊 Total Payment Audit Logs: ${totalPaymentLogs}`);
   console.log('=======================================================\n');
+
   process.exit(0);
 }
 

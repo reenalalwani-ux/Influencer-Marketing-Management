@@ -70,7 +70,20 @@ router.get('/', authenticateToken, checkPermission('influencer.view'), async (re
     const currentYear = Number(year) || now.getFullYear();
     const currentMonth = month !== undefined ? Number(month) - 1 : now.getMonth();
 
-    if (timeframe === 'today') {
+    if (timeframe && (timeframe as string).includes('_')) {
+      const parts = (timeframe as string).split('_');
+      const monthNames: Record<string, number> = {
+        january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
+        july: 6, august: 7, september: 8, october: 9, november: 10, december: 11
+      };
+      const mIdx = monthNames[parts[0].toLowerCase()];
+      const yr = Number(parts[1]) || 2026;
+      if (mIdx !== undefined) {
+        const startOfMonth = new Date(yr, mIdx, 1, 0, 0, 0);
+        const endOfMonth = new Date(yr, mIdx + 1, 0, 23, 59, 59);
+        filter.transactionDate = { $gte: startOfMonth, $lte: endOfMonth };
+      }
+    } else if (timeframe === 'today') {
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
       const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
       filter.transactionDate = { $gte: startOfDay, $lte: endOfDay };
@@ -95,7 +108,7 @@ router.get('/', authenticateToken, checkPermission('influencer.view'), async (re
 
     const influencers = await Influencer.find(filter)
       .populate('brandId', 'brandName brandId logo')
-      .sort({ transactionDate: -1, createdAt: -1 });
+      .sort({ sNo: 1, transactionDate: 1 });
 
     // Aggregate metrics
     const totalIn = influencers.reduce((acc, curr) => acc + (curr.inAmount || 0), 0);
@@ -359,7 +372,20 @@ router.get('/payment-logs', authenticateToken, checkPermission('influencer.view'
     const currentYear = Number(year) || now.getFullYear();
     const currentMonth = month !== undefined ? Number(month) - 1 : now.getMonth();
 
-    if (timeframe === 'today') {
+    if (timeframe && (timeframe as string).includes('_')) {
+      const parts = (timeframe as string).split('_');
+      const monthNames: Record<string, number> = {
+        january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
+        july: 6, august: 7, september: 8, october: 9, november: 10, december: 11
+      };
+      const mIdx = monthNames[parts[0].toLowerCase()];
+      const yr = Number(parts[1]) || 2026;
+      if (mIdx !== undefined) {
+        const startOfMonth = new Date(yr, mIdx, 1, 0, 0, 0);
+        const endOfMonth = new Date(yr, mIdx + 1, 0, 23, 59, 59);
+        filter.transactionDate = { $gte: startOfMonth, $lte: endOfMonth };
+      }
+    } else if (timeframe === 'today') {
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
       const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
       filter.transactionDate = { $gte: startOfDay, $lte: endOfDay };
@@ -382,7 +408,7 @@ router.get('/payment-logs', authenticateToken, checkPermission('influencer.view'
       ];
     }
 
-    const logs = await PaymentLog.find(filter).sort({ transactionDate: -1, createdAt: -1 });
+    const logs = await PaymentLog.find(filter).sort({ transactionDate: 1, createdAt: 1 });
 
     const totalIn = logs.filter(l => l.type === 'IN').reduce((acc, l) => acc + (l.amount || 0), 0);
     const totalOut = logs.filter(l => l.type === 'OUT').reduce((acc, l) => acc + (l.amount || 0), 0);

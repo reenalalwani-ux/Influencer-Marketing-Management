@@ -95,7 +95,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
   
   // Category Filter State
   const [activeCategory, setActiveCategory] = useState<'All' | 'Paid' | 'Barter'>('All');
-  const [timeframe, setTimeframe] = useState<'today' | 'monthly' | 'yearly' | 'all'>('monthly');
+  const [timeframe, setTimeframe] = useState<string>('all');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPayLogType, setSelectedPayLogType] = useState<'All' | 'IN' | 'OUT'>('All');
@@ -108,9 +108,9 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     totalCount: 0
   });
 
-  // Sorting State
-  const [sortKey, setSortKey] = useState<string>('transactionDate');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  // Sorting State — Default Ascending (1, 2, 3...) by sNo
+  const [sortKey, setSortKey] = useState<string>('sNo');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -269,6 +269,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
   }, []);
 
   useEffect(() => {
+    setCurrentPage(1);
     if (viewMode === 'Payment Audit Logs') {
       fetchPaymentLogs();
     } else if (viewMode === 'Targets & Goals') {
@@ -596,6 +597,21 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     if (viewMode === 'Paid Collaborations' && i.category !== 'Paid') return false;
     if (viewMode === 'Barter Collaborations' && i.category !== 'Barter') return false;
     return true;
+  }).sort((a, b) => {
+    let valA = (a as any)[sortKey];
+    let valB = (b as any)[sortKey];
+
+    if (sortKey === 'sNo') {
+      valA = a.sNo || 0;
+      valB = b.sNo || 0;
+    } else if (sortKey === 'transactionDate') {
+      valA = new Date(a.transactionDate).getTime();
+      valB = new Date(b.transactionDate).getTime();
+    }
+
+    if (valA < valB) return sortDir === 'asc' ? -1 : 1;
+    if (valA > valB) return sortDir === 'asc' ? 1 : -1;
+    return 0;
   });
 
   // Calculate Metrics from Current View
@@ -628,7 +644,8 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
 
   // Pagination
   const totalPages = Math.ceil(filteredInfluencers.length / itemsPerPage) || 1;
-  const paginatedInfluencers = filteredInfluencers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const paginatedInfluencers = filteredInfluencers.slice((safeCurrentPage - 1) * itemsPerPage, safeCurrentPage * itemsPerPage);
 
   const SortHeader = ({ field, label, align = 'left' }: { field: string; label: string; align?: 'left' | 'right' | 'center' }) => {
     const isSorted = sortKey === field;
@@ -776,12 +793,17 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
           <select
             value={timeframe}
             onChange={(e: any) => setTimeframe(e.target.value)}
-            className="px-3 py-1.5 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500 font-extrabold"
+            className="px-3 py-1.5 rounded-xl border border-purple-200 bg-purple-50/50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 font-extrabold shadow-xs"
           >
+            <option value="all">📅 All Months (All Records)</option>
+            <option value="august_2026">🗓️ August 2026</option>
+            <option value="july_2026">🗓️ July 2026</option>
+            <option value="june_2026">🗓️ June 2026</option>
+            <option value="may_2026">🗓️ May 2026</option>
+            <option value="april_2026">🗓️ April 2026</option>
             <option value="monthly">This Month</option>
             <option value="today">Today</option>
             <option value="yearly">This Year</option>
-            <option value="all">All Time</option>
           </select>
 
           <div className="relative">
@@ -1286,7 +1308,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                       return (
                         <tr key={item._id} className="hover:bg-slate-50 transition">
                           <td className="p-3 border-r border-slate-100 text-center font-extrabold text-slate-400">
-                            {item.sNo || (currentPage - 1) * itemsPerPage + idx + 1}
+                            {item.sNo || (safeCurrentPage - 1) * itemsPerPage + idx + 1}
                           </td>
 
                           <td className="p-3 border-r border-slate-100 font-semibold whitespace-nowrap text-slate-600">
@@ -1391,7 +1413,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
             {totalPages > 1 && (
               <div className="p-4 border-t border-slate-100">
                 <Pagination
-                  currentPage={currentPage}
+                  currentPage={safeCurrentPage}
                   totalPages={totalPages}
                   totalItems={filteredInfluencers.length}
                   itemsPerPage={itemsPerPage}
