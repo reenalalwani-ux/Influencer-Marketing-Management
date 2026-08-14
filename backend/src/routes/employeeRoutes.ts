@@ -130,4 +130,29 @@ router.put('/:id', authenticateToken, checkPermission('employee.update'), async 
   }
 });
 
+// DELETE /api/v1/employees/:id
+router.delete('/:id', authenticateToken, checkPermission('employee.delete'), async (req: AuthRequest, res: Response) => {
+  try {
+    const employee = await Employee.findById(req.params.id);
+    if (!employee) return res.status(404).json({ success: false, message: 'Employee not found' });
+
+    await User.findOneAndDelete({ email: employee.email });
+    await Employee.findByIdAndDelete(req.params.id);
+
+    await logActivity({
+      userId: req.user?._id,
+      userName: req.user?.name || 'System',
+      action: 'DELETE_EMPLOYEE',
+      module: 'Employee Management',
+      entity: 'Employee',
+      entityId: req.params.id,
+      oldValue: employee.toObject()
+    });
+
+    return res.json({ success: true, message: 'Employee deleted successfully' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to delete employee', error });
+  }
+});
+
 export default router;

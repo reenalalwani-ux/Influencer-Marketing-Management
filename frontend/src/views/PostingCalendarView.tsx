@@ -4,7 +4,12 @@ import { api } from '../services/api';
 import { TaskItem, Employee, Brand } from '../types';
 import { InlineLoader } from '../components/PageLoader';
 
-export const PostingCalendarView: React.FC = () => {
+interface PostingCalendarViewProps {
+  currentUser?: any;
+}
+
+export const PostingCalendarView: React.FC<PostingCalendarViewProps> = ({ currentUser }) => {
+  const isEmployeeRole = currentUser?.role === 'Employee';
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'Sheet Matrix' | 'Monthly' | 'Weekly' | 'Daily'>('Sheet Matrix');
   const [tasks, setTasks] = useState<TaskItem[]>([]);
@@ -32,7 +37,18 @@ export const PostingCalendarView: React.FC = () => {
 
       const res = await api.get(url);
       if (res.success) {
-        setMatrixEmployees(res.employees || []);
+        let fetchedEmployees: Employee[] = res.employees || [];
+        if (isEmployeeRole && currentUser) {
+          const matched = fetchedEmployees.find((e: any) =>
+            e.email?.toLowerCase() === currentUser.email?.toLowerCase() ||
+            e.name?.toLowerCase() === currentUser.name?.toLowerCase()
+          );
+          if (matched) {
+            fetchedEmployees = [matched];
+            setSelectedEmployeeId(matched._id);
+          }
+        }
+        setMatrixEmployees(fetchedEmployees);
         if (!selectedEmployeeId && res.selectedEmployeeId) {
           setSelectedEmployeeId(res.selectedEmployeeId);
         }
@@ -214,7 +230,15 @@ export const PostingCalendarView: React.FC = () => {
               </span>
 
               {/* Searchable Dropdown */}
-              <div className="relative">
+              {isEmployeeRole ? (
+                <div className="px-4 py-2 bg-purple-100/90 border border-purple-300 text-purple-950 rounded-xl text-xs font-black flex items-center gap-2 shadow-2xs">
+                  <span>{currentUser?.name || 'Gunjan'}</span>
+                  <span className="text-[10px] text-purple-700 font-semibold bg-purple-200/80 px-2 py-0.5 rounded-md">
+                    {matrixEmployees.find(e => e._id === selectedEmployeeId)?.department || 'Influencer Marketing'}
+                  </span>
+                </div>
+              ) : (
+                <div className="relative">
                 {isDropdownOpen && (
                   <div className="fixed inset-0 z-30" onClick={() => setIsDropdownOpen(false)} />
                 )}
@@ -293,6 +317,7 @@ export const PostingCalendarView: React.FC = () => {
                   </div>
                 )}
               </div>
+              )}
             </div>
 
             {/* Completion Progress Badge */}

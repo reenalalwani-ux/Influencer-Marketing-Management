@@ -74,13 +74,18 @@ const PERMISSION_GROUPS: { moduleName: string; icon: string; permissions: { code
     permissions: [
       { code: 'settings.view', label: 'View System Settings' },
       { code: 'settings.update', label: 'Configure Lookup Values & Roles' },
-      { code: 'audit.view', label: 'View Audit Logs & Activity History' }
     ]
   }
 ];
 
-export const SettingsView: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'roles' | 'config' | 'delegation'>('roles');
+interface SettingsViewProps {
+  userRole?: string;
+  currentUser?: any;
+}
+
+export const SettingsView: React.FC<SettingsViewProps> = ({ userRole, currentUser }) => {
+  const isManagerOrAdmin = userRole === 'Super Admin' || userRole === 'Admin' || userRole === 'Marketing Manager' || userRole === 'Team Leader';
+  const [activeTab, setActiveTab] = useState<'roles' | 'config' | 'delegation'>(isManagerOrAdmin ? 'roles' : 'config');
   const [settings, setSettings] = useState<any>({});
   const [roles, setRoles] = useState<SystemRole[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -163,20 +168,23 @@ export const SettingsView: React.FC = () => {
     setMessage(null);
 
     try {
-      const res = await api.put(`/roles/${selectedRole._id}`, {
+      const targetId = selectedRole._id || selectedRole.name;
+      const res = await api.put(`/roles/${targetId}`, {
         description: roleDescription,
         permissions: editingPermissions
       });
 
       if (res.success) {
-        setMessage({ type: 'success', text: `Role "${selectedRole.name}" permissions updated in MongoDB Atlas!` });
-        setSelectedRole(null);
-        fetchData();
+        setMessage({ type: 'success', text: `Role "${selectedRole.name}" permissions updated successfully!` });
+      } else {
+        setMessage({ type: 'error', text: res.message || 'Failed to update role permissions' });
       }
     } catch (err: any) {
       setMessage({ type: 'error', text: err.message || 'Failed to update role permissions' });
     } finally {
       setSaving(false);
+      setSelectedRole(null);
+      fetchData();
     }
   };
 
@@ -237,45 +245,51 @@ export const SettingsView: React.FC = () => {
           <div>
             <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">System Settings</h2>
             <p className="text-xs font-semibold text-slate-500 mt-0.5">
-              Hierarchical role delegation and dynamic permission configuration stored in MongoDB.
+              Hierarchical role delegation and dynamic permission configuration.
             </p>
           </div>
         </div>
 
-        <button
-          onClick={() => setShowCreateRoleModal(true)}
-          className="px-4 py-2.5 btn-gradient-primary text-white rounded-xl font-bold text-xs flex items-center space-x-2 shadow-md shrink-0"
-        >
-          <Plus size={16} />
-          <span>Create Custom Role</span>
-        </button>
+        {isManagerOrAdmin && (
+          <button
+            onClick={() => setShowCreateRoleModal(true)}
+            className="px-4 py-2.5 btn-gradient-primary text-white rounded-xl font-bold text-xs flex items-center space-x-2 shadow-md shrink-0 cursor-pointer"
+          >
+            <Plus size={16} />
+            <span>Create Custom Role</span>
+          </button>
+        )}
       </div>
 
       {/* Navigation Tabs */}
-      <div className="bg-slate-100 p-1 rounded-2xl border border-slate-200 flex text-xs font-extrabold w-full sm:w-auto self-start">
-        <button
-          onClick={() => setActiveTab('roles')}
-          className={`px-5 py-2.5 rounded-xl transition ${
-            activeTab === 'roles'
-              ? 'bg-white text-purple-700 shadow-xs border border-slate-200/60 font-black'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          Roles & Permissions Matrix
-        </button>
-        <button
-          onClick={() => setActiveTab('delegation')}
-          className={`px-5 py-2.5 rounded-xl transition ${
-            activeTab === 'delegation'
-              ? 'bg-white text-purple-700 shadow-xs border border-slate-200/60 font-black'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          User Role Delegation ({employees.length})
-        </button>
+      <div className="bg-slate-100 p-1 rounded-2xl border border-slate-200 flex flex-wrap text-xs font-extrabold w-full sm:w-auto self-start">
+        {isManagerOrAdmin && (
+          <>
+            <button
+              onClick={() => setActiveTab('roles')}
+              className={`px-5 py-2.5 rounded-xl transition cursor-pointer ${
+                activeTab === 'roles'
+                  ? 'bg-white text-purple-700 shadow-xs border border-slate-200/60 font-black'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Roles & Permissions Matrix
+            </button>
+            <button
+              onClick={() => setActiveTab('delegation')}
+              className={`px-5 py-2.5 rounded-xl transition cursor-pointer ${
+                activeTab === 'delegation'
+                  ? 'bg-white text-purple-700 shadow-xs border border-slate-200/60 font-black'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              User Role Delegation ({employees.length})
+            </button>
+          </>
+        )}
         <button
           onClick={() => setActiveTab('config')}
-          className={`px-5 py-2.5 rounded-xl transition ${
+          className={`px-5 py-2.5 rounded-xl transition cursor-pointer ${
             activeTab === 'config'
               ? 'bg-white text-purple-700 shadow-xs border border-slate-200/60 font-black'
               : 'text-slate-600 hover:text-slate-900'

@@ -42,23 +42,6 @@ router.get('/', authenticateToken, checkPermission('influencer.view'), async (re
     const { category, timeframe, year, month, search } = req.query;
     const filter: any = {};
 
-    // 0. Employee Role Brand Filtering
-    const isEmployeeRole = req.user?.role?.toLowerCase() === 'employee';
-    if (isEmployeeRole) {
-      const emp = await Employee.findOne({
-        $or: [
-          { email: req.user?.email },
-          { name: req.user?.name }
-        ]
-      });
-      if (emp) {
-        const assignments = await EmployeeBrand.find({ employeeId: emp._id, status: 'Active' });
-        const assignedBrandIds = assignments.map(a => a.brandId);
-        filter.brandId = { $in: assignedBrandIds };
-      } else {
-        filter.brandId = { $in: [] };
-      }
-    }
 
     // 1. Sub-module Category Filter (Paid vs Barter)
     if (category && category !== 'All') {

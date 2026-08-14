@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { Clock, Calendar as CalendarIcon, Filter, CheckCircle2, AlertTriangle, Send, ExternalLink, RefreshCw } from 'lucide-react';
+import { Clock, Calendar as CalendarIcon, Filter, CheckCircle2, AlertTriangle, Send, ExternalLink, RefreshCw, User as UserIcon } from 'lucide-react';
 import { api } from '../services/api';
-import { TaskItem, Employee, Brand } from '../types';
+import { TaskItem, Employee, Brand, User } from '../types';
 import { Pagination } from '../components/Pagination';
 import { InlineLoader } from '../components/PageLoader';
 
 interface DailyPostingViewProps {
+  currentUser?: User | null;
   refreshTrigger?: number;
   onOpenSubmitUrlModal?: (task: TaskItem) => void;
 }
 
-export const DailyPostingView: React.FC<DailyPostingViewProps> = ({ refreshTrigger }) => {
+export const DailyPostingView: React.FC<DailyPostingViewProps> = ({ currentUser, refreshTrigger }) => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [metrics, setMetrics] = useState<any>({ total: 0, completed: 0, pending: 0, delayed: 0, missed: 0 });
@@ -25,6 +26,8 @@ export const DailyPostingView: React.FC<DailyPostingViewProps> = ({ refreshTrigg
   const [selectedBrand, setSelectedBrand] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState('');
 
+  const isEmployeeRole = currentUser?.role === 'Employee';
+
   const fetchDailyData = async () => {
     setLoading(true);
     try {
@@ -35,8 +38,8 @@ export const DailyPostingView: React.FC<DailyPostingViewProps> = ({ refreshTrigg
 
       const res = await api.get(`/postings/daily?${params.toString()}`);
       if (res.success) {
-        setTasks(res.data);
-        setMetrics(res.metrics);
+        setTasks(res.data || []);
+        setMetrics(res.metrics || { total: 0, completed: 0, pending: 0, delayed: 0, missed: 0 });
       }
     } catch (err) {
       console.error(err);
@@ -53,14 +56,39 @@ export const DailyPostingView: React.FC<DailyPostingViewProps> = ({ refreshTrigg
     const fetchLookup = async () => {
       try {
         const [eRes, bRes] = await Promise.all([api.get('/employees'), api.get('/brands')]);
-        if (eRes.success) setEmployees(eRes.data);
-        if (bRes.success) setBrands(bRes.data);
+        if (eRes.success) {
+          const empList = eRes.data || [];
+          setEmployees(empList);
+
+          // If logged in user is Employee, default to their employee ID and assigned brands
+          if (isEmployeeRole && currentUser) {
+            const matchedEmp = empList.find((e: any) =>
+              e.email?.toLowerCase() === currentUser.email?.toLowerCase() ||
+              e.name?.toLowerCase() === currentUser.name?.toLowerCase()
+            );
+            if (matchedEmp) {
+              setSelectedEmployee(matchedEmp._id);
+              // Fetch assigned brands for logged-in employee
+              const ebRes = await api.get(`/employee-brands?employeeId=${matchedEmp._id}`);
+              if (ebRes.success && ebRes.data?.length > 0) {
+                const assignedBrandObjs = ebRes.data.map((a: any) => a.brandId).filter(Boolean);
+                setBrands(assignedBrandObjs);
+              } else if (bRes.success) {
+                setBrands(bRes.data || []);
+              }
+            } else if (bRes.success) {
+              setBrands(bRes.data || []);
+            }
+          } else if (bRes.success) {
+            setBrands(bRes.data || []);
+          }
+        }
       } catch (err) {
         console.error(err);
       }
     };
     fetchLookup();
-  }, []);
+  }, [currentUser, isEmployeeRole]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -133,23 +161,31 @@ export const DailyPostingView: React.FC<DailyPostingViewProps> = ({ refreshTrigg
           <Filter size={14} /> Filters:
         </span>
 
-        <select
-          value={selectedEmployee}
-          onChange={(e) => setSelectedEmployee(e.target.value)}
-          className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-slate-800 font-semibold focus:outline-none focus:border-purple-500"
-        >
-          <option value="">All Employees</option>
-          {employees.map((e) => (
-            <option key={e._id} value={e._id}>{e.name}</option>
-          ))}
-        </select>
+        {isEmployeeRole ? (
+          <div className="px-3.5 py-1.5 bg-purple-100/90 text-purple-950 border border-purple-300 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-2xs">
+            <UserIcon size={14} className="text-purple-700" />
+            <span>Employee:</span>
+            <span className="text-purple-900 font-extrabold">{currentUser?.name || 'Gunjan'}</span>
+          </div>
+        ) : (
+          <select
+            value={selectedEmployee}
+            onChange={(e) => setSelectedEmployee(e.target.value)}
+            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-slate-800 font-semibold focus:outline-none focus:border-purple-500"
+          >
+            <option value="">All Employees</option>
+            {employees.map((e) => (
+              <option key={e._id} value={e._id}>{e.name}</option>
+            ))}
+          </select>
+        )}
 
         <select
           value={selectedBrand}
           onChange={(e) => setSelectedBrand(e.target.value)}
           className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-slate-800 font-semibold focus:outline-none focus:border-purple-500"
         >
-          <option value="">All Brands</option>
+          <option value="">{isEmployeeRole ? 'My Assigned Brands' : 'All Brands'}</option>
           {brands.map((b) => (
             <option key={b._id} value={b._id}>{b.brandName}</option>
           ))}
@@ -198,52 +234,58 @@ export const DailyPostingView: React.FC<DailyPostingViewProps> = ({ refreshTrigg
                           <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-purple-50 text-purple-700 border border-purple-200">
                             {t.platform} • {t.contentType}
                           </span>
-                          <span className="text-xs font-bold text-purple-700">
-                            {brand?.brandName || 'Brand'}
+                          <span className="text-xs font-semibold text-slate-500">
+                            Brand: <span className="text-slate-900 font-bold">{brand?.brandName || 'N/A'}</span>
                           </span>
                         </div>
-
-                        <div className="font-bold text-slate-900 text-base">{t.title}</div>
-
-                        <div className="text-xs text-slate-600">
-                          Assigned Employee: <span className="text-slate-900 font-bold">{emp?.name || 'Unassigned'}</span> ({emp?.designation})
+                        <h4 className="font-extrabold text-slate-900 text-base">{t.title}</h4>
+                        <div className="flex items-center space-x-3 text-xs text-slate-500">
+                          <span>Assigned: <span className="font-semibold text-slate-700">{emp?.name || 'N/A'}</span></span>
+                          {(t as any).notes && <span>• Note: {(t as any).notes}</span>}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 border-slate-100 pt-3 md:pt-0">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${t.status === 'Verified' ? 'badge-verified' :
+                    <div className="flex items-center space-x-3 w-full md:w-auto justify-between md:justify-end">
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        t.status === 'Verified' ? 'badge-verified' :
                           t.status === 'Submitted' ? 'badge-submitted' :
                             t.status === 'Pending' ? 'badge-pending' : 'badge-rejected'
-                        }`}>
+                      }`}>
                         {t.status}
                       </span>
 
-                      {t.publishedUrl && (
+                      {t.publishedUrl ? (
                         <a
                           href={t.publishedUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold transition flex items-center space-x-1"
+                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center space-x-1 border border-slate-200"
                         >
-                          <ExternalLink size={13} />
-                          <span>Open Link</span>
+                          <ExternalLink size={14} />
+                          <span>View Link</span>
                         </a>
+                      ) : (
+                        <button
+                          onClick={() => alert(`Submit URL for task: ${t.title}`)}
+                          className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-1"
+                        >
+                          <Send size={14} />
+                          <span>Submit Link</span>
+                        </button>
                       )}
                     </div>
                   </div>
                 );
               })}
 
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={Math.ceil(tasks.length / itemsPerPage)}
-                  totalItems={tasks.length}
-                  itemsPerPage={itemsPerPage}
-                  onPageChange={setCurrentPage}
-                />
-              </div>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={Math.ceil(tasks.length / itemsPerPage)}
+                totalItems={tasks.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+              />
             </>
           )}
         </div>

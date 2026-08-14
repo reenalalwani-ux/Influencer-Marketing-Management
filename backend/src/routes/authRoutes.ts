@@ -267,6 +267,60 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => 
   });
 });
 
+// PUT /api/v1/auth/profile
+router.put('/profile', authenticateToken, async (req: AuthRequest, res: Response) => {
+  if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  const { name, phone, department, designation } = req.body;
+
+  try {
+    if (name) req.user.name = name;
+    await req.user.save();
+
+    let employee = await Employee.findOne({ email: req.user.email });
+    if (!employee) {
+      employee = await Employee.findOne({ userId: req.user._id });
+    }
+
+    if (employee) {
+      if (name) employee.name = name;
+      if (phone) employee.phone = phone;
+      if (department) employee.department = department;
+      if (designation) employee.designation = designation;
+      await employee.save();
+    }
+
+    const roleDoc = await Role.findOne({ name: req.user.role });
+    const permissions = roleDoc ? roleDoc.permissions : [];
+
+    await logActivity({
+      userId: req.user._id,
+      userName: req.user.name,
+      action: 'UPDATE_PROFILE',
+      module: 'Authentication',
+      entity: 'User',
+      entityId: (req.user._id as any).toString()
+    });
+
+    return res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: {
+        id: req.user._id,
+        name: req.user.name,
+        email: req.user.email,
+        role: req.user.role,
+        employeeId: employee ? employee.employeeId : req.user.employeeId,
+        permissions,
+        employeeDetails: employee
+      }
+    });
+  } catch (error: any) {
+    console.error('Update profile error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update profile' });
+  }
+});
+
 // POST /api/v1/auth/change-password
 router.post('/change-password', authenticateToken, async (req: AuthRequest, res: Response) => {
   const { currentPassword, newPassword } = req.body;

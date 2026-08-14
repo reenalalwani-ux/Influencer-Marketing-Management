@@ -1,7 +1,7 @@
-import { useState, useEffect, FormEvent } from 'react';
-import { UserCheck, Plus, Trash2, Edit2, Briefcase, User as UserIcon, CheckSquare, Square, Search, X } from 'lucide-react';
+import React, { useState, useEffect, FormEvent } from 'react';
+import { UserCheck, Plus, Trash2, Edit2, Briefcase, User as UserIcon, CheckSquare, Square, Search, X, Eye } from 'lucide-react';
 import { api } from '../services/api';
-import { Employee, Brand, EmployeeBrandAssignment } from '../types';
+import { Employee, Brand, EmployeeBrandAssignment, User } from '../types';
 import { Modal } from '../components/Modal';
 import { InlineLoader } from '../components/PageLoader';
 import { DataTable, DataTableColumn } from '../components/DataTable';
@@ -17,13 +17,21 @@ interface GroupedAssignment {
   startDate: string;
 }
 
-export const EmployeeBrandAssignmentView = () => {
+interface EmployeeBrandAssignmentViewProps {
+  userRole?: string;
+  currentUser?: User | null;
+}
+
+export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewProps> = ({ userRole, currentUser }) => {
+  const isEmployeeRole = userRole === 'Employee' || currentUser?.role === 'Employee';
+
   const [rawAssignments, setRawAssignments] = useState<EmployeeBrandAssignment[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
+  const [viewingGroup, setViewingGroup] = useState<GroupedAssignment | null>(null);
 
   // Form states
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
@@ -248,20 +256,33 @@ export const EmployeeBrandAssignmentView = () => {
       label: 'Actions',
       render: (_, row) => (
         <div className="flex items-center space-x-1 whitespace-nowrap">
-          <button
-            onClick={() => openEditModal(row)}
-            className="p-1.5 rounded-lg text-purple-600 hover:bg-purple-50 transition"
-            title="Edit Brand Assignments"
-          >
-            <Edit2 size={15} />
-          </button>
-          <button
-            onClick={() => handleRemoveAllForEmployee(row.employeeId)}
-            className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition"
-            title="Remove All Assignments"
-          >
-            <Trash2 size={15} />
-          </button>
+          {isEmployeeRole ? (
+            <button
+              onClick={() => setViewingGroup(row)}
+              className="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 transition font-extrabold text-xs flex items-center space-x-1.5 cursor-pointer shadow-2xs"
+              title="View Assigned Brands Portfolio"
+            >
+              <Eye size={14} />
+              <span>View</span>
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => openEditModal(row)}
+                className="p-1.5 rounded-lg text-purple-600 hover:bg-purple-50 transition cursor-pointer"
+                title="Edit Brand Assignments"
+              >
+                <Edit2 size={15} />
+              </button>
+              <button
+                onClick={() => handleRemoveAllForEmployee(row.employeeId)}
+                className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                title="Remove All Assignments"
+              >
+                <Trash2 size={15} />
+              </button>
+            </>
+          )}
         </div>
       ),
     },
@@ -282,13 +303,15 @@ export const EmployeeBrandAssignmentView = () => {
           </div>
         </div>
 
-        <button
-          onClick={openCreateModal}
-          className="px-4 py-2.5 btn-gradient-primary text-white rounded-xl font-bold text-sm flex items-center space-x-2 self-start sm:self-auto shadow-md"
-        >
-          <Plus size={18} />
-          <span>New Assignment</span>
-        </button>
+        {!isEmployeeRole && (
+          <button
+            onClick={openCreateModal}
+            className="px-4 py-2.5 btn-gradient-primary text-white rounded-xl font-bold text-sm flex items-center space-x-2 self-start sm:self-auto shadow-md cursor-pointer"
+          >
+            <Plus size={18} />
+            <span>New Assignment</span>
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -466,6 +489,67 @@ export const EmployeeBrandAssignmentView = () => {
           </div>
         </form>
       </Modal>
+
+      {/* View Brand Assignment Modal for Employee */}
+      {viewingGroup && (
+        <Modal
+          isOpen={!!viewingGroup}
+          onClose={() => setViewingGroup(null)}
+          title={`Assigned Brands Portfolio - ${viewingGroup.employee?.name || 'Staff'}`}
+        >
+          <div className="space-y-4">
+            <div className="p-4 rounded-2xl bg-purple-50/70 border border-purple-200 flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center font-extrabold text-sm shrink-0 shadow-sm">
+                {(viewingGroup.employee?.name || 'S').charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <h4 className="font-extrabold text-slate-900 text-base">{viewingGroup.employee?.name}</h4>
+                <p className="text-xs font-bold text-purple-700">{viewingGroup.employee?.designation || 'Influencer Executive'}</p>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-extrabold uppercase text-slate-500 mb-2 block">
+                Assigned Brands Portfolio ({viewingGroup.brands.length})
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1">
+                {viewingGroup.brands.map((b) => (
+                  <div key={b._id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center space-x-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-800 flex items-center justify-center font-black text-xs shrink-0">
+                      <Briefcase size={14} />
+                    </div>
+                    <div>
+                      <div className="font-extrabold text-slate-900 text-xs">{b.brandName}</div>
+                      <div className="text-[10px] text-slate-500 font-medium">{b.industry || 'General Industry'}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <span className="text-[10px] font-extrabold uppercase text-slate-400">Responsibility</span>
+                <p className="text-xs font-bold text-slate-800 mt-0.5">{viewingGroup.responsibility}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <span className="text-[10px] font-extrabold uppercase text-slate-400">Priority Level</span>
+                <p className="text-xs font-bold text-purple-700 mt-0.5">{viewingGroup.priority}</p>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setViewingGroup(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-extrabold text-xs transition border border-slate-200 cursor-pointer"
+              >
+                Close View
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

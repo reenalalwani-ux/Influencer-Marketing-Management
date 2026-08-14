@@ -135,6 +135,7 @@ export const App: React.FC = () => {
         onLogout={handleLogout}
         activeView={activeView}
         setActiveView={handleNavigate}
+        onUpdateUser={(updatedUser) => setUser(updatedUser)}
       />
 
       {/* Target Module Top System Banner */}
@@ -177,7 +178,9 @@ export const App: React.FC = () => {
               onTargetUpdated={() => setTargetRefreshCount(prev => prev + 1)}
             />
           )}
-          {activeView === 'employee-brands' && <EmployeeBrandAssignmentView />}
+          {activeView === 'employee-brands' && (
+            <EmployeeBrandAssignmentView userRole={user.role} currentUser={user} />
+          )}
           {activeView === 'tasks' && (
             <TaskManagementView
               currentUser={user}
@@ -187,11 +190,11 @@ export const App: React.FC = () => {
           )}
 
           {activeView === 'daily-posting' && (
-            <DailyPostingView refreshTrigger={taskRefreshCount} />
+            <DailyPostingView currentUser={user} refreshTrigger={taskRefreshCount} />
           )}
 
-          {activeView === 'calendar' && <PostingCalendarView />}
-          {activeView === 'content-calendar' && <ContentCalendarView />}
+          {activeView === 'calendar' && <PostingCalendarView currentUser={user} />}
+          {activeView === 'content-calendar' && <ContentCalendarView currentUser={user} />}
           {activeView === 'verification' && (
             <TaskManagementView
               currentUser={user}
@@ -200,9 +203,9 @@ export const App: React.FC = () => {
             />
           )}
           {activeView === 'performance' && <EmployeePerformanceView />}
-          {activeView === 'reports' && <ReportsView />}
+          {activeView === 'reports' && <ReportsView userRole={user.role} currentUser={user} />}
           {activeView === 'audit-logs' && <AuditLogView />}
-          {activeView === 'settings' && <SettingsView />}
+          {activeView === 'settings' && <SettingsView userRole={user.role} currentUser={user} />}
         </main>
       </div>
 

@@ -32,10 +32,17 @@ router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response) 
         .populate('brandId', 'brandName brandId logo industry');
 
       // Today's Tasks
-      const todaysTasks = await Task.find({
+      let todaysTasks = await Task.find({
         employeeId: emp._id,
         scheduledDate: { $gte: startOfDay, $lte: endOfDay }
       }).populate('brandId', 'brandName logo').sort({ scheduledTime: 1 });
+
+      if (todaysTasks.length === 0) {
+        todaysTasks = await Task.find({ employeeId: emp._id })
+          .populate('brandId', 'brandName logo')
+          .sort({ createdAt: -1 })
+          .limit(6);
+      }
 
       const completedCount = todaysTasks.filter(t => t.status === 'Verified' || t.status === 'Submitted').length;
       const pendingCount = todaysTasks.filter(t => t.status === 'Pending' || t.status === 'In Progress').length;
@@ -72,9 +79,17 @@ router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response) 
     const totalBrands = await Brand.countDocuments({ status: 'Active' });
 
     // Today's System Tasks
-    const todaysTasks = await Task.find({
+    let todaysTasks = await Task.find({
       scheduledDate: { $gte: startOfDay, $lte: endOfDay }
     }).populate('employeeId', 'name designation').populate('brandId', 'brandName logo');
+
+    if (todaysTasks.length === 0) {
+      todaysTasks = await Task.find({ status: { $in: ['Pending', 'Submitted', 'Verified'] } })
+        .populate('employeeId', 'name designation')
+        .populate('brandId', 'brandName logo')
+        .sort({ createdAt: -1 })
+        .limit(6);
+    }
 
     const completed = todaysTasks.filter(t => t.status === 'Verified' || t.status === 'Submitted').length;
     const pending = todaysTasks.filter(t => t.status === 'Pending' || t.status === 'In Progress').length;

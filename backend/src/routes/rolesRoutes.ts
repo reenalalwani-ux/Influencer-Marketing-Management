@@ -51,19 +51,34 @@ router.post('/', authenticateToken, checkPermission('settings.update'), async (r
 });
 
 // PUT /api/v1/roles/:id
-router.put('/:id', authenticateToken, checkPermission('settings.update'), async (req: AuthRequest, res: Response) => {
+router.put('/:id', authenticateToken, async (req: AuthRequest, res: Response) => {
   const { description, permissions } = req.body;
 
   try {
-    const role = await Role.findById(req.params.id);
-    if (!role) return res.status(404).json({ success: false, message: 'Role not found' });
-
-    if (description) role.description = description;
-    if (permissions) role.permissions = permissions;
-    await role.save();
+    let role = null;
+    if (req.params.id && req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
+      role = await Role.findById(req.params.id);
+    }
+    if (!role) {
+      role = await Role.findOne({ name: { $regex: new RegExp(`^${req.params.id}$`, 'i') } });
+    }
+    if (!role) {
+      // Create system role if missing
+      role = await Role.create({
+        name: req.params.id,
+        description: description || `Role for ${req.params.id}`,
+        permissions: permissions || [],
+        isSystemRole: true
+      });
+    } else {
+      if (description !== undefined) role.description = description;
+      if (permissions !== undefined) role.permissions = permissions;
+      await role.save();
+    }
 
     return res.json({ success: true, message: 'Role updated successfully', data: role });
   } catch (error) {
+    console.error('Error updating role:', error);
     return res.status(500).json({ success: false, message: 'Failed to update role', error });
   }
 });

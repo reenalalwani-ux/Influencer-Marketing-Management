@@ -93,7 +93,12 @@ const SearchableBrandDropdown: React.FC<{
   );
 };
 
-export const ContentCalendarView: React.FC = () => {
+interface ContentCalendarViewProps {
+  currentUser?: any;
+}
+
+export const ContentCalendarView: React.FC<ContentCalendarViewProps> = ({ currentUser }) => {
+  const isEmployeeRole = currentUser?.role === 'Employee';
   const [items, setItems] = useState<ContentCalendarItem[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -101,7 +106,7 @@ export const ContentCalendarView: React.FC = () => {
 
   // Filters
   const [selectedBrandFilter, setSelectedBrandFilter] = useState<string>('Kala Kurti');
-  const [selectedDesignerFilter, setSelectedDesignerFilter] = useState<string>('All');
+  const [selectedDesignerFilter, setSelectedDesignerFilter] = useState<string>(isEmployeeRole && currentUser?.name ? currentUser.name : 'All');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('All');
   const [selectedFortnight, setSelectedFortnight] = useState<string>('All');
   const [currentYear, setCurrentYear] = useState<number>(2026);
@@ -564,16 +569,24 @@ export const ContentCalendarView: React.FC = () => {
           </select>
 
           {/* POC Filter */}
-          <select
-            value={selectedDesignerFilter}
-            onChange={(e) => setSelectedDesignerFilter(e.target.value)}
-            className="bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none focus:border-pink-500 cursor-pointer"
-          >
-            <option value="All">👤 All POCs</option>
-            {uniqueDesigners.map(d => (
-              <option key={d} value={d}>{d}</option>
-            ))}
-          </select>
+          {isEmployeeRole ? (
+            <div className="px-3.5 py-2 bg-purple-100/90 text-purple-950 border border-purple-300 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-2xs">
+              <User size={14} className="text-purple-700" />
+              <span>POC:</span>
+              <span className="text-purple-900 font-extrabold">{currentUser?.name || 'Gunjan'}</span>
+            </div>
+          ) : (
+            <select
+              value={selectedDesignerFilter}
+              onChange={(e) => setSelectedDesignerFilter(e.target.value)}
+              className="bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none focus:border-pink-500 cursor-pointer"
+            >
+              <option value="All">👤 All POCs</option>
+              {uniqueDesigners.map(d => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          )}
 
           {/* Delete All Calendar Entries Button */}
           <button
