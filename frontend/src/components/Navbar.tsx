@@ -120,7 +120,7 @@ export const Navbar: React.FC<NavbarProps> = ({ user, onLogout, activeView, setA
           </div>
           <div>
             <h1 className="font-extrabold text-slate-900 text-lg leading-none tracking-tight">
-              Influencer Operations
+              Influencer Marketing Operation
             </h1>
             <p className="text-[11px] text-purple-600 font-bold mt-0.5 tracking-wide">Enterprise Work Management System v1.0</p>
           </div>

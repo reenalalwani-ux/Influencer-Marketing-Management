@@ -1,16 +1,19 @@
 import nodemailer from 'nodemailer';
 
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'sandbox.smtp.mailtrap.io',
-  port: parseInt(process.env.SMTP_PORT || '2525', 10),
+  service: 'gmail',
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT || '465', 10),
+  secure: true,
   auth: {
-    user: process.env.SMTP_USER || '6e37db07adc827',
-    pass: process.env.SMTP_PASS || 'cd0155dc9d7c14'
+    user: process.env.SMTP_USER || 'reena.lalwani@ad2ship.com',
+    pass: process.env.SMTP_PASS || 'gzolidmmbhnmdnrq'
   }
 });
 
 export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: string = 'Team Member') => {
-  const fromAddress = process.env.FROM_EMAIL || 'no-reply@influencer-operations.com';
+  const fromAddress = process.env.FROM_EMAIL || 'reena.lalwani@ad2ship.com';
+  const appName = process.env.APP_NAME || 'Influencer Marketing Operation';
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -20,7 +23,7 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
       <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; }
         .container { max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; padding: 32px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05); }
-        .badge { display: inline-block; background: linear-gradient(135deg, #9333ea, #4f46e5); color: #ffffff; font-weight: 800; font-size: 14px; padding: 6px 16px; border-radius: 12px; letter-spacing: 1px; }
+        .badge { display: inline-block; background: linear-gradient(135deg, #9333ea, #4f46e5); color: #ffffff; font-weight: 800; font-size: 13px; padding: 6px 16px; border-radius: 12px; letter-spacing: 1px; }
         .title { color: #0f172a; font-size: 22px; font-weight: 800; margin-top: 20px; margin-bottom: 8px; }
         .subtitle { color: #64748b; font-size: 14px; margin-bottom: 24px; }
         .otp-card { background-color: #f1f5f9; border: 2px dashed #cbd5e1; border-radius: 14px; text-align: center; padding: 20px; margin: 24px 0; }
@@ -30,9 +33,9 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
     </head>
     <body>
       <div class="container">
-        <div class="badge">INFLUENCER OPERATIONS</div>
+        <div class="badge">${appName.toUpperCase()}</div>
         <div class="title">Security Verification Code</div>
-        <div class="subtitle">Hello <strong>${userName}</strong>, please use the following 6-digit OTP code to complete your login authentication.</div>
+        <div class="subtitle">Hello <strong>${userName}</strong>, please use the following 6-digit OTP code to complete your login authentication for <strong>${appName}</strong>.</div>
 
         <div class="otp-card">
           <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #64748b; margin-bottom: 6px;">Your One-Time Password</div>
@@ -45,7 +48,7 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
         </p>
 
         <div class="footer">
-          &copy; ${new Date().getFullYear()} Influencer Marketing Operations System. Confidential & Secure.
+          &copy; ${new Date().getFullYear()} ${appName}. Confidential & Secure.
         </div>
       </div>
     </body>
@@ -54,17 +57,17 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
 
   try {
     const info = await transporter.sendMail({
-      from: `"Influencer Ops Security" <${fromAddress}>`,
+      from: `"${appName}" <${fromAddress}>`,
       to: toEmail,
-      subject: `🔑 ${otpCode} is your Influencer Operations Login OTP`,
+      subject: `🔑 ${otpCode} is your ${appName} Login OTP`,
       html: htmlContent
     });
 
-    console.log(`[SMTP Mailtrap] OTP Email sent successfully to ${toEmail}. MessageID: ${info.messageId}`);
+    console.log(`[Google SMTP] OTP Email sent successfully to ${toEmail} via Google SMTP. MessageID: ${info.messageId}`);
     return true;
   } catch (error) {
-    console.error(`[SMTP Mailtrap Error] Failed to send OTP email to ${toEmail}:`, error);
-    // Even if transporter errors, log to console for dev fallback
+    console.error(`[Google SMTP Error] Failed to send OTP email to ${toEmail}:`, error);
+    // Dev console fallback
     console.log(`\n=================================================`);
     console.log(`[SECURITY OTP FALLBACK] EMAIL: ${toEmail} | CODE: ${otpCode}`);
     console.log(`=================================================\n`);
