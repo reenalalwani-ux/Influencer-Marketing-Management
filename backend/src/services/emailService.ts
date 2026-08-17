@@ -73,6 +73,64 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
     </html>
   `;
 
+  // 1. Try Resend HTTPS API (Port 443 - Never blocked by Render free tier firewall)
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const resendRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.RESEND_API_KEY.trim()}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: `${appName} <onboarding@resend.dev>`,
+          to: [toEmail],
+          subject: `🔑 ${otpCode} is your ${appName} Login OTP`,
+          html: htmlContent
+        })
+      });
+      const data = await resendRes.json();
+      if (resendRes.ok) {
+        console.log(`[Resend HTTPS API Success] OTP Email delivered to ${toEmail}. ID: ${data.id}`);
+        return true;
+      } else {
+        console.error(`[Resend HTTPS API Error]`, data);
+      }
+    } catch (e: any) {
+      console.error(`[Resend HTTPS API Failure]`, e?.message || e);
+    }
+  }
+
+  // 2. Try Brevo (Sendinblue) HTTPS API (Port 443 - Never blocked by Render)
+  if (process.env.BREVO_API_KEY) {
+    try {
+      const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': process.env.BREVO_API_KEY.trim(),
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          sender: { name: appName, email: fromAddress },
+          to: [{ email: toEmail }],
+          subject: `🔑 ${otpCode} is your ${appName} Login OTP`,
+          htmlContent: htmlContent
+        })
+      });
+      const data = await brevoRes.json();
+      if (brevoRes.ok) {
+        console.log(`[Brevo HTTPS API Success] OTP Email delivered to ${toEmail}. MessageID: ${data.messageId}`);
+        return true;
+      } else {
+        console.error(`[Brevo HTTPS API Error]`, data);
+      }
+    } catch (e: any) {
+      console.error(`[Brevo HTTPS API Failure]`, e?.message || e);
+    }
+  }
+
+  // 3. Fallback to Nodemailer Raw SMTP (Port 587 / 465)
   try {
     const transporter = getTransporter(true);
     const info = await transporter.sendMail({
@@ -97,7 +155,7 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
       console.log(`[Google SMTP Success (Port 465)] OTP Email sent to ${toEmail}. MessageID: ${info.messageId}`);
       return true;
     } catch (fallbackErr: any) {
-      console.error(`[Google SMTP Fallback Failure] Error sending OTP to ${toEmail}:`, fallbackErr?.message || fallbackErr);
+      console.error(`[Google SMTP Fallback Failure] Render free tier firewall blocks SMTP ports 587/465. To send live emails on Render free tier, add RESEND_API_KEY or BREVO_API_KEY in Render environment variables. Error:`, fallbackErr?.message || fallbackErr);
       console.log(`\n=================================================`);
       console.log(`[SECURITY OTP FALLBACK] EMAIL: ${toEmail} | CODE: ${otpCode}`);
       console.log(`=================================================\n`);
