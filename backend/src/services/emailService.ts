@@ -1,4 +1,109 @@
+import nodemailer from 'nodemailer';
+
 export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: string = 'Team Member'): Promise<boolean> => {
-  console.log(`[Direct Auth System] OTP Code generated for ${toEmail}: ${otpCode}`);
+  const fromAddress = (process.env.FROM_EMAIL || 'reena.lalwani@ad2ship.com').trim();
+  const appName = (process.env.APP_NAME || 'Influencer Marketing Operation').trim();
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; }
+        .container { max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; padding: 32px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05); }
+        .badge { display: inline-block; background: linear-gradient(135deg, #9333ea, #4f46e5); color: #ffffff; font-weight: 800; font-size: 13px; padding: 6px 16px; border-radius: 12px; letter-spacing: 1px; }
+        .title { color: #0f172a; font-size: 22px; font-weight: 800; margin-top: 20px; margin-bottom: 8px; }
+        .subtitle { color: #64748b; font-size: 14px; margin-bottom: 24px; }
+        .otp-card { background-color: #f1f5f9; border: 2px dashed #cbd5e1; border-radius: 14px; text-align: center; padding: 20px; margin: 24px 0; }
+        .otp-code { font-family: monospace; font-size: 36px; font-weight: 900; letter-spacing: 8px; color: #7c3aed; }
+        .footer { font-size: 12px; color: #94a3b8; border-t: 1px solid #f1f5f9; padding-top: 16px; margin-top: 24px; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="badge">${appName.toUpperCase()}</div>
+        <div class="title">Security Verification Code</div>
+        <div class="subtitle">Hello <strong>${userName}</strong>, please use the following 6-digit OTP code to complete your login authentication for <strong>${appName}</strong>.</div>
+
+        <div class="otp-card">
+          <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #64748b; margin-bottom: 6px;">Your One-Time Password</div>
+          <div class="otp-code">${otpCode}</div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 8px;">Valid for <strong>10 minutes</strong> only</div>
+        </div>
+
+        <p style="font-size: 13px; color: #475569; line-height: 1.5;">
+          If you did not request this verification code, please ignore this email or contact system administration immediately.
+        </p>
+
+        <div class="footer">
+          &copy; ${new Date().getFullYear()} ${appName}. Confidential & Secure.
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  // 1. Try Brevo (Sendinblue) HTTPS API (Port 443 - Never blocked on Render)
+  if (process.env.BREVO_API_KEY) {
+    try {
+      const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': process.env.BREVO_API_KEY.trim(),
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          sender: { name: appName, email: fromAddress },
+          to: [{ email: toEmail }],
+          subject: `🔑 ${otpCode} is your ${appName} Login OTP`,
+          htmlContent: htmlContent
+        })
+      });
+      const data = await brevoRes.json();
+      if (brevoRes.ok) {
+        console.log(`[Brevo HTTPS API Success] OTP Email delivered to ${toEmail}. MessageID: ${data.messageId}`);
+        return true;
+      } else {
+        console.error(`[Brevo HTTPS API Error]`, data);
+      }
+    } catch (e: any) {
+      console.error(`[Brevo HTTPS API Failure]`, e?.message || e);
+    }
+  }
+
+  // 2. Try Resend HTTPS API (Port 443)
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const resendRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.RESEND_API_KEY.trim()}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: `${appName} <onboarding@resend.dev>`,
+          to: [toEmail],
+          subject: `🔑 ${otpCode} is your ${appName} Login OTP`,
+          html: htmlContent
+        })
+      });
+      const data = await resendRes.json();
+      if (resendRes.ok) {
+        console.log(`[Resend HTTPS API Success] OTP Email delivered to ${toEmail}. ID: ${data.id}`);
+        return true;
+      } else {
+        console.error(`[Resend HTTPS API Error]`, data);
+      }
+    } catch (e: any) {
+      console.error(`[Resend HTTPS API Failure]`, e?.message || e);
+    }
+  }
+
+  // 3. Fallback / Dev Log
+  console.log(`\n=================================================`);
+  console.log(`[SECURITY OTP FALLBACK] EMAIL: ${toEmail} | CODE: ${otpCode}`);
+  console.log(`=================================================\n`);
   return true;
 };
