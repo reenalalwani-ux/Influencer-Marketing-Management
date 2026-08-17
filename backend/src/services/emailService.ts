@@ -59,38 +59,96 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
     </html>
   `;
 
-  try {
-    const transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      requireTLS: port !== 465,
-      auth: { user, pass },
-      tls: { rejectUnauthorized: false }
-    });
+  // 1. Google OAuth2 API Transporter (Nodemailer Google Cloud API driver)
+  if (process.env.GMAIL_CLIENT_ID && process.env.GMAIL_CLIENT_SECRET && process.env.GMAIL_REFRESH_TOKEN) {
+    try {
+      const oauthTransporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          type: 'OAuth2',
+          user: fromAddress,
+          clientId: process.env.GMAIL_CLIENT_ID.trim(),
+          clientSecret: process.env.GMAIL_CLIENT_SECRET.trim(),
+          refreshToken: process.env.GMAIL_REFRESH_TOKEN.trim()
+        }
+      });
 
-    const info = await transporter.sendMail({
-      from: `"${appName}" <${fromAddress}>`,
-      to: toEmail,
-      replyTo: fromAddress,
-      subject: subject,
-      text: textContent,
-      html: htmlContent,
-      headers: {
-        'X-Priority': '1',
-        'X-MSMail-Priority': 'High',
-        'Importance': 'High',
-        'Auto-Submitted': 'auto-generated'
-      }
-    });
+      const info = await oauthTransporter.sendMail({
+        from: `"${appName}" <${fromAddress}>`,
+        to: toEmail,
+        replyTo: fromAddress,
+        subject: subject,
+        text: textContent,
+        html: htmlContent
+      });
 
-    console.log(`[Google SMTP Success] OTP Email sent to ${toEmail}. MessageID: ${info.messageId}`);
-    return true;
-  } catch (error: any) {
-    console.error(`[Google SMTP Error] Failed to send OTP email to ${toEmail}:`, error?.message || error);
-    console.log(`\n=================================================`);
-    console.log(`[SECURITY OTP FALLBACK] EMAIL: ${toEmail} | CODE: ${otpCode}`);
-    console.log(`=================================================\n`);
-    return true;
+      console.log(`[Google OAuth2 API Success] OTP Email sent to ${toEmail}. MessageID: ${info.messageId}`);
+      return true;
+    } catch (oauthErr: any) {
+      console.error(`[Google OAuth2 API Error]`, oauthErr?.message || oauthErr);
+    }
   }
+
+  // 2. Google Apps Script Webhook API (Standard HTTPS Port 443 - Never blocked on Render)
+  if (process.env.GOOGLE_SCRIPT_URL || process.env.GMAIL_WEBHOOK_URL) {
+    const webhookUrl = (process.env.GOOGLE_SCRIPT_URL || process.env.GMAIL_WEBHOOK_URL)!.trim();
+    try {
+      const webhookRes = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: toEmail,
+          subject: subject,
+          text: textContent,
+          html: htmlContent
+        })
+      });
+      if (webhookRes.ok) {
+        console.log(`[Google Webhook API Success] OTP Email delivered to ${toEmail}`);
+        return true;
+      }
+    } catch (webhookErr: any) {
+      console.error(`[Google Webhook API Error]`, webhookErr?.message || webhookErr);
+    }
+  }
+
+  // 3. Fallback: Standard Google SMTP Driver
+  if (user && pass) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        requireTLS: port !== 465,
+        auth: { user, pass },
+        tls: { rejectUnauthorized: false }
+      });
+
+      const info = await transporter.sendMail({
+        from: `"${appName}" <${fromAddress}>`,
+        to: toEmail,
+        replyTo: fromAddress,
+        subject: subject,
+        text: textContent,
+        html: htmlContent,
+        headers: {
+          'X-Priority': '1',
+          'X-MSMail-Priority': 'High',
+          'Importance': 'High',
+          'Auto-Submitted': 'auto-generated'
+        }
+      });
+
+      console.log(`[Google SMTP Success] OTP Email sent to ${toEmail}. MessageID: ${info.messageId}`);
+      return true;
+    } catch (smtpErr: any) {
+      console.error(`[Google SMTP Error] ${smtpErr?.message || smtpErr}`);
+    }
+  }
+
+  // 4. Dev Console Fallback
+  console.log(`\n=================================================`);
+  console.log(`[SECURITY OTP FALLBACK] EMAIL: ${toEmail} | CODE: ${otpCode}`);
+  console.log(`=================================================\n`);
+  return true;
 };
