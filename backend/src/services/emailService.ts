@@ -4,6 +4,11 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
   const fromAddress = (process.env.FROM_EMAIL || 'reena.lalwani@ad2ship.com').trim();
   const appName = (process.env.APP_NAME || 'Influencer Marketing Operation').trim();
 
+  // Clean anti-spam subject line (No emojis or spam keywords)
+  const subject = `Your ${appName} security code is ${otpCode}`;
+
+  const textContent = `Hello ${userName},\n\nYour ${appName} security verification code is: ${otpCode}\n\nThis code will expire in 10 minutes.\n\nIf you did not request this verification code, please ignore this email.\n\nRegards,\n${appName} Security Team`;
+
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -24,12 +29,12 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
       <div class="container">
         <div class="badge">${appName.toUpperCase()}</div>
         <div class="title">Security Verification Code</div>
-        <div class="subtitle">Hello <strong>${userName}</strong>, please use the following 6-digit OTP code to complete your login authentication for <strong>${appName}</strong>.</div>
+        <div class="subtitle">Hello <strong>${userName}</strong>, please use the following 6-digit code to complete your login authentication for <strong>${appName}</strong>.</div>
 
         <div class="otp-card">
-          <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #64748b; margin-bottom: 6px;">Your One-Time Password</div>
+          <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #64748b; margin-bottom: 6px;">Security Verification Code</div>
           <div class="otp-code">${otpCode}</div>
-          <div style="font-size: 11px; color: #64748b; margin-top: 8px;">Valid for <strong>10 minutes</strong> only</div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 8px;">Valid for <strong>10 minutes</strong></div>
         </div>
 
         <p style="font-size: 13px; color: #475569; line-height: 1.5;">
@@ -37,14 +42,14 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
         </p>
 
         <div class="footer">
-          &copy; ${new Date().getFullYear()} ${appName}. Confidential & Secure.
+          &copy; ${new Date().getFullYear()} ${appName}. Security & Operations Portal.
         </div>
       </div>
     </body>
     </html>
   `;
 
-  // 1. Try Brevo (Sendinblue) HTTPS API (Port 443 - Never blocked on Render)
+  // 1. Try Brevo (Sendinblue) HTTPS API
   if (process.env.BREVO_API_KEY) {
     try {
       const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -57,7 +62,9 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
         body: JSON.stringify({
           sender: { name: appName, email: fromAddress },
           to: [{ email: toEmail }],
-          subject: `🔑 ${otpCode} is your ${appName} Login OTP`,
+          replyTo: { email: fromAddress },
+          subject: subject,
+          textContent: textContent,
           htmlContent: htmlContent
         })
       });
@@ -73,7 +80,7 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
     }
   }
 
-  // 2. Try Resend HTTPS API (Port 443)
+  // 2. Try Resend HTTPS API
   if (process.env.RESEND_API_KEY) {
     try {
       const resendRes = await fetch('https://api.resend.com/emails', {
@@ -85,7 +92,8 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
         body: JSON.stringify({
           from: `${appName} <onboarding@resend.dev>`,
           to: [toEmail],
-          subject: `🔑 ${otpCode} is your ${appName} Login OTP`,
+          subject: subject,
+          text: textContent,
           html: htmlContent
         })
       });
@@ -119,8 +127,16 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
       const info = await transporter.sendMail({
         from: `"${appName}" <${fromAddress}>`,
         to: toEmail,
-        subject: `🔑 ${otpCode} is your ${appName} Login OTP`,
-        html: htmlContent
+        replyTo: fromAddress,
+        subject: subject,
+        text: textContent,
+        html: htmlContent,
+        headers: {
+          'X-Priority': '1',
+          'X-MSMail-Priority': 'High',
+          'Importance': 'High',
+          'Auto-Submitted': 'auto-generated'
+        }
       });
       console.log(`[Google SMTP Success] OTP Email sent to ${toEmail}. MessageID: ${info.messageId}`);
       return true;
