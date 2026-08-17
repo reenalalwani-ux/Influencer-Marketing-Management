@@ -101,7 +101,35 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
     }
   }
 
-  // 3. Fallback / Dev Log
+  // 3. Try Nodemailer Google SMTP
+  const user = (process.env.SMTP_USER || 'reena.lalwani@ad2ship.com').trim();
+  const pass = (process.env.SMTP_PASS || 'gzolidmmbhnmdnrq').trim();
+  const host = (process.env.SMTP_HOST || 'smtp.gmail.com').trim();
+  const port = parseInt(process.env.SMTP_PORT || '587', 10);
+
+  if (user && pass) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        auth: { user, pass },
+        tls: { rejectUnauthorized: false }
+      });
+      const info = await transporter.sendMail({
+        from: `"${appName}" <${fromAddress}>`,
+        to: toEmail,
+        subject: `🔑 ${otpCode} is your ${appName} Login OTP`,
+        html: htmlContent
+      });
+      console.log(`[Google SMTP Success] OTP Email sent to ${toEmail}. MessageID: ${info.messageId}`);
+      return true;
+    } catch (smtpErr: any) {
+      console.error(`[Google SMTP Error] ${smtpErr?.message || smtpErr}`);
+    }
+  }
+
+  // 4. Fallback / Dev Log
   console.log(`\n=================================================`);
   console.log(`[SECURITY OTP FALLBACK] EMAIL: ${toEmail} | CODE: ${otpCode}`);
   console.log(`=================================================\n`);

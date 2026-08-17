@@ -44,16 +44,15 @@ router.post('/request-otp', async (req: AuthRequest, res: Response) => {
     user.otpExpiresAt = otpExpiresAt;
     await user.save();
 
-    // Trigger email send in background via Brevo / Resend HTTPS API
+    // Send security OTP email to user inbox via Brevo / Resend / Google SMTP
     sendOTPEmail(user.email, otpCode, user.name).catch((err) => {
       console.error('[Background Email Dispatch Error]', err);
     });
 
     return res.json({
       success: true,
-      message: `Verification OTP generated! Code: ${otpCode}`,
-      email: user.email,
-      otpCode
+      message: `Security OTP sent to ${user.email}. Please check your email inbox.`,
+      email: user.email
     });
   } catch (error: any) {
     console.error('Request OTP error:', error);

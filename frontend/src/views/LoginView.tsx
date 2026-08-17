@@ -56,12 +56,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     try {
       const res = await api.post('/auth/request-otp', { email: email.toLowerCase().trim() });
       if (res.success) {
-        if (res.otpCode) {
-          setOtpCode(res.otpCode);
-          setSuccessMessage(`Instant OTP Code: ${res.otpCode} (Auto-filled below for instant 1-click login)`);
-        } else {
-          setSuccessMessage(`Security OTP generated for ${res.email}`);
-        }
+        setOtpCode('');
+        setSuccessMessage(`Security OTP sent to ${res.email}. Please check your email inbox.`);
         setStep('otp');
         setResendTimer(30);
       }
