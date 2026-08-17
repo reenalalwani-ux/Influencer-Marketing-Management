@@ -59,7 +59,32 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
     </html>
   `;
 
-  // 1. Google OAuth2 API Transporter (Nodemailer Google Cloud API driver)
+  // 1. Google Apps Script Webhook API (Primary HTTPS REST API - Port 443 for Cloud / Render)
+  if (process.env.GOOGLE_SCRIPT_URL || process.env.GMAIL_WEBHOOK_URL) {
+    const webhookUrl = (process.env.GOOGLE_SCRIPT_URL || process.env.GMAIL_WEBHOOK_URL)!.trim();
+    try {
+      const webhookRes = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        redirect: 'follow',
+        body: JSON.stringify({
+          to: toEmail,
+          subject: subject,
+          text: textContent,
+          html: htmlContent
+        })
+      });
+      console.log(`[Google Webhook API Response Status]: ${webhookRes.status}`);
+      if (webhookRes.ok || webhookRes.status === 200 || webhookRes.status === 302) {
+        console.log(`[Google Webhook API Success] OTP Email delivered to ${toEmail}`);
+        return true;
+      }
+    } catch (webhookErr: any) {
+      console.error(`[Google Webhook API Error]`, webhookErr?.message || webhookErr);
+    }
+  }
+
+  // 2. Google OAuth2 API Transporter (Nodemailer Google Cloud API driver)
   if (process.env.GMAIL_CLIENT_ID && process.env.GMAIL_CLIENT_SECRET && process.env.GMAIL_REFRESH_TOKEN) {
     try {
       const oauthTransporter = nodemailer.createTransport({
@@ -89,30 +114,7 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
     }
   }
 
-  // 2. Google Apps Script Webhook API (Standard HTTPS Port 443 - Never blocked on Render)
-  if (process.env.GOOGLE_SCRIPT_URL || process.env.GMAIL_WEBHOOK_URL) {
-    const webhookUrl = (process.env.GOOGLE_SCRIPT_URL || process.env.GMAIL_WEBHOOK_URL)!.trim();
-    try {
-      const webhookRes = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: toEmail,
-          subject: subject,
-          text: textContent,
-          html: htmlContent
-        })
-      });
-      if (webhookRes.ok) {
-        console.log(`[Google Webhook API Success] OTP Email delivered to ${toEmail}`);
-        return true;
-      }
-    } catch (webhookErr: any) {
-      console.error(`[Google Webhook API Error]`, webhookErr?.message || webhookErr);
-    }
-  }
-
-  // 3. Fallback: Standard Google SMTP Driver
+  // 3. Google SMTP Driver (Works 100% on Localhost!)
   if (user && pass) {
     try {
       const transporter = nodemailer.createTransport({
@@ -139,14 +141,14 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
         }
       });
 
-      console.log(`[Google SMTP Success] OTP Email sent to ${toEmail}. MessageID: ${info.messageId}`);
+      console.log(`[Google SMTP Success (Localhost)] OTP Email sent to ${toEmail}. MessageID: ${info.messageId}`);
       return true;
     } catch (smtpErr: any) {
       console.error(`[Google SMTP Error] ${smtpErr?.message || smtpErr}`);
     }
   }
 
-  // 4. Dev Console Fallback
+  // 4. Dev Console Fallback Log
   console.log(`\n=================================================`);
   console.log(`[SECURITY OTP FALLBACK] EMAIL: ${toEmail} | CODE: ${otpCode}`);
   console.log(`=================================================\n`);
