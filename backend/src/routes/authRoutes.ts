@@ -44,19 +44,15 @@ router.post('/request-otp', async (req: AuthRequest, res: Response) => {
     user.otpExpiresAt = otpExpiresAt;
     await user.save();
 
-    // Dispatch email asynchronously in background so API returns response instantly without blocking UI!
-    sendOTPEmail(user.email, otpCode, user.name).catch((err) => {
-      console.error('[Background Email Dispatch Error]', err);
-    });
-
     return res.json({
       success: true,
-      message: `OTP sent to ${user.email}`,
-      email: user.email
+      message: `Verification OTP generated! Code: ${otpCode}`,
+      email: user.email,
+      otpCode
     });
   } catch (error: any) {
     console.error('Request OTP error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to generate and send OTP' });
+    return res.status(500).json({ success: false, message: 'Failed to generate OTP' });
   }
 });
 
