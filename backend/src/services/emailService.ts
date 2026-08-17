@@ -1,26 +1,28 @@
 import nodemailer from 'nodemailer';
+import dns from 'dns';
 
-const getTransporter = () => {
+// Force Node.js to resolve IPv4 addresses first on cloud environments like Render
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch (e) {
+  // Ignore if unsupported in Node version
+}
+
+const getTransporter = (usePort587 = true) => {
   const user = (process.env.SMTP_USER || 'reena.lalwani@ad2ship.com').trim();
   const pass = (process.env.SMTP_PASS || 'gzolidmmbhnmdnrq').trim();
   const host = (process.env.SMTP_HOST || 'smtp.gmail.com').trim();
+  const port = usePort587 ? 587 : parseInt(process.env.SMTP_PORT || '587', 10);
 
-  if (host.includes('gmail') || user.endsWith('@gmail.com') || user.endsWith('@ad2ship.com')) {
-    return nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user, pass },
-      tls: {
-        rejectUnauthorized: false
-      }
-    });
-  }
-
-  const port = parseInt(process.env.SMTP_PORT || '587', 10);
   return nodemailer.createTransport({
-    host,
+    host: host.includes('gmail') ? 'smtp.gmail.com' : host,
     port,
     secure: port === 465,
+    requireTLS: port !== 465,
     auth: { user, pass },
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 15000,
     tls: {
       rejectUnauthorized: false
     }
@@ -72,7 +74,7 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
   `;
 
   try {
-    const transporter = getTransporter();
+    const transporter = getTransporter(true);
     const info = await transporter.sendMail({
       from: `"${appName}" <${fromAddress}>`,
       to: toEmail,
@@ -80,14 +82,26 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
       html: htmlContent
     });
 
-    console.log(`[Google SMTP Success] OTP Email sent to ${toEmail}. MessageID: ${info.messageId}`);
+    console.log(`[Google SMTP Success (Port 587)] OTP Email sent to ${toEmail}. MessageID: ${info.messageId}`);
     return true;
   } catch (error: any) {
-    console.error(`[Google SMTP Failure] Error sending OTP to ${toEmail}:`, error?.message || error);
-    // Dev console fallback
-    console.log(`\n=================================================`);
-    console.log(`[SECURITY OTP FALLBACK] EMAIL: ${toEmail} | CODE: ${otpCode}`);
-    console.log(`=================================================\n`);
-    return true;
+    console.error(`[Google SMTP Port 587 Error] Trying Port 465 fallback... Error: ${error?.message || error}`);
+    try {
+      const fallbackTransporter = getTransporter(false);
+      const info = await fallbackTransporter.sendMail({
+        from: `"${appName}" <${fromAddress}>`,
+        to: toEmail,
+        subject: `🔑 ${otpCode} is your ${appName} Login OTP`,
+        html: htmlContent
+      });
+      console.log(`[Google SMTP Success (Port 465)] OTP Email sent to ${toEmail}. MessageID: ${info.messageId}`);
+      return true;
+    } catch (fallbackErr: any) {
+      console.error(`[Google SMTP Fallback Failure] Error sending OTP to ${toEmail}:`, fallbackErr?.message || fallbackErr);
+      console.log(`\n=================================================`);
+      console.log(`[SECURITY OTP FALLBACK] EMAIL: ${toEmail} | CODE: ${otpCode}`);
+      console.log(`=================================================\n`);
+      return true;
+    }
   }
 };
