@@ -114,7 +114,7 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
     }
   }
 
-  // 3. Google SMTP Driver (Works 100% on Localhost!)
+  // 3. Google SMTP Driver (Delivers real emails on Localhost!)
   if (user && pass) {
     try {
       const transporter = nodemailer.createTransport({
@@ -148,7 +148,7 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
     }
   }
 
-  // 4. Dev Console Fallback Log
+  // 4. Fallback Console Log
   console.log(`\n=================================================`);
   console.log(`[SECURITY OTP FALLBACK] EMAIL: ${toEmail} | CODE: ${otpCode}`);
   console.log(`=================================================\n`);
