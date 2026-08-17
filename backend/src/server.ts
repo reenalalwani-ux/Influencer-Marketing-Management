@@ -36,6 +36,16 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Root endpoint welcome message
+app.get('/', (req, res) => {
+  res.json({
+    status: 'OK',
+    message: 'Influencer Marketing Operation Backend API is running live on Render!',
+    healthCheck: '/api/v1/health',
+    version: '1.0.0'
+  });
+});
+
 // Health check endpoint
 app.get('/api/v1/health', (req, res) => {
   res.json({

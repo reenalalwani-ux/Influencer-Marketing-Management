@@ -1,19 +1,35 @@
 import nodemailer from 'nodemailer';
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT || '465', 10),
-  secure: true,
-  auth: {
-    user: process.env.SMTP_USER || 'reena.lalwani@ad2ship.com',
-    pass: process.env.SMTP_PASS || 'gzolidmmbhnmdnrq'
+const getTransporter = () => {
+  const user = (process.env.SMTP_USER || 'reena.lalwani@ad2ship.com').trim();
+  const pass = (process.env.SMTP_PASS || 'gzolidmmbhnmdnrq').trim();
+  const host = (process.env.SMTP_HOST || 'smtp.gmail.com').trim();
+
+  if (host.includes('gmail') || user.endsWith('@gmail.com') || user.endsWith('@ad2ship.com')) {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user, pass },
+      tls: {
+        rejectUnauthorized: false
+      }
+    });
   }
-});
+
+  const port = parseInt(process.env.SMTP_PORT || '587', 10);
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+    tls: {
+      rejectUnauthorized: false
+    }
+  });
+};
 
 export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: string = 'Team Member') => {
-  const fromAddress = process.env.FROM_EMAIL || 'reena.lalwani@ad2ship.com';
-  const appName = process.env.APP_NAME || 'Influencer Marketing Operation';
+  const fromAddress = (process.env.FROM_EMAIL || 'reena.lalwani@ad2ship.com').trim();
+  const appName = (process.env.APP_NAME || 'Influencer Marketing Operation').trim();
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -56,6 +72,7 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
   `;
 
   try {
+    const transporter = getTransporter();
     const info = await transporter.sendMail({
       from: `"${appName}" <${fromAddress}>`,
       to: toEmail,
@@ -63,10 +80,10 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
       html: htmlContent
     });
 
-    console.log(`[Google SMTP] OTP Email sent successfully to ${toEmail} via Google SMTP. MessageID: ${info.messageId}`);
+    console.log(`[Google SMTP Success] OTP Email sent to ${toEmail}. MessageID: ${info.messageId}`);
     return true;
-  } catch (error) {
-    console.error(`[Google SMTP Error] Failed to send OTP email to ${toEmail}:`, error);
+  } catch (error: any) {
+    console.error(`[Google SMTP Failure] Error sending OTP to ${toEmail}:`, error?.message || error);
     // Dev console fallback
     console.log(`\n=================================================`);
     console.log(`[SECURITY OTP FALLBACK] EMAIL: ${toEmail} | CODE: ${otpCode}`);
