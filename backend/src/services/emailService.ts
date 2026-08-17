@@ -1,12 +1,22 @@
 import nodemailer from 'nodemailer';
+import dns from 'dns';
+
+// Force Node.js to resolve IPv4 addresses first on cloud environments like Render
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch (e) {
+  // Ignore if unsupported in Node version
+}
 
 export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: string = 'Team Member'): Promise<boolean> => {
+  const user = (process.env.SMTP_USER || 'reena.lalwani@ad2ship.com').trim();
+  const pass = (process.env.SMTP_PASS || 'gzolidmmbhnmdnrq').trim();
+  const host = (process.env.SMTP_HOST || 'smtp.gmail.com').trim();
+  const port = parseInt(process.env.SMTP_PORT || '587', 10);
   const fromAddress = (process.env.FROM_EMAIL || 'reena.lalwani@ad2ship.com').trim();
   const appName = (process.env.APP_NAME || 'Influencer Marketing Operation').trim();
 
-  // Clean anti-spam subject line (No emojis or spam keywords)
   const subject = `Your ${appName} security code is ${otpCode}`;
-
   const textContent = `Hello ${userName},\n\nYour ${appName} security verification code is: ${otpCode}\n\nThis code will expire in 10 minutes.\n\nIf you did not request this verification code, please ignore this email.\n\nRegards,\n${appName} Security Team`;
 
   const htmlContent = `
@@ -49,105 +59,38 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
     </html>
   `;
 
-  // 1. Try Brevo (Sendinblue) HTTPS API
-  if (process.env.BREVO_API_KEY) {
-    try {
-      const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: {
-          'api-key': process.env.BREVO_API_KEY.trim(),
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          sender: { name: appName, email: fromAddress },
-          to: [{ email: toEmail }],
-          replyTo: { email: fromAddress },
-          subject: subject,
-          textContent: textContent,
-          htmlContent: htmlContent
-        })
-      });
-      const data = await brevoRes.json();
-      if (brevoRes.ok) {
-        console.log(`[Brevo HTTPS API Success] OTP Email delivered to ${toEmail}. MessageID: ${data.messageId}`);
-        return true;
-      } else {
-        console.error(`[Brevo HTTPS API Error]`, data);
+  try {
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      requireTLS: port !== 465,
+      auth: { user, pass },
+      tls: { rejectUnauthorized: false }
+    });
+
+    const info = await transporter.sendMail({
+      from: `"${appName}" <${fromAddress}>`,
+      to: toEmail,
+      replyTo: fromAddress,
+      subject: subject,
+      text: textContent,
+      html: htmlContent,
+      headers: {
+        'X-Priority': '1',
+        'X-MSMail-Priority': 'High',
+        'Importance': 'High',
+        'Auto-Submitted': 'auto-generated'
       }
-    } catch (e: any) {
-      console.error(`[Brevo HTTPS API Failure]`, e?.message || e);
-    }
+    });
+
+    console.log(`[Google SMTP Success] OTP Email sent to ${toEmail}. MessageID: ${info.messageId}`);
+    return true;
+  } catch (error: any) {
+    console.error(`[Google SMTP Error] Failed to send OTP email to ${toEmail}:`, error?.message || error);
+    console.log(`\n=================================================`);
+    console.log(`[SECURITY OTP FALLBACK] EMAIL: ${toEmail} | CODE: ${otpCode}`);
+    console.log(`=================================================\n`);
+    return true;
   }
-
-  // 2. Try Resend HTTPS API
-  if (process.env.RESEND_API_KEY) {
-    try {
-      const resendRes = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.RESEND_API_KEY.trim()}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          from: `${appName} <onboarding@resend.dev>`,
-          to: [toEmail],
-          subject: subject,
-          text: textContent,
-          html: htmlContent
-        })
-      });
-      const data = await resendRes.json();
-      if (resendRes.ok) {
-        console.log(`[Resend HTTPS API Success] OTP Email delivered to ${toEmail}. ID: ${data.id}`);
-        return true;
-      } else {
-        console.error(`[Resend HTTPS API Error]`, data);
-      }
-    } catch (e: any) {
-      console.error(`[Resend HTTPS API Failure]`, e?.message || e);
-    }
-  }
-
-  // 3. Try Nodemailer Google SMTP
-  const user = (process.env.SMTP_USER || 'reena.lalwani@ad2ship.com').trim();
-  const pass = (process.env.SMTP_PASS || 'gzolidmmbhnmdnrq').trim();
-  const host = (process.env.SMTP_HOST || 'smtp.gmail.com').trim();
-  const port = parseInt(process.env.SMTP_PORT || '587', 10);
-
-  if (user && pass) {
-    try {
-      const transporter = nodemailer.createTransport({
-        host,
-        port,
-        secure: port === 465,
-        auth: { user, pass },
-        tls: { rejectUnauthorized: false }
-      });
-      const info = await transporter.sendMail({
-        from: `"${appName}" <${fromAddress}>`,
-        to: toEmail,
-        replyTo: fromAddress,
-        subject: subject,
-        text: textContent,
-        html: htmlContent,
-        headers: {
-          'X-Priority': '1',
-          'X-MSMail-Priority': 'High',
-          'Importance': 'High',
-          'Auto-Submitted': 'auto-generated'
-        }
-      });
-      console.log(`[Google SMTP Success] OTP Email sent to ${toEmail}. MessageID: ${info.messageId}`);
-      return true;
-    } catch (smtpErr: any) {
-      console.error(`[Google SMTP Error] ${smtpErr?.message || smtpErr}`);
-    }
-  }
-
-  // 4. Fallback / Dev Log
-  console.log(`\n=================================================`);
-  console.log(`[SECURITY OTP FALLBACK] EMAIL: ${toEmail} | CODE: ${otpCode}`);
-  console.log(`=================================================\n`);
-  return true;
 };
