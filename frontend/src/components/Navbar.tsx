@@ -244,9 +244,8 @@ export const Navbar: React.FC<NavbarProps> = ({ user, onLogout, activeView, setA
             </div>
 
             {profileMessage && (
-              <div className={`p-3 rounded-xl border text-xs font-bold flex items-center gap-2 ${
-                profileMessage.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-rose-50 border-rose-200 text-rose-700'
-              }`}>
+              <div className={`p-3 rounded-xl border text-xs font-bold flex items-center gap-2 ${profileMessage.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-rose-50 border-rose-200 text-rose-700'
+                }`}>
                 {profileMessage.type === 'success' ? <CheckCircle2 size={16} /> : <UserCheck size={16} />}
                 <span>{profileMessage.text}</span>
               </div>
@@ -319,7 +318,7 @@ export const Navbar: React.FC<NavbarProps> = ({ user, onLogout, activeView, setA
               <div className="bg-purple-50/60 p-3.5 rounded-xl border border-purple-200 space-y-2">
                 <span className="text-[11px] font-black text-purple-900 uppercase tracking-wider flex items-center gap-1.5">
                   <Briefcase size={14} className="text-purple-700" />
-                  My Assigned Brand Portfolio ({assignedBrands.length > 0 ? assignedBrands.length : '10 Assigned Brands'})
+                  My Assigned Brand Portfolio ({assignedBrands.length > 0 ? assignedBrands.length : ''})
                 </span>
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   {assignedBrands.length > 0 ? (

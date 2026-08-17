@@ -332,6 +332,18 @@ export const PostingCalendarView: React.FC<PostingCalendarViewProps> = ({ curren
           {/* Spreadsheet Table Grid */}
           {loading ? (
             <InlineLoader message="Loading posting matrix..." />
+          ) : isEmployeeRole && matrixBrands.length === 0 ? (
+            <div className="bg-white p-12 sm:p-16 rounded-3xl border border-slate-200 shadow-xs text-center space-y-4 max-w-2xl mx-auto my-6 animate-fade-in">
+              <div className="w-16 h-16 bg-purple-100/80 text-purple-700 rounded-2xl flex items-center justify-center mx-auto border border-purple-200 shadow-xs">
+                <CalendarIcon size={32} />
+              </div>
+              <div>
+                <h3 className="text-xl font-extrabold text-slate-900 tracking-tight">No Assigned Brands Found</h3>
+                <p className="text-xs text-slate-500 font-semibold mt-1.5 leading-relaxed">
+                  You currently have <strong className="text-slate-800">0 brands assigned</strong> to your employee portfolio. Please request your Marketing Manager to assign brands to your staff profile to view your posting schedule.
+                </p>
+              </div>
+            </div>
           ) : (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
               <div className="overflow-x-auto max-h-[600px]">

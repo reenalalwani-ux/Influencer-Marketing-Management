@@ -124,7 +124,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
                 <Briefcase size={18} />
               </div>
             </div>
-            <div className="text-3xl font-black text-slate-900">{data?.myBrands?.length || 10}</div>
+            <div className="text-3xl font-black text-slate-900">{data?.myBrands ? data.myBrands.length : 0}</div>
             <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-xs">
               <span className="text-slate-500 font-semibold">Active brand portfolio</span>
               <span className="text-purple-600 font-bold flex items-center gap-0.5 group-hover:translate-x-1 transition">
@@ -380,51 +380,47 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
                   My Assigned Brands
                 </h3>
                 <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-black">
-                  {data?.myBrands?.length || 10} Active
+                  {data?.myBrands ? data.myBrands.length : 0} Active
                 </span>
               </div>
 
               <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
-                {(data?.myBrands || [
-                  { _id: '1', brandId: { brandName: 'Kala Kurti', industry: 'Fashion' }, priority: 'High' },
-                  { _id: '2', brandId: { brandName: 'Vexo Trend', industry: 'Apparel' }, priority: 'Medium' },
-                  { _id: '3', brandId: { brandName: 'Fake Losser', industry: 'E-commerce' }, priority: 'Medium' },
-                  { _id: '4', brandId: { brandName: 'Royal Design', industry: 'Jewelry' }, priority: 'Medium' },
-                  { _id: '5', brandId: { brandName: 'Rivaayath House', industry: 'Ethnic' }, priority: 'Medium' },
-                  { _id: '6', brandId: { brandName: 'KD Design', industry: 'Textile' }, priority: 'Medium' },
-                  { _id: '7', brandId: { brandName: 'Walkin Wardrobe', industry: 'Footwear' }, priority: 'Medium' },
-                  { _id: '8', brandId: { brandName: 'Sanwarlyanghee', industry: 'Couture' }, priority: 'Medium' },
-                  { _id: '9', brandId: { brandName: 'Suchira', industry: 'Boutique' }, priority: 'Medium' },
-                  { _id: '10', brandId: { brandName: 'House of Rashmi', industry: 'Designer' }, priority: 'Medium' }
-                ]).map((b: any, idx: number) => {
-                  const bName = b.brandId?.brandName || 'Brand';
-                  return (
-                    <div
-                      key={b._id}
-                      onClick={() => onNavigate('daily-posting')}
-                      className="p-3 rounded-2xl bg-slate-50 hover:bg-purple-50/50 border border-slate-200 hover:border-purple-200 flex items-center justify-between text-xs cursor-pointer transition shadow-2xs group"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-9 h-9 rounded-xl ${getBrandBg(idx)} flex items-center justify-center font-black text-xs shrink-0 shadow-2xs`}>
-                          {getBrandAvatar(bName)}
+                {(!data?.myBrands || data.myBrands.length === 0) ? (
+                  <div className="p-6 text-center bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
+                    <p className="text-xs font-extrabold text-slate-600">No Assigned Brands</p>
+                    <p className="text-[11px] text-slate-400 font-medium">You currently have 0 assigned brands in your portfolio.</p>
+                  </div>
+                ) : (
+                  data.myBrands.map((b: any, idx: number) => {
+                    const bName = b.brandId?.brandName || b.brandName || 'Brand';
+                    return (
+                      <div
+                        key={b._id || idx}
+                        onClick={() => onNavigate('daily-posting')}
+                        className="p-3 rounded-2xl bg-slate-50 hover:bg-purple-50/50 border border-slate-200 hover:border-purple-200 flex items-center justify-between text-xs cursor-pointer transition shadow-2xs group"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-9 h-9 rounded-xl ${getBrandBg(idx)} flex items-center justify-center font-black text-xs shrink-0 shadow-2xs`}>
+                            {getBrandAvatar(bName)}
+                          </div>
+                          <div>
+                            <div className="font-extrabold text-slate-900 text-sm group-hover:text-purple-700 transition">{bName}</div>
+                            <div className="text-slate-500 font-medium text-[11px]">{b.brandId?.industry || b.industry || 'General Industry'}</div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="font-extrabold text-slate-900 text-sm group-hover:text-purple-700 transition">{bName}</div>
-                          <div className="text-slate-500 font-medium text-[11px]">{b.brandId?.industry || 'General Industry'}</div>
-                        </div>
-                      </div>
 
-                      <div className="flex items-center space-x-2">
-                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
-                          b.priority === 'High' ? 'bg-rose-100 text-rose-800 border border-rose-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                        }`}>
-                          {b.priority || 'Active'}
-                        </span>
-                        <ChevronRight size={14} className="text-slate-400 group-hover:text-purple-600 group-hover:translate-x-0.5 transition" />
+                        <div className="flex items-center space-x-2">
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                            b.priority === 'High' ? 'bg-rose-100 text-rose-800 border border-rose-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          }`}>
+                            {b.priority || 'Active'}
+                          </span>
+                          <ChevronRight size={14} className="text-slate-400 group-hover:text-purple-600 group-hover:translate-x-0.5 transition" />
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
 
               <button

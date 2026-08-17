@@ -126,11 +126,13 @@ router.get('/matrix', authenticateToken, checkPermission('posting.view'), async 
       assignedBrandIds = assignments.map(a => a.brandId);
     }
 
-    let brands;
+    let brands: any[] = [];
     if (assignedBrandIds.length > 0) {
       brands = await Brand.find({ _id: { $in: assignedBrandIds }, status: 'Active' }).sort({ brandName: 1 });
-    } else {
+    } else if (req.user?.role !== 'Employee') {
       brands = await Brand.find({ status: 'Active' }).sort({ brandName: 1 });
+    } else {
+      brands = [];
     }
 
     // Query tasks for the month
