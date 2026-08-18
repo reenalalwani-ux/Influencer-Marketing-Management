@@ -3,7 +3,7 @@ import {
   Users, Briefcase, Target, CheckCircle2, Clock, AlertTriangle,
   ArrowUpRight, ExternalLink, Calendar, Send, ShieldCheck,
   BarChart3, Trophy, Medal, TrendingUp, Award, Sparkles, Plus,
-  Layers, ChevronRight, CheckSquare, Star
+  Layers, ChevronRight, CheckSquare, Star, Pencil
 } from 'lucide-react';
 import { api } from '../services/api';
 import { User, TaskItem, EmployeePerformanceData } from '../types';
@@ -14,13 +14,15 @@ interface DashboardViewProps {
   user: User | null;
   onNavigate: (view: string) => void;
   onOpenSubmitUrlModal: (task: TaskItem) => void;
+  onRegisterTaskUpdater?: (fn: (taskId: string, url: string) => void) => void;
 }
 
-export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, onOpenSubmitUrlModal }) => {
+export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, onOpenSubmitUrlModal, onRegisterTaskUpdater }) => {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [perfData, setPerfData] = useState<EmployeePerformanceData[]>([]);
   const [logPage, setLogPage] = useState(1);
+  const [localTasks, setLocalTasks] = useState<any[]>([]);
   const itemsPerPage = 6;
 
   const fetchDashboardStats = async () => {
@@ -29,7 +31,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
         api.get('/dashboard/stats'),
         api.get('/performance'),
       ]);
-      if (dashRes.success) setData(dashRes.data);
+      if (dashRes.success) {
+        setData(dashRes.data);
+        setLocalTasks(dashRes.data?.todaysTasks || []);
+      }
       if (perfRes.success) setPerfData(perfRes.data || []);
     } catch (err) {
       console.error('Failed to fetch dashboard stats', err);
@@ -38,9 +43,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
     }
   };
 
+  // Called by parent after a URL is successfully submitted — update that task locally
+  const handleUrlSubmitted = (taskId: string, submittedUrl: string) => {
+    setLocalTasks(prev =>
+      prev.map(t =>
+        t._id === taskId
+          ? { ...t, status: 'Submitted', publishedUrl: submittedUrl }
+          : t
+      )
+    );
+  };
+
   useEffect(() => {
     fetchDashboardStats();
   }, []);
+
+  // Register the updater with the parent so URL submission from the modal triggers an instant update
+  useEffect(() => {
+    if (onRegisterTaskUpdater) {
+      onRegisterTaskUpdater(handleUrlSubmitted);
+    }
+  }, [onRegisterTaskUpdater]);
 
   if (loading) return <PageLoader message="Loading operational dashboard..." />;
 
@@ -289,12 +312,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
             </div>
 
             <div className="space-y-3">
-              {(!data?.todaysTasks || data.todaysTasks.length === 0) ? (
+              {(!localTasks || localTasks.length === 0) ? (
                 <div className="p-8 bg-gradient-to-br from-purple-50/50 to-slate-50 rounded-2xl border border-purple-100/80 text-center space-y-2">
                   <p className="text-xs text-slate-500 font-semibold">No operational tasks found in database for today.</p>
                 </div>
               ) : (
-                data.todaysTasks.map((t: any) => (
+                localTasks.map((t: any) => (
                   <div
                     key={t._id}
                     className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:border-purple-300 transition shadow-2xs"
@@ -312,9 +335,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
                       <div className="text-xs text-slate-600">
                         Brand: <span className="font-extrabold text-slate-900">{typeof t.brandId === 'object' ? t.brandId?.brandName : 'N/A'}</span>
                       </div>
+                      {/* Show submitted URL inline */}
+                      {t.publishedUrl && (
+                        <div className="text-[10px] text-slate-400 font-medium truncate max-w-xs">
+                          🔗 {t.publishedUrl}
+                        </div>
+                      )}
                     </div>
 
-                    <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end flex-wrap">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-black ${
                         t.status === 'Verified' ? 'badge-verified' :
                           t.status === 'Submitted' ? 'badge-submitted' :
@@ -323,25 +352,39 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
                         {t.status}
                       </span>
 
-                      {t.status === 'Pending' && (
+                      {/* Submit URL — for Pending or Rejected tasks */}
+                      {(t.status === 'Pending' || t.status === 'Rejected') && (
                         <button
                           onClick={() => onOpenSubmitUrlModal(t)}
                           className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-extrabold transition flex items-center space-x-1 shadow-xs cursor-pointer"
                         >
                           <Send size={12} />
-                          <span>Submit URL</span>
+                          <span>{t.status === 'Rejected' ? 'Re-submit URL' : 'Submit URL'}</span>
                         </button>
                       )}
 
+                      {/* Edit URL — for Submitted tasks */}
+                      {t.status === 'Submitted' && (
+                        <button
+                          onClick={() => onOpenSubmitUrlModal(t)}
+                          className="px-3.5 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-xs font-extrabold transition flex items-center space-x-1 shadow-xs cursor-pointer"
+                        >
+                          <Pencil size={12} />
+                          <span>Edit URL</span>
+                        </button>
+                      )}
+
+                      {/* View URL — for tasks that have a submitted URL */}
                       {t.publishedUrl && (
                         <a
                           href={t.publishedUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="p-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-xs transition border border-purple-200"
+                          className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-extrabold transition flex items-center space-x-1 border border-emerald-200 cursor-pointer"
                           title="Open Published URL"
                         >
-                          <ExternalLink size={14} />
+                          <ExternalLink size={12} />
+                          <span>View URL</span>
                         </a>
                       )}
                     </div>

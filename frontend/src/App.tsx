@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, TaskItem } from './types';
 import { api } from './services/api';
 import { Navbar } from './components/Navbar';
@@ -49,6 +49,9 @@ export const App: React.FC = () => {
   const [activeView, setActiveView] = useState<string>(getViewFromHash);
   const [submitUrlTask, setSubmitUrlTask] = useState<TaskItem | null>(null);
   const [taskRefreshCount, setTaskRefreshCount] = useState(0);
+
+  // Ref to DashboardView's local task updater — called on URL submit so dashboard card updates instantly
+  const dashboardTaskUpdaterRef = useRef<((taskId: string, url: string) => void) | null>(null);
 
   // Custom view navigator that updates browser URL bar
   const handleNavigate = (view: string) => {
@@ -152,10 +155,11 @@ export const App: React.FC = () => {
 
         <main className="flex-1 p-4 overflow-y-auto w-full">
           {activeView === 'dashboard' && (
-            <DashboardView
+          <DashboardView
               user={user}
               onNavigate={handleNavigate}
               onOpenSubmitUrlModal={(task) => setSubmitUrlTask(task)}
+              onRegisterTaskUpdater={(fn) => { dashboardTaskUpdaterRef.current = fn; }}
             />
           )}
 
@@ -212,8 +216,12 @@ export const App: React.FC = () => {
         <URLSubmissionModal
           task={submitUrlTask}
           onClose={() => setSubmitUrlTask(null)}
-          onSuccess={() => {
+          onSuccess={(taskId, submittedUrl) => {
             setTaskRefreshCount(prev => prev + 1);
+            // Update dashboard task card instantly without full reload
+            if (dashboardTaskUpdaterRef.current) {
+              dashboardTaskUpdaterRef.current(taskId, submittedUrl);
+            }
           }}
         />
       )}

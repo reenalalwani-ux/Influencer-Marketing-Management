@@ -7,7 +7,7 @@ import { Modal } from './Modal';
 interface URLSubmissionModalProps {
   task: TaskItem | null;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (taskId: string, publishedUrl: string) => void;
 }
 
 export const URLSubmissionModal: React.FC<URLSubmissionModalProps> = ({ task, onClose, onSuccess }) => {
@@ -25,7 +25,7 @@ export const URLSubmissionModal: React.FC<URLSubmissionModalProps> = ({ task, on
     try {
       const res = await api.post(`/tasks/${task._id}/submit-url`, { publishedUrl });
       if (res.success) {
-        onSuccess();
+        onSuccess(task._id as string, publishedUrl);
         onClose();
       }
     } catch (err: any) {
