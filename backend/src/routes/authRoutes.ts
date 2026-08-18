@@ -10,11 +10,12 @@ const router = Router();
 
 // Cookie options — secure:true only in production (HTTPS)
 const cookieOptions = {
-  httpOnly: true,                              // JS cannot access the cookie
-  secure: process.env.NODE_ENV === 'production', // HTTPS only in prod
-  sameSite: 'lax' as const,                   // CSRF protection
-  maxAge: 24 * 60 * 60 * 1000                 // 24 hours in milliseconds
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? ('none' as const) : ('lax' as const),
+  maxAge: 24 * 60 * 60 * 1000
 };
+
 
 const isValidCompanyEmail = (email: string) => {
   return typeof email === 'string' && email.trim().toLowerCase().endsWith('@ad2ship.com');
