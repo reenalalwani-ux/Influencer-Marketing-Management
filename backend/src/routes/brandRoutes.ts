@@ -30,11 +30,28 @@ router.get('/', authenticateToken, checkPermission('brand.view'), async (req: Au
     }
 
     const brands = await Brand.find(filter).sort({ createdAt: -1 });
+
+    // Fetch all active employee assignments to attach assigned executive name to each brand
+    const assignments = await EmployeeBrand.find({ status: 'Active' })
+      .populate('employeeId', 'name email designation');
+    
+    const assignmentMap: Record<string, any> = {};
+    assignments.forEach((a: any) => {
+      if (a.brandId && a.employeeId) {
+        assignmentMap[a.brandId.toString()] = a.employeeId;
+      }
+    });
+
+    const enrichedBrands = brands.map(b => ({
+      ...b.toObject(),
+      assignedExecutive: assignmentMap[(b._id as any).toString()] || null
+    }));
+
     return res.status(200).json({ 
       success: true, 
-      count: brands.length, 
-      data: brands,
-      message: brands.length === 0 ? 'No records found' : 'Brands fetched successfully'
+      count: enrichedBrands.length, 
+      data: enrichedBrands,
+      message: enrichedBrands.length === 0 ? 'No records found' : 'Brands fetched successfully'
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error fetching brands', error });
@@ -66,7 +83,10 @@ router.get('/:id', authenticateToken, checkPermission('brand.view'), async (req:
 
 // POST /api/v1/brands
 router.post('/', authenticateToken, checkPermission('brand.create'), async (req: AuthRequest, res: Response) => {
-  const { brandName, logo, website, industry, contactPerson, email, phone, notes } = req.body;
+  const { 
+    brandName, logo, website, industry, contactPerson, email, phone, notes,
+    brandType = 'Running', targetBarterCollabs, targetPaidCollabs
+  } = req.body;
 
   if (!brandName || !industry || !contactPerson || !email || !phone) {
     return res.status(400).json({ success: false, message: 'Required brand details missing' });
@@ -75,6 +95,10 @@ router.post('/', authenticateToken, checkPermission('brand.create'), async (req:
   try {
     const count = await Brand.countDocuments();
     const brandId = `BRD-${100 + count + 1}`;
+
+    const barterCount = targetBarterCollabs !== undefined ? Number(targetBarterCollabs) : (brandType === 'New' ? 8 : 7);
+    const paidCount = targetPaidCollabs !== undefined ? Number(targetPaidCollabs) : (brandType === 'New' ? 2 : 3);
+    const totalCount = barterCount + paidCount;
 
     const brand = await Brand.create({
       brandId,
@@ -86,6 +110,10 @@ router.post('/', authenticateToken, checkPermission('brand.create'), async (req:
       email,
       phone,
       notes,
+      brandType,
+      targetBarterCollabs: barterCount,
+      targetPaidCollabs: paidCount,
+      targetTotalCollabs: totalCount,
       status: 'Active'
     });
 
@@ -96,7 +124,7 @@ router.post('/', authenticateToken, checkPermission('brand.create'), async (req:
       module: 'Brand Management',
       entity: 'Brand',
       entityId: (brand._id as any).toString(),
-      newValue: { brandId, brandName, industry }
+      newValue: { brandId, brandName, industry, brandType }
     });
 
     return res.status(200).json({ success: true, message: 'Brand created successfully', data: brand });
@@ -113,6 +141,11 @@ router.put('/:id', authenticateToken, checkPermission('brand.update'), async (re
 
     const oldValue = { ...brand.toObject() };
     Object.assign(brand, req.body);
+
+    if (req.body.targetBarterCollabs !== undefined || req.body.targetPaidCollabs !== undefined) {
+      brand.targetTotalCollabs = (brand.targetBarterCollabs || 0) + (brand.targetPaidCollabs || 0);
+    }
+
     await brand.save();
 
     await logActivity({

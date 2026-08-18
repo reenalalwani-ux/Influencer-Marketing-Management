@@ -101,6 +101,10 @@ export interface IBrand extends Document {
   email: string;
   phone: string;
   status: 'Active' | 'Inactive';
+  brandType: 'New' | 'Running';
+  targetBarterCollabs: number;
+  targetPaidCollabs: number;
+  targetTotalCollabs: number;
   notes?: string;
 }
 
@@ -114,6 +118,10 @@ const BrandSchema = new Schema<IBrand>({
   email: { type: String, required: true },
   phone: { type: String, required: true },
   status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
+  brandType: { type: String, enum: ['New', 'Running'], default: 'Running' },
+  targetBarterCollabs: { type: Number, default: 7 },
+  targetPaidCollabs: { type: Number, default: 3 },
+  targetTotalCollabs: { type: Number, default: 10 },
   notes: { type: String }
 }, { timestamps: true });
 
@@ -333,6 +341,8 @@ export interface IInfluencer extends Document {
   adsCode?: string;
   viewsCount?: number;
   ordersCount?: number;
+  ordersGenerated?: number;
+  isOrderBonusQualified?: boolean;
   isApproved?: boolean;
   brandManagerTeam?: string;
   assignedExecutive?: string;
@@ -380,6 +390,8 @@ const InfluencerSchema = new Schema<IInfluencer>({
   adsCode: { type: String, default: '' },
   viewsCount: { type: Number, default: 0 },
   ordersCount: { type: Number, default: 0 },
+  ordersGenerated: { type: Number, default: 0 },
+  isOrderBonusQualified: { type: Boolean, default: false },
   isApproved: { type: Boolean, default: true },
   notes: { type: String, default: '' },
   remark: { type: String, default: '' },

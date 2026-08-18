@@ -79,9 +79,18 @@ export const TargetTopBanner: React.FC<TargetTopBannerProps> = ({ user, onNaviga
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-400/30 uppercase">
                 {target.period}
               </span>
+              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                target.achievedAmount >= 720000 || percentage >= 100
+                  ? 'bg-emerald-500/30 text-emerald-300 border-emerald-400/50'
+                  : target.achievedAmount >= 480000 || percentage >= 67
+                    ? 'bg-blue-500/30 text-blue-300 border-blue-400/50'
+                    : 'bg-amber-500/30 text-amber-300 border-amber-400/50'
+              }`}>
+                {target.achievedAmount >= 720000 || percentage >= 100 ? '🏆 10% Slab Unlocked' : target.achievedAmount >= 480000 || percentage >= 67 ? '🥈 5% Slab Unlocked' : '⚡ 0% (<₹80k/exec)'}
+              </span>
             </div>
             <p className="text-[11px] text-slate-300 font-medium">
-              Target: <span className="font-bold text-emerald-400">{target.currency}{formattedTarget}</span> | Achieved: <span className="font-bold text-purple-300">{target.currency}{formattedAchieved}</span> ({percentage}%)
+              Net Margin Target: <span className="font-bold text-emerald-400">{target.currency}{formattedTarget}</span> | Achieved: <span className="font-bold text-purple-300">{target.currency}{formattedAchieved}</span> ({percentage}%)
             </p>
           </div>
         </div>

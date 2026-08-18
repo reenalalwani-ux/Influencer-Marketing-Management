@@ -1280,6 +1280,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                         <SortHeader field="brandOnboardingAmt" label="Brand Price (IN)" align="right" />
                         <SortHeader field="influencerOnboardingAmt" label="Creator Price (OUT)" align="right" />
                         <SortHeader field="ad2shipMargin" label="AD2ship Margin" align="right" />
+                        <SortHeader field="ordersCount" label="Orders & Bonus" align="center" />
                       </>
                     )}
 
@@ -1314,6 +1315,8 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                     paginatedInfluencers.map((item, idx) => {
                       const isPaid = item.category === 'Paid';
                       const margin = (item.brandOnboardingAmt || item.inAmount || 0) - (item.influencerOnboardingAmt || item.outAmount || 0);
+                      const orders = item.ordersGenerated !== undefined ? item.ordersGenerated : (item.ordersCount || 0);
+                      const isBonusQualified = isPaid && orders >= 100;
 
                       return (
                         <tr key={item._id} className="hover:bg-slate-50 transition">
@@ -1372,6 +1375,25 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                                   <span className="px-2.5 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 text-xs font-black border border-emerald-200">PAID</span>
                                 )}
                               </td>
+
+                              <td className="p-3 border-r border-slate-100 text-center">
+                                {isBonusQualified ? (
+                                  <div className="space-y-0.5">
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                                      🌟 {orders} orders
+                                    </span>
+                                    {isManagerOrAdmin && (
+                                      <div className="text-[10px] font-black text-emerald-700">
+                                        +₹{new Intl.NumberFormat().format(Math.round(margin * 0.10))} Bonus
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-[11px] font-semibold text-slate-600">
+                                    {orders > 0 ? `${orders} orders` : '—'}
+                                  </span>
+                                )}
+                              </td>
                             </>
                           )}
 
@@ -1388,7 +1410,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                               </td>
 
                               <td className="p-3 border-r border-slate-100 text-right font-bold text-slate-700">
-                                {item.viewsCount || 0} views / {item.ordersCount || 0} orders
+                                {item.viewsCount || 0} views / {orders} orders
                               </td>
                             </>
                           )}
@@ -1820,7 +1842,14 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
               </div>
 
               <div>
-                <label className="block text-slate-700 mb-1">Orders Count</label>
+                <label className="block text-slate-700 mb-1 flex items-center justify-between">
+                  <span>Orders Generated</span>
+                  {Number(ordersCount) >= 100 && category === 'Paid' && (
+                    <span className="text-[10px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300">
+                      🌟 10% Bonus Qualified
+                    </span>
+                  )}
+                </label>
                 <input
                   type="number"
                   placeholder="0"
@@ -1828,6 +1857,9 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                   onChange={(e) => setOrdersCount(e.target.value === '' ? '' : Number(e.target.value))}
                   className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
                 />
+                <p className="text-[10px] text-slate-500 font-semibold mt-1">
+                  100+ orders on a paid collab unlocks an extra 10% bonus on this deal's margin.
+                </p>
               </div>
             </div>
           </div>

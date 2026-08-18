@@ -11,6 +11,7 @@ export const BrandManagementView: React.FC = () => {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [brandTypeFilter, setBrandTypeFilter] = useState<'All' | 'New' | 'Running'>('All');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<any>(null);
@@ -24,6 +25,9 @@ export const BrandManagementView: React.FC = () => {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [website, setWebsite] = useState('');
+  const [brandType, setBrandType] = useState<'New' | 'Running'>('Running');
+  const [targetBarterCollabs, setTargetBarterCollabs] = useState<number>(7);
+  const [targetPaidCollabs, setTargetPaidCollabs] = useState<number>(3);
 
   const fetchBrands = async () => {
     try {
@@ -40,6 +44,17 @@ export const BrandManagementView: React.FC = () => {
     fetchBrands();
   }, []);
 
+  const handleBrandTypeChange = (type: 'New' | 'Running') => {
+    setBrandType(type);
+    if (type === 'New') {
+      setTargetBarterCollabs(8);
+      setTargetPaidCollabs(2);
+    } else {
+      setTargetBarterCollabs(7);
+      setTargetPaidCollabs(3);
+    }
+  };
+
   const openAddBrandModal = () => {
     setEditingBrand(null);
     setBrandName('');
@@ -48,6 +63,9 @@ export const BrandManagementView: React.FC = () => {
     setEmail('');
     setPhone('');
     setWebsite('');
+    setBrandType('Running');
+    setTargetBarterCollabs(7);
+    setTargetPaidCollabs(3);
     setShowAddModal(true);
   };
 
@@ -59,21 +77,28 @@ export const BrandManagementView: React.FC = () => {
     setEmail(brand.email || '');
     setPhone(brand.phone || '');
     setWebsite(brand.website || '');
+    const bType = brand.brandType || 'Running';
+    setBrandType(bType);
+    setTargetBarterCollabs(brand.targetBarterCollabs !== undefined ? brand.targetBarterCollabs : (bType === 'New' ? 8 : 7));
+    setTargetPaidCollabs(brand.targetPaidCollabs !== undefined ? brand.targetPaidCollabs : (bType === 'New' ? 2 : 3));
     setShowAddModal(true);
   };
 
   const handleSaveBrand = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const payload = {
+        brandName, industry, contactPerson, email, phone, website,
+        brandType,
+        targetBarterCollabs: Number(targetBarterCollabs),
+        targetPaidCollabs: Number(targetPaidCollabs)
+      };
+
       let res;
       if (editingBrand) {
-        res = await api.put(`/brands/${editingBrand._id}`, {
-          brandName, industry, contactPerson, email, phone, website
-        });
+        res = await api.put(`/brands/${editingBrand._id}`, payload);
       } else {
-        res = await api.post('/brands', {
-          brandName, industry, contactPerson, email, phone, website
-        });
+        res = await api.post('/brands', payload);
       }
 
       if (res.success) {
@@ -121,12 +146,17 @@ export const BrandManagementView: React.FC = () => {
     }
   };
 
-  const filteredBrands = brands.filter(b =>
-    b.brandName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    b.brandId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    b.industry.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    b.contactPerson.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredBrands = brands.filter(b => {
+    const matchesSearch = 
+      b.brandName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      b.brandId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      b.industry.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      b.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (b.assignedExecutive && b.assignedExecutive.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    const matchesType = brandTypeFilter === 'All' || (b.brandType || 'Running') === brandTypeFilter;
+    return matchesSearch && matchesType;
+  });
 
   const paginatedBrands = filteredBrands.slice(
     (currentPage - 1) * itemsPerPage,
@@ -150,6 +180,50 @@ export const BrandManagementView: React.FC = () => {
         </div>
       ),
     },
+    {
+      key: 'brandType',
+      label: 'Status & Collab Target',
+      render: (_, row) => {
+        const isNew = row.brandType === 'New';
+        const barter = row.targetBarterCollabs !== undefined ? row.targetBarterCollabs : (isNew ? 8 : 7);
+        const paid = row.targetPaidCollabs !== undefined ? row.targetPaidCollabs : (isNew ? 2 : 3);
+        const total = barter + paid;
+
+        return (
+          <div className="space-y-1">
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+              isNew ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-blue-100 text-blue-800 border border-blue-300'
+            }`}>
+              {isNew ? '✨ New Brand' : '⚡ Running Brand'}
+            </span>
+            <div className="text-[11px] font-bold text-slate-700">
+              <span className="text-purple-700">{barter}B</span> : <span className="text-indigo-700">{paid}P</span>
+              <span className="text-[10px] text-slate-400 ml-1 font-semibold">({total}/mo)</span>
+            </div>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'assignedExecutive',
+      label: 'Assigned Executive',
+      render: (_, row) => {
+        const exec = row.assignedExecutive;
+        return exec ? (
+          <div className="flex items-center gap-1.5">
+            <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 font-black text-[10px] flex items-center justify-center">
+              {exec.name.charAt(0)}
+            </div>
+            <div>
+              <div className="text-xs font-extrabold text-slate-800">{exec.name}</div>
+              <div className="text-[10px] text-slate-400 font-medium">{exec.email}</div>
+            </div>
+          </div>
+        ) : (
+          <span className="text-xs text-slate-400 font-semibold italic">Unassigned</span>
+        );
+      }
+    },
     { key: 'industry', label: 'Industry', sortable: true },
     { key: 'contactPerson', label: 'Contact Person', sortable: true },
     {
@@ -171,22 +245,8 @@ export const BrandManagementView: React.FC = () => {
       ),
     },
     {
-      key: 'website',
-      label: 'Website',
-      render: (val) => val ? (
-        <a
-          href={val}
-          target="_blank"
-          rel="noreferrer"
-          className="text-purple-600 hover:text-purple-700 flex items-center gap-1 font-semibold text-xs"
-        >
-          <Globe size={12} /> Link <ExternalLink size={10} />
-        </a>
-      ) : <span className="text-slate-400">—</span>,
-    },
-    {
       key: 'status',
-      label: 'Status',
+      label: 'Active',
       sortable: true,
       render: (_, row) => {
         const isActive = row.status === 'Active' || !row.status;
@@ -263,21 +323,36 @@ export const BrandManagementView: React.FC = () => {
         </button>
       </div>
 
-      {/* Search */}
-      <div className="bg-white p-3 rounded-2xl flex items-center space-x-3 border border-slate-200 shadow-xs">
-        <Search size={16} className="text-purple-600 ml-1 shrink-0" />
-        <input
-          type="text"
-          placeholder="Search by brand name, ID, industry, or contact person..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none bg-transparent"
-        />
-        {filteredBrands.length > 0 && (
-          <span className="text-xs text-slate-400 font-semibold whitespace-nowrap">
-            {filteredBrands.length} records
-          </span>
-        )}
+      {/* Search & Brand Type Filter */}
+      <div className="bg-white p-3 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 border border-slate-200 shadow-xs">
+        <div className="flex items-center space-x-3 w-full sm:w-2/3">
+          <Search size={16} className="text-purple-600 ml-1 shrink-0" />
+          <input
+            type="text"
+            placeholder="Search by brand name, ID, executive, industry, or contact person..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none bg-transparent"
+          />
+        </div>
+
+        <div className="flex items-center space-x-2 self-end sm:self-auto shrink-0">
+          <label className="text-[11px] font-bold text-slate-500">Status:</label>
+          <select
+            value={brandTypeFilter}
+            onChange={(e) => setBrandTypeFilter(e.target.value as any)}
+            className="bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-purple-500"
+          >
+            <option value="All">All Brands ({brands.length})</option>
+            <option value="Running">Running Brands (7B : 3P)</option>
+            <option value="New">New Brands (8B : 2P)</option>
+          </select>
+          {filteredBrands.length > 0 && (
+            <span className="text-xs text-slate-400 font-semibold whitespace-nowrap ml-2">
+              {filteredBrands.length} records
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Table */}
@@ -316,9 +391,18 @@ export const BrandManagementView: React.FC = () => {
                 <h3 className="text-lg font-black text-slate-900">{selectedBrand.brandName}</h3>
                 <p className="text-xs text-slate-500 font-semibold">{selectedBrand.industry}</p>
               </div>
-              <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
-                {selectedBrand.status || 'Active'}
-              </span>
+              <div className="text-right space-y-1">
+                <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-200 inline-block">
+                  {selectedBrand.status || 'Active'}
+                </span>
+                <div>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                    selectedBrand.brandType === 'New' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-blue-50 text-blue-700 border border-blue-200'
+                  }`}>
+                    {selectedBrand.brandType || 'Running'} Brand
+                  </span>
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
@@ -331,8 +415,11 @@ export const BrandManagementView: React.FC = () => {
                 <p className="font-bold text-slate-800 text-xs">{selectedBrand.email}</p>
               </div>
               <div>
-                <span className="text-slate-400 text-[10px] uppercase font-bold">Phone</span>
-                <p className="font-bold text-slate-800 text-xs">{selectedBrand.phone || 'N/A'}</p>
+                <span className="text-slate-400 text-[10px] uppercase font-bold">Monthly Collab Target</span>
+                <p className="font-extrabold text-purple-700 text-xs">
+                  {selectedBrand.targetBarterCollabs || (selectedBrand.brandType === 'New' ? 8 : 7)} Barter : {selectedBrand.targetPaidCollabs || (selectedBrand.brandType === 'New' ? 2 : 3)} Paid
+                  <span className="text-slate-500 font-medium ml-1">({(selectedBrand.targetBarterCollabs || (selectedBrand.brandType === 'New' ? 8 : 7)) + (selectedBrand.targetPaidCollabs || (selectedBrand.brandType === 'New' ? 2 : 3))}/mo)</span>
+                </p>
               </div>
               <div>
                 <span className="text-slate-400 text-[10px] uppercase font-bold">Website</span>
@@ -381,7 +468,7 @@ export const BrandManagementView: React.FC = () => {
       <Modal
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
-        title={editingBrand ? "Edit Brand Details" : "Add New Brand"}
+        title={editingBrand ? "Edit Brand Details & Targets" : "Add New Brand"}
       >
         <form onSubmit={handleSaveBrand} className="space-y-3.5 text-sm">
           <div>
@@ -391,9 +478,74 @@ export const BrandManagementView: React.FC = () => {
               required
               value={brandName}
               onChange={(e) => setBrandName(e.target.value)}
-              placeholder="e.g. Puma"
+              placeholder="e.g. Vaasva"
               className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium text-xs"
             />
+          </div>
+
+          {/* Manager Controls: Brand Status & Collab Targets */}
+          <div className="p-3.5 bg-purple-50/60 rounded-xl border border-purple-200 space-y-3">
+            <div>
+              <label className="block text-xs font-extrabold text-purple-900 uppercase mb-1.5">
+                Brand Status (Manager Decision) *
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleBrandTypeChange('Running')}
+                  className={`py-2 px-3 rounded-xl font-extrabold text-xs text-center border transition-all ${
+                    brandType === 'Running'
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  ⚡ Running Brand (7B : 3P)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleBrandTypeChange('New')}
+                  className={`py-2 px-3 rounded-xl font-extrabold text-xs text-center border transition-all ${
+                    brandType === 'New'
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  ✨ New Brand (8B : 2P)
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 pt-1">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Target Barter Collabs
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  value={targetBarterCollabs}
+                  onChange={(e) => setTargetBarterCollabs(Number(e.target.value))}
+                  className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-lg px-3 py-1.5 text-slate-900 font-bold text-xs focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Target Paid Collabs
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  value={targetPaidCollabs}
+                  onChange={(e) => setTargetPaidCollabs(Number(e.target.value))}
+                  className="w-full bg-white border border-slate-200 focus:border-purple-500 rounded-lg px-3 py-1.5 text-slate-900 font-bold text-xs focus:outline-none"
+                />
+              </div>
+            </div>
+            <div className="text-[11px] font-semibold text-purple-700 text-right">
+              Total Target: <span className="font-extrabold">{Number(targetBarterCollabs) + Number(targetPaidCollabs)} Collabs/month</span>
+            </div>
           </div>
 
           <div>
@@ -403,7 +555,7 @@ export const BrandManagementView: React.FC = () => {
               required
               value={industry}
               onChange={(e) => setIndustry(e.target.value)}
-              placeholder="e.g. Sportswear"
+              placeholder="e.g. Fashion & Lifestyle"
               className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium text-xs"
             />
           </div>
@@ -415,7 +567,7 @@ export const BrandManagementView: React.FC = () => {
               required
               value={contactPerson}
               onChange={(e) => setContactPerson(e.target.value)}
-              placeholder="e.g. Elena Rostova"
+              placeholder="e.g. Brand Marketing POC"
               className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium text-xs"
             />
           </div>
@@ -428,7 +580,7 @@ export const BrandManagementView: React.FC = () => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="contact@puma.com"
+                placeholder="contact@brand.com"
                 className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium text-xs"
               />
             </div>
@@ -440,7 +592,7 @@ export const BrandManagementView: React.FC = () => {
                 required
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="+1 800 555 7862"
+                placeholder="+91 98765 00000"
                 className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium text-xs"
               />
             </div>
@@ -452,7 +604,7 @@ export const BrandManagementView: React.FC = () => {
               type="url"
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
-              placeholder="https://puma.com"
+              placeholder="https://brand.com"
               className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium text-xs"
             />
           </div>

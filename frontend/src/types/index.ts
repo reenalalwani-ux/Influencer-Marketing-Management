@@ -35,6 +35,11 @@ export interface Brand {
   email: string;
   phone: string;
   status: 'Active' | 'Inactive';
+  brandType?: 'New' | 'Running';
+  targetBarterCollabs?: number;
+  targetPaidCollabs?: number;
+  targetTotalCollabs?: number;
+  assignedExecutive?: { name: string; email: string; designation: string } | null;
   notes?: string;
   assignedEmployees?: EmployeeBrandAssignment[];
 }
@@ -119,6 +124,32 @@ export interface PerformanceMetrics {
   brandsManaged: number;
 }
 
+export interface IncentiveSummary {
+  netMargin: number;
+  individualMonthlyTarget: number;
+  targetAchievedPercent: number;
+  targetTier: string;
+  targetIncentivePercentage: number;
+  targetIncentiveAmount: number;
+  qualifyingBonusDealsCount: number;
+  orderBonusAmount: number;
+  totalTakeHomeIncentive: number;
+  totalRevenue: number;
+  totalInfluencerCost: number;
+  barterCount: number;
+  paidCount: number;
+  totalCollabs: number;
+}
+
+export interface QualifyingDeal {
+  id: string;
+  brandName: string;
+  influencerName: string;
+  ordersGenerated: number;
+  ad2shipMargin: number;
+  bonusEarned: number;
+}
+
 export interface EmployeePerformanceData {
   employee: {
     id: string;
@@ -130,6 +161,8 @@ export interface EmployeePerformanceData {
     role: string;
   };
   metrics: PerformanceMetrics;
+  incentiveSummary?: IncentiveSummary;
+  qualifyingDeals?: QualifyingDeal[];
 }
 
 export interface TargetItem {
@@ -192,6 +225,8 @@ export interface InfluencerTransaction {
   adsCode?: string;
   viewsCount?: number;
   ordersCount?: number;
+  ordersGenerated?: number;
+  isOrderBonusQualified?: boolean;
   isApproved?: boolean;
   notes?: string;
   remark?: string;

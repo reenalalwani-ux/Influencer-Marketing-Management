@@ -76,49 +76,97 @@ export const EmployeePerformanceView: React.FC = () => {
       ),
     },
     {
-      key: 'totalAssigned',
-      label: 'Assigned',
+      key: 'netMargin',
+      label: 'Ad2ship Net Margin',
       sortable: true,
-      render: (_, row) => (
-        <span className="font-bold text-slate-900">{row.metrics.totalAssigned}</span>
-      ),
+      render: (_, row) => {
+        const margin = row.incentiveSummary?.netMargin || 0;
+        return (
+          <div className="space-y-0.5">
+            <span className="font-black text-slate-900 text-xs">
+              ₹{new Intl.NumberFormat().format(margin)}
+            </span>
+            <div className="text-[10px] text-slate-400 font-semibold">
+              Target: ₹1,20,000 ({row.incentiveSummary?.targetAchievedPercent || 0}%)
+            </div>
+          </div>
+        );
+      }
     },
     {
-      key: 'completed',
-      label: 'Completed',
-      sortable: true,
-      render: (_, row) => (
-        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-700 border border-emerald-200">
-          {row.metrics.completed}
-        </span>
-      ),
+      key: 'targetTier',
+      label: 'Incentive Slab',
+      render: (_, row) => {
+        const tier = row.incentiveSummary?.targetTier || '0%';
+        const isTier1 = tier === '10%';
+        const isTier2 = tier === '5%';
+
+        return (
+          <div className="space-y-1">
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+              isTier1 
+                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
+                : isTier2 
+                  ? 'bg-blue-100 text-blue-800 border border-blue-300' 
+                  : 'bg-slate-100 text-slate-600 border border-slate-200'
+            }`}>
+              {isTier1 ? '🏆 10% Slab (1L+)' : isTier2 ? '🥈 5% Slab (80k+)' : '0% (Below 80k)'}
+            </span>
+            <div className="text-[11px] font-bold text-emerald-700">
+              ₹{new Intl.NumberFormat().format(row.incentiveSummary?.targetIncentiveAmount || 0)}
+            </div>
+          </div>
+        );
+      }
     },
     {
-      key: 'pending',
-      label: 'Pending',
-      sortable: true,
-      render: (_, row) => (
-        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-700 border border-amber-200">
-          {row.metrics.pending}
-        </span>
-      ),
+      key: 'orderBonus',
+      label: '100+ Order Bonus',
+      render: (_, row) => {
+        const bonusCount = row.incentiveSummary?.qualifyingBonusDealsCount || 0;
+        const bonusAmount = row.incentiveSummary?.orderBonusAmount || 0;
+
+        return (
+          <div className="space-y-0.5">
+            {bonusCount > 0 ? (
+              <>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                  🌟 {bonusCount} Videos (100+ Orders)
+                </span>
+                <div className="text-[11px] font-black text-amber-700">
+                  +₹{new Intl.NumberFormat().format(bonusAmount)}
+                </div>
+              </>
+            ) : (
+              <span className="text-xs text-slate-400 italic">No qualifying videos</span>
+            )}
+          </div>
+        );
+      }
     },
     {
-      key: 'delayed',
-      label: 'Delayed',
-      sortable: true,
-      render: (_, row) => (
-        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-700 border border-rose-200">
-          {row.metrics.delayed}
-        </span>
-      ),
+      key: 'totalIncentive',
+      label: 'Total Take-Home',
+      render: (_, row) => {
+        const total = row.incentiveSummary?.totalTakeHomeIncentive || 0;
+        return (
+          <div className="p-1.5 bg-emerald-50 rounded-xl border border-emerald-200 text-center">
+            <span className="text-xs font-black text-emerald-700">
+              ₹{new Intl.NumberFormat().format(total)}
+            </span>
+            <span className="text-[9px] block text-emerald-600 font-extrabold uppercase tracking-wider">Total Incentive</span>
+          </div>
+        );
+      }
     },
     {
-      key: 'brandsManaged',
-      label: 'Brands',
-      sortable: true,
+      key: 'collabs',
+      label: 'Collabs Done',
       render: (_, row) => (
-        <span className="font-semibold text-slate-700">{row.metrics.brandsManaged}</span>
+        <div className="text-xs font-bold text-slate-800">
+          <span className="text-purple-700">{row.incentiveSummary?.barterCount || 0}B</span> : <span className="text-indigo-700">{row.incentiveSummary?.paidCount || 0}P</span>
+          <div className="text-[10px] text-slate-400 font-semibold">{row.metrics.brandsManaged} brands managed</div>
+        </div>
       ),
     },
     {
@@ -126,7 +174,7 @@ export const EmployeePerformanceView: React.FC = () => {
       label: 'Completion Rate',
       sortable: true,
       render: (_, row) => (
-        <div className="flex items-center gap-2.5 w-36">
+        <div className="flex items-center gap-2 w-28">
           <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
             <div
               className="bg-gradient-to-r from-purple-600 to-emerald-500 h-full rounded-full"
@@ -209,9 +257,15 @@ export const EmployeePerformanceView: React.FC = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {paginatedData.map((item) => {
-                const { employee, metrics } = item;
+                const { employee, metrics, incentiveSummary, qualifyingDeals } = item;
+                const margin = incentiveSummary?.netMargin || 0;
+                const targetPct = incentiveSummary?.targetAchievedPercent || 0;
+                const tier = incentiveSummary?.targetTier || '0%';
+                const totalIncentive = incentiveSummary?.totalTakeHomeIncentive || 0;
+                const bonusCount = incentiveSummary?.qualifyingBonusDealsCount || 0;
+
                 return (
-                  <div key={employee.id} className="bg-white glass-card-hover p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+                  <div key={employee.id} className="bg-white glass-card-hover p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 text-white flex items-center justify-center font-extrabold text-base shadow">
@@ -224,39 +278,74 @@ export const EmployeePerformanceView: React.FC = () => {
                       </div>
 
                       <div className="text-right">
-                        <span className="text-2xl font-extrabold text-emerald-600">{metrics.completionRate}%</span>
-                        <span className="text-[9px] text-slate-500 block uppercase font-bold">Completion</span>
+                        <span className="text-xl font-black text-emerald-600">₹{new Intl.NumberFormat().format(totalIncentive)}</span>
+                        <span className="text-[9px] text-slate-500 block uppercase font-bold">Total Incentive</span>
                       </div>
                     </div>
 
-                    <div className="w-full bg-slate-100 rounded-full h-2.5 p-0.5 border border-slate-200">
-                      <div
-                        className="bg-gradient-to-r from-purple-600 to-emerald-500 h-full rounded-full transition-all duration-500"
-                        style={{ width: `${Math.min(metrics.completionRate, 100)}%` }}
-                      />
+                    {/* Net Margin & Slabs Box */}
+                    <div className="p-3 bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-xl space-y-2">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-slate-300 font-bold">Net Ad2ship Margin:</span>
+                        <span className="text-base font-black text-emerald-400">
+                          ₹{new Intl.NumberFormat().format(margin)}
+                        </span>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[11px] font-semibold text-slate-400">
+                          <span>Target Progress ({targetPct}%)</span>
+                          <span>Target: ₹1,20,000</span>
+                        </div>
+                        <div className="w-full bg-slate-700 rounded-full h-2 overflow-hidden">
+                          <div
+                            className="bg-emerald-400 h-full rounded-full transition-all duration-500"
+                            style={{ width: `${Math.min(targetPct, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-700 text-xs">
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                          tier === '10%' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : tier === '5%' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40' : 'bg-slate-700 text-slate-400'
+                        }`}>
+                          {tier === '10%' ? '🏆 10% Slab (1L+)' : tier === '5%' ? '🥈 5% Slab (80k+)' : '0% Slab (<80k)'}
+                        </span>
+                        <span className="text-xs font-bold text-slate-200">
+                          Target Bonus: <strong className="text-emerald-400 font-black">₹{new Intl.NumberFormat().format(incentiveSummary?.targetIncentiveAmount || 0)}</strong>
+                        </span>
+                      </div>
+
+                      {bonusCount > 0 && (
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-700 text-xs">
+                          <span className="text-amber-400 font-bold flex items-center gap-1 text-[11px]">
+                            🌟 {bonusCount} Videos (100+ Orders)
+                          </span>
+                          <span className="text-amber-300 font-black text-xs">
+                            +₹{new Intl.NumberFormat().format(incentiveSummary?.orderBonusAmount || 0)}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="grid grid-cols-4 gap-2 text-center pt-1">
+                    {/* Collab Counts & Tasks */}
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      <div className="p-2 rounded-xl bg-purple-50 border border-purple-200">
+                        <span className="text-[10px] uppercase font-bold text-purple-700 block">Barter Collabs</span>
+                        <span className="text-base font-extrabold text-purple-900">{incentiveSummary?.barterCount || 0}</span>
+                      </div>
+                      <div className="p-2 rounded-xl bg-indigo-50 border border-indigo-200">
+                        <span className="text-[10px] uppercase font-bold text-indigo-700 block">Paid Collabs</span>
+                        <span className="text-base font-extrabold text-indigo-900">{incentiveSummary?.paidCount || 0}</span>
+                      </div>
                       <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">
-                        <span className="text-[9px] uppercase font-bold text-slate-500 block">Assigned</span>
-                        <span className="text-base font-bold text-slate-900">{metrics.totalAssigned}</span>
-                      </div>
-                      <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200">
-                        <span className="text-[9px] uppercase font-bold text-emerald-700 block">Completed</span>
-                        <span className="text-base font-extrabold text-emerald-700">{metrics.completed}</span>
-                      </div>
-                      <div className="p-2 rounded-xl bg-amber-50 border border-amber-200">
-                        <span className="text-[9px] uppercase font-bold text-amber-700 block">Pending</span>
-                        <span className="text-base font-extrabold text-amber-700">{metrics.pending}</span>
-                      </div>
-                      <div className="p-2 rounded-xl bg-rose-50 border border-rose-200">
-                        <span className="text-[9px] uppercase font-bold text-rose-700 block">Delayed</span>
-                        <span className="text-base font-extrabold text-rose-700">{metrics.delayed}</span>
+                        <span className="text-[10px] uppercase font-bold text-slate-600 block">Brands Managed</span>
+                        <span className="text-base font-bold text-slate-900">{metrics.brandsManaged}</span>
                       </div>
                     </div>
 
                     <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                      <span>Brands Managed: <strong className="text-slate-900 font-bold">{metrics.brandsManaged}</strong></span>
+                      <span>Task Completion Rate: <strong className="text-emerald-600 font-bold">{metrics.completionRate}%</strong></span>
                     </div>
                   </div>
                 );
