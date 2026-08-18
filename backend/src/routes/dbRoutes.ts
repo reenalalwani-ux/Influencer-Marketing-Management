@@ -28,7 +28,7 @@ const modelsMap: Record<string, mongoose.Model<any>> = {
 router.get('/overview', async (req, res) => {
   try {
     const isConnected = mongoose.connection.readyState === 1;
-    const collectionsInfo = [];
+    const collectionsInfo: any[] = [];
 
     for (const [key, model] of Object.entries(modelsMap)) {
       const count = await model.countDocuments();

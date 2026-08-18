@@ -168,7 +168,7 @@ router.get('/matrix', authenticateToken, checkPermission('posting.view'), async 
     });
 
     // Build dates array using local timezone date formatting
-    const dates = [];
+    const dates: any[] = [];
     const todayStr = formatLocalDate(new Date());
 
     for (let day = 1; day <= daysInMonth; day++) {

@@ -175,7 +175,7 @@ router.post('/create-cycle', authenticateToken, checkPermission('task.create'), 
     // Determine step frequency (1 for Daily, 2 for Alternate days)
     const step = frequency === 'Alternate' ? 2 : (frequency === 'Single' ? 99 : 1);
 
-    const createdEntries = [];
+    const createdEntries: any[] = [];
     const postTypes = ['Intro Post', 'Product Reel', 'Brand Carousel', 'Behind The Scenes', 'Customer Review', 'Feature Highlight', 'Special Offer'];
 
     let postTypeIdx = 0;
