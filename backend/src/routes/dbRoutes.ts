@@ -2,7 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import { 
   Permission, Role, User, Employee, Brand, EmployeeBrand, 
-  Task, Notification, AuditLog, Setting, Target
+  Task, Notification, AuditLog, Setting, Target, Influencer, PaymentLog, ContentCalendar
 } from '../models/allModels';
 
 const router = Router();
@@ -18,7 +18,10 @@ const modelsMap: Record<string, mongoose.Model<any>> = {
   notifications: Notification,
   auditlogs: AuditLog,
   settings: Setting,
-  targets: Target
+  targets: Target,
+  influencers: Influencer,
+  paymentlogs: PaymentLog,
+  contentcalendars: ContentCalendar
 };
 
 // GET /api/v1/db/overview - Get database overview with collection counts
@@ -37,15 +40,17 @@ router.get('/overview', async (req, res) => {
       });
     }
 
-    res.json({
+    return res.status(200).json({
+      success: true,
       status: 'success',
       dbState: isConnected ? 'Connected' : 'Disconnected',
-      databaseName: mongoose.connection.name || 'MemoryServerDB',
+      databaseName: mongoose.connection.name || 'influencer_db',
       totalCollections: collectionsInfo.length,
-      collections: collectionsInfo
+      collections: collectionsInfo,
+      message: 'Database overview fetched successfully'
     });
   } catch (error: any) {
-    res.status(500).json({ status: 'error', message: error.message });
+    return res.status(500).json({ success: false, status: 'error', message: error.message });
   }
 });
 
@@ -57,8 +62,9 @@ router.get('/collection/:name', async (req, res) => {
 
     if (!model) {
       return res.status(404).json({ 
+        success: false,
         status: 'error', 
-        message: `Collection '${req.params.name}' not found. Available collections: ${Object.keys(modelsMap).join(', ')}` 
+        message: `No record exists for collection '${req.params.name}'. Available collections: ${Object.keys(modelsMap).join(', ')}` 
       });
     }
 
@@ -68,17 +74,20 @@ router.get('/collection/:name', async (req, res) => {
     const total = await model.countDocuments();
     const documents = await model.find().skip(skip).limit(limit).lean();
 
-    res.json({
+    return res.status(200).json({
+      success: true,
       status: 'success',
       collection: colName,
       modelName: model.modelName,
       total,
       limit,
       skip,
-      documents
+      documents,
+      count: documents.length,
+      message: documents.length === 0 ? 'No records found in this collection' : `Fetched ${documents.length} records from ${colName}`
     });
   } catch (error: any) {
-    res.status(500).json({ status: 'error', message: error.message });
+    return res.status(500).json({ success: false, status: 'error', message: error.message });
   }
 });
 

@@ -21,7 +21,12 @@ router.get('/', authenticateToken, checkPermission('brand.view'), async (req: Au
       .populate('assignedBy', 'name role')
       .sort({ createdAt: -1 });
 
-    return res.json({ success: true, count: assignments.length, data: assignments });
+    return res.status(200).json({ 
+      success: true, 
+      count: assignments.length, 
+      data: assignments,
+      message: assignments.length === 0 ? 'No records found' : 'Assignments fetched successfully'
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to fetch assignments', error });
   }
@@ -80,7 +85,7 @@ router.post('/assign', authenticateToken, checkPermission('brand.assign'), async
       newValue: { employeeId, brandId, responsibility }
     });
 
-    return res.status(201).json({ success: true, message: 'Employee assigned to brand successfully', data: populated });
+    return res.status(200).json({ success: true, message: 'Employee assigned to brand successfully', data: populated });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to assign employee to brand', error });
   }
@@ -90,7 +95,7 @@ router.post('/assign', authenticateToken, checkPermission('brand.assign'), async
 router.patch('/:id/unassign', authenticateToken, checkPermission('brand.assign'), async (req: AuthRequest, res: Response) => {
   try {
     const assignment = await EmployeeBrand.findById(req.params.id);
-    if (!assignment) return res.status(404).json({ success: false, message: 'Assignment not found' });
+    if (!assignment) return res.status(404).json({ success: false, message: 'No record exists for this assignment' });
 
     assignment.status = 'Removed';
     assignment.endDate = new Date();
@@ -105,7 +110,7 @@ router.patch('/:id/unassign', authenticateToken, checkPermission('brand.assign')
       entityId: req.params.id
     });
 
-    return res.json({ success: true, message: 'Employee removed from brand assignment', data: assignment });
+    return res.status(200).json({ success: true, message: 'Employee removed from brand assignment', data: assignment });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to unassign employee', error });
   }
@@ -115,7 +120,7 @@ router.patch('/:id/unassign', authenticateToken, checkPermission('brand.assign')
 router.put('/:id', authenticateToken, checkPermission('brand.assign'), async (req: AuthRequest, res: Response) => {
   try {
     const assignment = await EmployeeBrand.findById(req.params.id);
-    if (!assignment) return res.status(404).json({ success: false, message: 'Assignment not found' });
+    if (!assignment) return res.status(404).json({ success: false, message: 'No record exists for this assignment' });
 
     const oldValue = { ...assignment.toObject() };
     const { employeeId, brandId, responsibility, priority, status } = req.body;
@@ -143,7 +148,7 @@ router.put('/:id', authenticateToken, checkPermission('brand.assign'), async (re
       newValue: assignment.toObject()
     });
 
-    return res.json({ success: true, message: 'Assignment updated successfully', data: populated });
+    return res.status(200).json({ success: true, message: 'Assignment updated successfully', data: populated });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to update assignment', error });
   }
@@ -189,7 +194,7 @@ router.post('/sync-employee', authenticateToken, checkPermission('brand.assign')
       .populate('employeeId', 'name employeeId designation department email')
       .populate('brandId', 'brandName brandId logo industry');
 
-    return res.json({ success: true, message: 'Employee brand assignments updated successfully', data: updatedAssignments });
+    return res.status(200).json({ success: true, message: 'Employee brand assignments updated successfully', data: updatedAssignments });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to sync employee brand assignments', error });
   }
@@ -199,7 +204,7 @@ router.post('/sync-employee', authenticateToken, checkPermission('brand.assign')
 router.delete('/employee/:employeeId', authenticateToken, checkPermission('brand.assign'), async (req: AuthRequest, res: Response) => {
   try {
     await EmployeeBrand.deleteMany({ employeeId: req.params.employeeId });
-    return res.json({ success: true, message: 'All brand assignments removed for employee' });
+    return res.status(200).json({ success: true, message: 'All brand assignments removed for employee' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to delete assignments', error });
   }

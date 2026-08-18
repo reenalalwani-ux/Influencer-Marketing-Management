@@ -24,7 +24,7 @@ router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response) 
       // Find employee document
       const emp = await Employee.findOne({ email: req.user.email });
       if (!emp) {
-        return res.status(404).json({ success: false, message: 'Employee profile not found' });
+        return res.status(404).json({ success: false, message: 'No record exists for employee profile' });
       }
 
       // My Brands
@@ -56,9 +56,10 @@ router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response) 
         scheduledDate: { $gt: endOfDay, $lte: nextWeek }
       }).populate('brandId', 'brandName logo').limit(10).sort({ scheduledDate: 1 });
 
-      return res.json({
+      return res.status(200).json({
         success: true,
         role: 'Employee',
+        message: 'Dashboard stats fetched successfully',
         data: {
           myBrands,
           todaySummary: {
@@ -103,9 +104,10 @@ router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response) 
     // Recent Audit Logs
     const recentAuditLogs = await AuditLog.find().sort({ timestamp: -1 }).limit(8);
 
-    return res.json({
+    return res.status(200).json({
       success: true,
       role,
+      message: 'Dashboard stats fetched successfully',
       data: {
         totalEmployees,
         totalBrands,

@@ -47,7 +47,12 @@ router.get('/', authenticateToken, checkPermission('target.view'), async (req: A
     for (const target of targets) {
       await recalculateTargetProgress(target);
     }
-    return res.json({ success: true, count: targets.length, data: targets });
+    return res.status(200).json({ 
+      success: true, 
+      count: targets.length, 
+      data: targets,
+      message: targets.length === 0 ? 'No records found' : 'Targets fetched successfully'
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error fetching targets', error });
   }
@@ -67,7 +72,11 @@ router.get('/active', authenticateToken, checkPermission('target.view'), async (
       await recalculateTargetProgress(activeTarget);
     }
 
-    return res.json({ success: true, data: activeTarget || null });
+    return res.status(200).json({ 
+      success: true, 
+      data: activeTarget || null,
+      message: activeTarget ? 'Active target fetched successfully' : 'No active target found'
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error fetching active target', error });
   }
@@ -118,7 +127,7 @@ router.post('/', authenticateToken, checkPermission('target.create'), async (req
       newValue: newTarget.toObject()
     });
 
-    return res.status(201).json({ success: true, message: 'Target created successfully', data: newTarget });
+    return res.status(200).json({ success: true, message: 'Target created successfully', data: newTarget });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to create target', error });
   }
@@ -128,7 +137,7 @@ router.post('/', authenticateToken, checkPermission('target.create'), async (req
 router.put('/:id', authenticateToken, checkPermission('target.update'), async (req: AuthRequest, res: Response) => {
   try {
     const target = await Target.findById(req.params.id);
-    if (!target) return res.status(404).json({ success: false, message: 'Target not found' });
+    if (!target) return res.status(404).json({ success: false, message: 'No record exists for this target' });
 
     const oldValue = { ...target.toObject() };
 
@@ -166,7 +175,7 @@ router.put('/:id', authenticateToken, checkPermission('target.update'), async (r
       newValue: target.toObject()
     });
 
-    return res.json({ success: true, message: 'Target updated successfully', data: target });
+    return res.status(200).json({ success: true, message: 'Target updated successfully', data: target });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to update target', error });
   }
@@ -176,7 +185,7 @@ router.put('/:id', authenticateToken, checkPermission('target.update'), async (r
 router.patch('/:id/active', authenticateToken, checkPermission('target.update'), async (req: AuthRequest, res: Response) => {
   try {
     const target = await Target.findById(req.params.id);
-    if (!target) return res.status(404).json({ success: false, message: 'Target not found' });
+    if (!target) return res.status(404).json({ success: false, message: 'No record exists for this target' });
 
     // Set all targets to isActive: false, then set this one to true
     await Target.updateMany({}, { isActive: false });
@@ -194,7 +203,7 @@ router.patch('/:id/active', authenticateToken, checkPermission('target.update'),
       newValue: { title: target.title, isActive: true }
     });
 
-    return res.json({ success: true, message: 'Set as active system target', data: target });
+    return res.status(200).json({ success: true, message: 'Set as active system target', data: target });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to set active target', error });
   }
@@ -204,7 +213,7 @@ router.patch('/:id/active', authenticateToken, checkPermission('target.update'),
 router.delete('/:id', authenticateToken, checkPermission('target.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const target = await Target.findByIdAndDelete(req.params.id);
-    if (!target) return res.status(404).json({ success: false, message: 'Target not found' });
+    if (!target) return res.status(404).json({ success: false, message: 'No record exists for this target' });
 
     await logActivity({
       userId: req.user?._id,
@@ -216,7 +225,7 @@ router.delete('/:id', authenticateToken, checkPermission('target.delete'), async
       oldValue: target.toObject()
     });
 
-    return res.json({ success: true, message: 'Target deleted successfully' });
+    return res.status(200).json({ success: true, message: 'Target deleted successfully' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to delete target', error });
   }

@@ -78,7 +78,12 @@ router.get('/', authenticateToken, checkPermission('task.view'), async (req: Aut
       .populate('assignedDesignerId', 'name designation')
       .sort({ postDate: 1 });
 
-    return res.json({ success: true, data: items });
+    return res.status(200).json({ 
+      success: true, 
+      count: items.length, 
+      data: items,
+      message: items.length === 0 ? 'No records found' : 'Content calendar fetched successfully'
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error fetching content calendar', error });
   }
@@ -122,9 +127,9 @@ router.delete('/clear-all', authenticateToken, checkPermission('task.delete'), a
       newValue: { brandName, deletedCount: result.deletedCount, year: currentYear, month: currentMonth + 1 }
     });
 
-    return res.json({
+    return res.status(200).json({
       success: true,
-      message: `Successfully deleted ${result.deletedCount} content calendar entries`,
+      message: result.deletedCount === 0 ? 'No records found to delete' : `Successfully deleted ${result.deletedCount} content calendar entries`,
       deletedCount: result.deletedCount
     });
   } catch (error) {
@@ -209,7 +214,7 @@ router.post('/create-cycle', authenticateToken, checkPermission('task.create'), 
       newValue: { brandName: finalBrandName, year: currentYear, month: currentMonth + 1, fortnight, count: createdEntries.length }
     });
 
-    return res.status(201).json({
+    return res.status(200).json({
       success: true,
       message: `Successfully created ${createdEntries.length} calendar posts for ${finalBrandName} (${fortnight || 'Full Month'})`,
       count: createdEntries.length,
@@ -270,7 +275,7 @@ router.post('/', authenticateToken, checkPermission('task.create'), async (req: 
       newValue: { brandName: finalBrandName, typeOfPost, postDate: newEntry.postDate }
     });
 
-    return res.status(201).json({ success: true, message: 'Content calendar entry created', data: newEntry });
+    return res.status(200).json({ success: true, message: 'Content calendar entry created successfully', data: newEntry });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error creating content calendar entry', error });
   }
@@ -283,7 +288,7 @@ router.put('/:id', authenticateToken, checkPermission('task.update'), async (req
 
     const item = await ContentCalendar.findById(req.params.id);
     if (!item) {
-      return res.status(404).json({ success: false, message: 'Content calendar entry not found' });
+      return res.status(404).json({ success: false, message: 'No record exists for this content calendar entry' });
     }
 
     if (brandId !== undefined) item.brandId = brandId || undefined;
@@ -303,7 +308,7 @@ router.put('/:id', authenticateToken, checkPermission('task.update'), async (req
 
     await item.save();
 
-    return res.json({ success: true, message: 'Content calendar entry updated', data: item });
+    return res.status(200).json({ success: true, message: 'Content calendar entry updated successfully', data: item });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error updating content calendar entry', error });
   }
@@ -312,8 +317,11 @@ router.put('/:id', authenticateToken, checkPermission('task.update'), async (req
 // DELETE /api/v1/content-calendar/:id
 router.delete('/:id', authenticateToken, checkPermission('task.delete'), async (req: AuthRequest, res: Response) => {
   try {
-    await ContentCalendar.findByIdAndDelete(req.params.id);
-    return res.json({ success: true, message: 'Content calendar entry deleted' });
+    const deleted = await ContentCalendar.findByIdAndDelete(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: 'No record exists for this content calendar entry' });
+    }
+    return res.status(200).json({ success: true, message: 'Content calendar entry deleted successfully' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error deleting content calendar entry', error });
   }
@@ -331,7 +339,7 @@ router.post('/share', authenticateToken, async (req: AuthRequest, res: Response)
     const tokenPayload = `${brandName}|${year || new Date().getFullYear()}|${month || new Date().getMonth() + 1}`;
     const token = Buffer.from(tokenPayload).toString('base64url');
 
-    return res.json({
+    return res.status(200).json({
       success: true,
       token,
       message: 'Share token generated successfully'
@@ -374,9 +382,11 @@ router.get('/public/:token', async (req, res: Response) => {
       .populate('assignedDesignerId', 'name designation')
       .sort({ postDate: 1 });
 
-    return res.json({
+    return res.status(200).json({
       success: true,
+      count: items.length,
       data: items,
+      message: items.length === 0 ? 'No records found' : 'Shared calendar fetched successfully',
       meta: {
         brandName,
         year,

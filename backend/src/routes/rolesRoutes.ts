@@ -10,7 +10,12 @@ const router = Router();
 router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const roles = await Role.find().sort({ name: 1 });
-    return res.json({ success: true, count: roles.length, data: roles });
+    return res.status(200).json({ 
+      success: true, 
+      count: roles.length, 
+      data: roles,
+      message: roles.length === 0 ? 'No records found' : 'Roles fetched successfully'
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to fetch roles', error });
   }
@@ -20,7 +25,13 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
 router.get('/permissions', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const permissions = await Permission.find().sort({ module: 1, code: 1 });
-    return res.json({ success: true, count: permissions.length, data: permissions, availableCodes: PERMISSIONS });
+    return res.status(200).json({ 
+      success: true, 
+      count: permissions.length, 
+      data: permissions, 
+      availableCodes: PERMISSIONS,
+      message: permissions.length === 0 ? 'No records found' : 'Permissions fetched successfully'
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to fetch permissions', error });
   }
@@ -44,7 +55,7 @@ router.post('/', authenticateToken, checkPermission('settings.update'), async (r
       isSystemRole: false
     });
 
-    return res.status(201).json({ success: true, message: 'Role created successfully', data: role });
+    return res.status(200).json({ success: true, message: 'Role created successfully', data: role });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to create role', error });
   }
@@ -76,7 +87,7 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res: Response) =>
       await role.save();
     }
 
-    return res.json({ success: true, message: 'Role updated successfully', data: role });
+    return res.status(200).json({ success: true, message: 'Role updated successfully', data: role });
   } catch (error) {
     console.error('Error updating role:', error);
     return res.status(500).json({ success: false, message: 'Failed to update role', error });

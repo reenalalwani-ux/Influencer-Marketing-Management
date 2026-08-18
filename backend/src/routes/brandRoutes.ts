@@ -30,7 +30,12 @@ router.get('/', authenticateToken, checkPermission('brand.view'), async (req: Au
     }
 
     const brands = await Brand.find(filter).sort({ createdAt: -1 });
-    return res.json({ success: true, count: brands.length, data: brands });
+    return res.status(200).json({ 
+      success: true, 
+      count: brands.length, 
+      data: brands,
+      message: brands.length === 0 ? 'No records found' : 'Brands fetched successfully'
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error fetching brands', error });
   }
@@ -40,18 +45,19 @@ router.get('/', authenticateToken, checkPermission('brand.view'), async (req: Au
 router.get('/:id', authenticateToken, checkPermission('brand.view'), async (req: AuthRequest, res: Response) => {
   try {
     const brand = await Brand.findById(req.params.id);
-    if (!brand) return res.status(404).json({ success: false, message: 'Brand not found' });
+    if (!brand) return res.status(404).json({ success: false, message: 'No record exists for this brand' });
 
     // Fetch assigned employees via relationship collection
     const assignedEmployees = await EmployeeBrand.find({ brandId: brand._id, status: 'Active' })
       .populate('employeeId', 'name employeeId email designation department phone');
 
-    return res.json({
+    return res.status(200).json({
       success: true,
       data: {
         ...brand.toObject(),
         assignedEmployees
-      }
+      },
+      message: 'Brand details fetched successfully'
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error fetching brand details', error });
@@ -93,7 +99,7 @@ router.post('/', authenticateToken, checkPermission('brand.create'), async (req:
       newValue: { brandId, brandName, industry }
     });
 
-    return res.status(201).json({ success: true, message: 'Brand created successfully', data: brand });
+    return res.status(200).json({ success: true, message: 'Brand created successfully', data: brand });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to create brand', error });
   }
@@ -103,7 +109,7 @@ router.post('/', authenticateToken, checkPermission('brand.create'), async (req:
 router.put('/:id', authenticateToken, checkPermission('brand.update'), async (req: AuthRequest, res: Response) => {
   try {
     const brand = await Brand.findById(req.params.id);
-    if (!brand) return res.status(404).json({ success: false, message: 'Brand not found' });
+    if (!brand) return res.status(404).json({ success: false, message: 'No record exists for this brand' });
 
     const oldValue = { ...brand.toObject() };
     Object.assign(brand, req.body);
@@ -120,7 +126,7 @@ router.put('/:id', authenticateToken, checkPermission('brand.update'), async (re
       newValue: brand.toObject()
     });
 
-    return res.json({ success: true, message: 'Brand updated successfully', data: brand });
+    return res.status(200).json({ success: true, message: 'Brand updated successfully', data: brand });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to update brand', error });
   }
@@ -130,7 +136,7 @@ router.put('/:id', authenticateToken, checkPermission('brand.update'), async (re
 router.delete('/:id', authenticateToken, checkPermission('brand.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const brand = await Brand.findByIdAndDelete(req.params.id);
-    if (!brand) return res.status(404).json({ success: false, message: 'Brand not found' });
+    if (!brand) return res.status(404).json({ success: false, message: 'No record exists for this brand' });
 
     await EmployeeBrand.deleteMany({ brandId: req.params.id });
 
@@ -144,7 +150,7 @@ router.delete('/:id', authenticateToken, checkPermission('brand.delete'), async 
       oldValue: brand.toObject()
     });
 
-    return res.json({ success: true, message: 'Brand deleted successfully' });
+    return res.status(200).json({ success: true, message: 'Brand deleted successfully' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to delete brand', error });
   }

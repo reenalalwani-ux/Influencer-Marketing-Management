@@ -2,20 +2,25 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { User, IUser, Role } from '../models/allModels';
 
+export const COOKIE_NAME = 'token';
+export const JWT_SECRET = process.env.JWT_SECRET || 'influencer_marketing_operations_secret_key_2026';
+
 export interface AuthRequest extends Request {
   user?: IUser;
   userPermissions?: string[];
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'influencer_marketing_operations_secret_key_2026';
 
 export const generateToken = (userId: string, role: string): string => {
   return jwt.sign({ id: userId, role }, JWT_SECRET, { expiresIn: '24h' });
 };
 
 export const authenticateToken = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  // Read JWT from HttpOnly cookie (primary) or Authorization header (fallback)
+  const token = req.cookies?.[COOKIE_NAME] || (() => {
+    const authHeader = req.headers['authorization'];
+    return authHeader && authHeader.split(' ')[1];
+  })();
 
   if (!token) {
     return res.status(401).json({ success: false, message: 'Access token required' });
@@ -27,6 +32,11 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
 
     if (!user || user.status !== 'Active') {
       return res.status(403).json({ success: false, message: 'Invalid or inactive user account' });
+    }
+
+    // Verify token matches active session in MongoDB database
+    if (user.activeToken !== undefined && user.activeToken !== token) {
+      return res.status(401).json({ success: false, message: 'Session expired or invalidated. Please log in again.' });
     }
 
     req.user = user;

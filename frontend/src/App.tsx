@@ -79,22 +79,15 @@ export const App: React.FC = () => {
   }
 
   const checkAuth = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
     try {
+      // Cookie is sent automatically — no token needed from localStorage
       const res = await api.get('/auth/me');
       if (res.success) {
         setUser(res.user);
-      } else {
-        localStorage.removeItem('token');
       }
     } catch (err) {
+      // Token invalid or expired — stay on login screen
       console.error(err);
-      localStorage.removeItem('token');
     } finally {
       setLoading(false);
     }
@@ -109,10 +102,15 @@ export const App: React.FC = () => {
     handleNavigate('dashboard');
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    setUser(null);
-    window.location.hash = '';
+  const handleLogout = async () => {
+    try {
+      await api.post('/auth/logout', {});  // Clears HttpOnly cookie server-side
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      setUser(null);
+      window.location.hash = '';
+    }
   };
 
   if (loading) {

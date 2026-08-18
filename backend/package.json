@@ -11,9 +11,11 @@
     "import": "ts-node src/scripts/importData.ts"
   },
   "dependencies": {
+    "@types/cookie-parser": "^1.4.10",
     "@types/nodemailer": "^8.0.1",
     "@types/xlsx": "^0.0.35",
     "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",

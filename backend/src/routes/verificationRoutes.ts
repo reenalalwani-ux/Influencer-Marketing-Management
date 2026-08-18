@@ -14,7 +14,12 @@ router.get('/pending', authenticateToken, checkPermission('task.verify'), async 
       .populate('brandId', 'brandName brandId logo industry')
       .sort({ publishedDate: -1 });
 
-    return res.json({ success: true, count: pendingTasks.length, data: pendingTasks });
+    return res.status(200).json({ 
+      success: true, 
+      count: pendingTasks.length, 
+      data: pendingTasks,
+      message: pendingTasks.length === 0 ? 'No records found' : 'Pending verification tasks fetched successfully'
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to fetch pending verifications', error });
   }
@@ -34,7 +39,7 @@ router.post('/:taskId/verify', authenticateToken, checkPermission('task.verify')
 
   try {
     const task = await Task.findById(req.params.taskId);
-    if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
+    if (!task) return res.status(404).json({ success: false, message: 'No record exists for this task' });
 
     task.verifiedBy = req.user?._id as any;
     task.verifiedAt = new Date();
@@ -76,7 +81,7 @@ router.post('/:taskId/verify', authenticateToken, checkPermission('task.verify')
       newValue: { decision, rejectionReason, verifiedBy: req.user?.name }
     });
 
-    return res.json({ 
+    return res.status(200).json({ 
       success: true, 
       message: `Task verification completed: ${decision}`, 
       data: task 

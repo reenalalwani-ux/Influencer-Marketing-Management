@@ -52,7 +52,12 @@ router.get('/', authenticateToken, checkPermission('task.view'), async (req: Aut
       .populate('parentTaskId', 'taskId title brandId platform contentType')
       .sort({ scheduledDate: 1, scheduledTime: 1 });
 
-    return res.json({ success: true, count: tasks.length, data: tasks });
+    return res.status(200).json({ 
+      success: true, 
+      count: tasks.length, 
+      data: tasks,
+      message: tasks.length === 0 ? 'No records found' : 'Tasks fetched successfully'
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to fetch tasks', error });
   }
@@ -67,8 +72,8 @@ router.get('/:id', authenticateToken, checkPermission('task.view'), async (req: 
       .populate('verifiedBy', 'name email role')
       .populate('parentTaskId', 'taskId title brandId platform contentType');
 
-    if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
-    return res.json({ success: true, data: task });
+    if (!task) return res.status(404).json({ success: false, message: 'No record exists for this task' });
+    return res.status(200).json({ success: true, data: task, message: 'Task fetched successfully' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to fetch task', error });
   }
@@ -143,7 +148,7 @@ router.post('/', authenticateToken, checkPermission('task.create'), async (req: 
       newValue: { taskId, title, employeeId, brandId, scheduledDate }
     });
 
-    return res.status(201).json({ success: true, message: 'Task created successfully', data: task });
+    return res.status(200).json({ success: true, message: 'Task created successfully', data: task });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to create task', error });
   }
@@ -153,7 +158,7 @@ router.post('/', authenticateToken, checkPermission('task.create'), async (req: 
 router.put('/:id', authenticateToken, checkPermission('task.update'), async (req: AuthRequest, res: Response) => {
   try {
     const task = await Task.findById(req.params.id);
-    if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
+    if (!task) return res.status(404).json({ success: false, message: 'No record exists for this task' });
 
     const oldValue = { ...task.toObject() };
     Object.assign(task, req.body);
@@ -170,7 +175,7 @@ router.put('/:id', authenticateToken, checkPermission('task.update'), async (req
       newValue: task.toObject()
     });
 
-    return res.json({ success: true, message: 'Task updated successfully', data: task });
+    return res.status(200).json({ success: true, message: 'Task updated successfully', data: task });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to update task', error });
   }
@@ -192,7 +197,7 @@ router.post('/:id/submit-url', authenticateToken, async (req: AuthRequest, res: 
 
   try {
     const task = await Task.findById(req.params.id);
-    if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
+    if (!task) return res.status(404).json({ success: false, message: 'No record exists for this task' });
 
     // Check duplicate URL check across completed/submitted tasks
     const duplicate = await Task.findOne({ publishedUrl, _id: { $ne: task._id } });
@@ -221,7 +226,7 @@ router.post('/:id/submit-url', authenticateToken, async (req: AuthRequest, res: 
       newValue: { publishedUrl, detectedPlatform: detected }
     });
 
-    return res.json({ 
+    return res.status(200).json({ 
       success: true, 
       message: 'Published URL submitted successfully and sent for verification', 
       detectedPlatform: detected,
@@ -236,7 +241,7 @@ router.post('/:id/submit-url', authenticateToken, async (req: AuthRequest, res: 
 router.delete('/:id', authenticateToken, checkPermission('task.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const task = await Task.findById(req.params.id);
-    if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
+    if (!task) return res.status(404).json({ success: false, message: 'No record exists for this task' });
 
     // Delete sub-tasks if main task
     if (task.isMainTask) {
@@ -255,7 +260,7 @@ router.delete('/:id', authenticateToken, checkPermission('task.delete'), async (
       oldValue: task.toObject()
     });
 
-    return res.json({ success: true, message: 'Task deleted successfully' });
+    return res.status(200).json({ success: true, message: 'Task deleted successfully' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to delete task', error });
   }

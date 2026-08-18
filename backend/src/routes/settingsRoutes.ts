@@ -28,7 +28,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       settingsMap[s.key] = s.value;
     });
 
-    return res.json({ success: true, data: settingsMap });
+    return res.status(200).json({ success: true, data: settingsMap, message: 'Settings fetched successfully' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to fetch settings', error });
   }
@@ -59,7 +59,7 @@ router.post('/', authenticateToken, checkPermission('settings.update'), async (r
       newValue: { key, value }
     });
 
-    return res.json({ success: true, message: 'Setting updated successfully', data: setting });
+    return res.status(200).json({ success: true, message: 'Setting updated successfully', data: setting });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to update setting', error });
   }

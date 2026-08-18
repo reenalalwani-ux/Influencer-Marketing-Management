@@ -1,11 +1,20 @@
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import { User, Employee, Role } from '../models/allModels';
-import { generateToken, authenticateToken, AuthRequest } from '../middleware/auth';
+import { generateToken, authenticateToken, AuthRequest, COOKIE_NAME, JWT_SECRET } from '../middleware/auth';
 import { logActivity } from '../middleware/auditLog';
 import { sendOTPEmail } from '../services/emailService';
 
 const router = Router();
+
+// Cookie options — secure:true only in production (HTTPS)
+const cookieOptions = {
+  httpOnly: true,                              // JS cannot access the cookie
+  secure: process.env.NODE_ENV === 'production', // HTTPS only in prod
+  sameSite: 'lax' as const,                   // CSRF protection
+  maxAge: 24 * 60 * 60 * 1000                 // 24 hours in milliseconds
+};
 
 const isValidCompanyEmail = (email: string) => {
   return typeof email === 'string' && email.trim().toLowerCase().endsWith('@ad2ship.com');
@@ -49,7 +58,7 @@ router.post('/request-otp', async (req: AuthRequest, res: Response) => {
       console.error('[Background Email Dispatch Error]', err);
     });
 
-    return res.json({
+    return res.status(200).json({
       success: true,
       message: `Security OTP sent to ${user.email}. Please check your email inbox.`,
       email: user.email
@@ -78,7 +87,7 @@ router.post('/verify-otp', async (req: AuthRequest, res: Response) => {
   try {
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
+      return res.status(404).json({ success: false, message: 'No record exists for this user account' });
     }
 
     if (!user.otpCode || user.otpCode !== otpCode.trim()) {
@@ -95,6 +104,12 @@ router.post('/verify-otp', async (req: AuthRequest, res: Response) => {
     await user.save();
 
     const token = generateToken((user._id as any).toString(), user.role);
+
+    // Save token to database
+    user.activeToken = token;
+    user.tokenIssuedAt = new Date();
+    await user.save();
+
     const roleDoc = await Role.findOne({ name: user.role });
     const permissions = roleDoc ? roleDoc.permissions : [];
     const employee = await Employee.findOne({ email: user.email });
@@ -108,10 +123,12 @@ router.post('/verify-otp', async (req: AuthRequest, res: Response) => {
       entityId: (user._id as any).toString()
     });
 
-    return res.json({
+    // Set JWT as HttpOnly cookie — browser stores it, JS cannot read it
+    res.cookie(COOKIE_NAME, token, cookieOptions);
+
+    return res.status(200).json({
       success: true,
       message: 'OTP verified successfully. Logged in!',
-      token,
       user: {
         id: user._id,
         name: user.name,
@@ -177,6 +194,12 @@ router.post('/signup', async (req: AuthRequest, res: Response) => {
     });
 
     const token = generateToken((newUser._id as any).toString(), newUser.role);
+
+    // Save token to database
+    newUser.activeToken = token;
+    newUser.tokenIssuedAt = new Date();
+    await newUser.save();
+
     const roleDoc = await Role.findOne({ name: newUser.role });
     const permissions = roleDoc ? roleDoc.permissions : [];
 
@@ -189,10 +212,12 @@ router.post('/signup', async (req: AuthRequest, res: Response) => {
       entityId: (newUser._id as any).toString()
     });
 
-    return res.json({
+    // Set JWT as HttpOnly cookie
+    res.cookie(COOKIE_NAME, token, cookieOptions);
+
+    return res.status(200).json({
       success: true,
       message: 'Account created successfully',
-      token,
       user: {
         id: newUser._id,
         name: newUser.name,
@@ -227,12 +252,12 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
   try {
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
 
     if (user.status !== 'Active') {
@@ -240,6 +265,11 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
     }
 
     const token = generateToken((user._id as any).toString(), user.role);
+
+    // Save token to database
+    user.activeToken = token;
+    user.tokenIssuedAt = new Date();
+    await user.save();
 
     // Fetch user role & permissions
     const roleDoc = await Role.findOne({ name: user.role });
@@ -257,10 +287,12 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
       entityId: (user._id as any).toString()
     });
 
-    return res.json({
+    // Set JWT as HttpOnly cookie
+    res.cookie(COOKIE_NAME, token, cookieOptions);
+
+    return res.status(200).json({
       success: true,
       message: 'Login successful',
-      token,
       user: {
         id: user._id,
         name: user.name,
@@ -277,6 +309,31 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// POST /api/v1/auth/logout
+router.post('/logout', async (req: AuthRequest, res: Response) => {
+  const token = req.cookies?.[COOKIE_NAME] || (() => {
+    const authHeader = req.headers['authorization'];
+    return authHeader && authHeader.split(' ')[1];
+  })();
+
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as { id: string };
+      await User.findByIdAndUpdate(decoded.id, { activeToken: null, tokenIssuedAt: null });
+    } catch (e) {
+      // Ignore token verification errors during logout
+    }
+  }
+
+  // Clear the HttpOnly cookie — browser deletes it immediately
+  res.clearCookie(COOKIE_NAME, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax'
+  });
+  return res.status(200).json({ success: true, message: 'Logged out successfully' });
+});
+
 // GET /api/v1/auth/me
 router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => {
   if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
@@ -285,8 +342,9 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => 
   const permissions = roleDoc ? roleDoc.permissions : [];
   const employee = await Employee.findOne({ email: req.user.email });
 
-  return res.json({
+  return res.status(200).json({
     success: true,
+    message: 'Current user profile fetched successfully',
     user: {
       id: req.user._id,
       name: req.user.name,
@@ -334,7 +392,7 @@ router.put('/profile', authenticateToken, async (req: AuthRequest, res: Response
       entityId: (req.user._id as any).toString()
     });
 
-    return res.json({
+    return res.status(200).json({
       success: true,
       message: 'Profile updated successfully',
       user: {
@@ -378,7 +436,7 @@ router.post('/change-password', authenticateToken, async (req: AuthRequest, res:
     entityId: (req.user._id as any).toString()
   });
 
-  return res.json({ success: true, message: 'Password updated successfully' });
+  return res.status(200).json({ success: true, message: 'Password updated successfully' });
 });
 
 export default router;

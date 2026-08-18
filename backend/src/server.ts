@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { connectDB } from './config/db';
 import { seedDatabase } from './seed/seedData';
@@ -31,9 +32,14 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({
-  origin: '*',
-  credentials: true
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:4173',
+    process.env.FRONTEND_URL || 'http://localhost:5173'
+  ],
+  credentials: true  // Required for HttpOnly cookies
 }));
+app.use(cookieParser());  // Parse cookies from incoming requests
 app.use(express.json());
 
 // Root endpoint welcome message

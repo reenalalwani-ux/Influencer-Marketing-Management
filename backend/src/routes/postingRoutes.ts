@@ -48,11 +48,12 @@ router.get('/daily', authenticateToken, checkPermission('posting.view'), async (
       missed: tasks.filter(t => t.status === 'Missed').length,
     };
 
-    return res.json({
+    return res.status(200).json({
       success: true,
       date: startOfDay.toISOString().split('T')[0],
       metrics,
-      data: tasks
+      data: tasks,
+      message: tasks.length === 0 ? 'No records found' : 'Daily postings fetched successfully'
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error fetching daily postings', error });
@@ -88,7 +89,12 @@ router.get('/calendar', authenticateToken, checkPermission('posting.view'), asyn
       .populate('brandId', 'brandName brandId logo')
       .sort({ scheduledDate: 1, scheduledTime: 1 });
 
-    return res.json({ success: true, count: tasks.length, data: tasks });
+    return res.status(200).json({ 
+      success: true, 
+      count: tasks.length, 
+      data: tasks,
+      message: tasks.length === 0 ? 'No records found' : 'Posting calendar data fetched successfully'
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error fetching posting calendar data', error });
   }
@@ -179,7 +185,7 @@ router.get('/matrix', authenticateToken, checkPermission('posting.view'), async 
       });
     }
 
-    return res.json({
+    return res.status(200).json({
       success: true,
       year: targetYear,
       month: targetMonth + 1,
@@ -188,7 +194,8 @@ router.get('/matrix', authenticateToken, checkPermission('posting.view'), async 
       employees,
       brands,
       dates,
-      matrixMap
+      matrixMap,
+      message: brands.length === 0 ? 'No records found' : 'Posting matrix data fetched successfully'
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error fetching posting matrix data', error });
@@ -258,7 +265,7 @@ router.post('/matrix/toggle', authenticateToken, checkPermission('posting.update
       }
     }
 
-    return res.json({
+    return res.status(200).json({
       success: true,
       message: `Posting updated for ${date}`,
       isPosted: !!isPosted,

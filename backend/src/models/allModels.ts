@@ -39,6 +39,8 @@ export interface IUser extends Document {
   employeeId?: string;
   status: 'Active' | 'Inactive';
   refreshToken?: string;
+  activeToken?: string;
+  tokenIssuedAt?: Date;
   otpCode?: string;
   otpExpiresAt?: Date;
 }
@@ -51,6 +53,8 @@ const UserSchema = new Schema<IUser>({
   employeeId: { type: String },
   status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
   refreshToken: { type: String },
+  activeToken: { type: String },
+  tokenIssuedAt: { type: Date },
   otpCode: { type: String },
   otpExpiresAt: { type: Date }
 }, { timestamps: true });

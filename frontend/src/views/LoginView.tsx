@@ -82,8 +82,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     try {
       const res = await api.post('/auth/verify-otp', { email: email.toLowerCase().trim(), otpCode });
       if (res.success) {
-        localStorage.setItem('token', res.token);
-        onLoginSuccess(res.user, res.token);
+        // Cookie is set by backend automatically — no localStorage needed
+        onLoginSuccess(res.user, '');
       }
     } catch (err: any) {
       setError(err.message || 'Invalid or expired OTP code');
@@ -141,8 +141,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       });
 
       if (res.success) {
-        localStorage.setItem('token', res.token);
-        onLoginSuccess(res.user, res.token);
+        // Cookie is set by backend automatically — no localStorage needed
+        onLoginSuccess(res.user, '');
       }
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please check details.');

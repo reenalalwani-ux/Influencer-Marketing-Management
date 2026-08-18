@@ -36,7 +36,12 @@ router.get('/employee-summary', authenticateToken, checkPermission('report.view'
       })
     );
 
-    return res.json({ success: true, data: report });
+    return res.status(200).json({ 
+      success: true, 
+      count: report.length, 
+      data: report,
+      message: report.length === 0 ? 'No records found' : 'Employee summary report generated successfully'
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to generate employee report', error });
   }
@@ -70,7 +75,12 @@ router.get('/brand-summary', authenticateToken, checkPermission('report.view'), 
       })
     );
 
-    return res.json({ success: true, data: report });
+    return res.status(200).json({ 
+      success: true, 
+      count: report.length, 
+      data: report,
+      message: report.length === 0 ? 'No records found' : 'Brand summary report generated successfully'
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to generate brand report', error });
   }
@@ -110,7 +120,13 @@ router.get('/daily-posting', authenticateToken, checkPermission('report.view'), 
       };
     });
 
-    return res.json({ success: true, date: startOfDay.toISOString().split('T')[0], count: report.length, data: report });
+    return res.status(200).json({ 
+      success: true, 
+      date: startOfDay.toISOString().split('T')[0], 
+      count: report.length, 
+      data: report,
+      message: report.length === 0 ? 'No records found' : 'Daily posting report generated successfully'
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to generate daily posting report', error });
   }

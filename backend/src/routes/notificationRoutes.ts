@@ -15,7 +15,13 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
 
     const unreadCount = await Notification.countDocuments({ userId: req.user._id, read: false });
 
-    return res.json({ success: true, unreadCount, data: notifications });
+    return res.status(200).json({ 
+      success: true, 
+      unreadCount, 
+      count: notifications.length, 
+      data: notifications,
+      message: notifications.length === 0 ? 'No records found' : 'Notifications fetched successfully'
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to fetch notifications', error });
   }
@@ -24,8 +30,11 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
 // PATCH /api/v1/notifications/:id/read
 router.patch('/:id/read', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
-    await Notification.findByIdAndUpdate(req.params.id, { read: true });
-    return res.json({ success: true, message: 'Notification marked as read' });
+    const updated = await Notification.findByIdAndUpdate(req.params.id, { read: true }, { new: true });
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'No record exists for this notification' });
+    }
+    return res.status(200).json({ success: true, message: 'Notification marked as read', data: updated });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to update notification', error });
   }
@@ -36,8 +45,12 @@ router.patch('/read-all', authenticateToken, async (req: AuthRequest, res: Respo
   if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
   try {
-    await Notification.updateMany({ userId: req.user._id, read: false }, { read: true });
-    return res.json({ success: true, message: 'All notifications marked as read' });
+    const result = await Notification.updateMany({ userId: req.user._id, read: false }, { read: true });
+    return res.status(200).json({ 
+      success: true, 
+      message: result.modifiedCount === 0 ? 'No unread notifications to mark as read' : 'All notifications marked as read',
+      modifiedCount: result.modifiedCount
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to mark all as read', error });
   }

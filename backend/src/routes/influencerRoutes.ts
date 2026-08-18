@@ -98,7 +98,7 @@ router.get('/', authenticateToken, checkPermission('influencer.view'), async (re
     const totalOut = influencers.reduce((acc, curr) => acc + (curr.outAmount || 0), 0);
     const netBalance = totalIn - totalOut;
 
-    return res.json({
+    return res.status(200).json({
       success: true,
       timeframe: timeframe || 'all',
       metrics: {
@@ -107,7 +107,8 @@ router.get('/', authenticateToken, checkPermission('influencer.view'), async (re
         netBalance,
         totalCount: influencers.length
       },
-      data: influencers
+      data: influencers,
+      message: influencers.length === 0 ? 'No records found' : 'Influencer records fetched successfully'
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error fetching influencer records', error });
@@ -236,7 +237,7 @@ router.post('/', authenticateToken, checkPermission('influencer.create'), async 
 
     await triggerTargetSync();
 
-    return res.status(201).json({ success: true, message: 'Influencer entry created successfully', data: newRecord });
+    return res.status(200).json({ success: true, message: 'Influencer entry created successfully', data: newRecord });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error creating influencer record', error });
   }
@@ -254,7 +255,7 @@ router.put('/:id', authenticateToken, checkPermission('influencer.update'), asyn
 
     const record = await Influencer.findById(req.params.id);
     if (!record) {
-      return res.status(404).json({ success: false, message: 'Influencer record not found' });
+      return res.status(404).json({ success: false, message: 'No record exists for this influencer' });
     }
 
     if (influencerName) record.influencerName = influencerName;
@@ -310,7 +311,7 @@ router.put('/:id', authenticateToken, checkPermission('influencer.update'), asyn
 
     await triggerTargetSync();
 
-    return res.json({ success: true, message: 'Influencer record updated', data: record });
+    return res.status(200).json({ success: true, message: 'Influencer record updated successfully', data: record });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error updating influencer record', error });
   }
@@ -321,7 +322,7 @@ router.delete('/:id', authenticateToken, checkPermission('influencer.delete'), a
   try {
     const record = await Influencer.findByIdAndDelete(req.params.id);
     if (!record) {
-      return res.status(404).json({ success: false, message: 'Influencer record not found' });
+      return res.status(404).json({ success: false, message: 'No record exists for this influencer' });
     }
 
     await logActivity({
@@ -335,7 +336,7 @@ router.delete('/:id', authenticateToken, checkPermission('influencer.delete'), a
 
     await triggerTargetSync();
 
-    return res.json({ success: true, message: 'Influencer record deleted' });
+    return res.status(200).json({ success: true, message: 'Influencer record deleted successfully' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error deleting influencer record', error });
   }
@@ -396,7 +397,7 @@ router.get('/payment-logs', authenticateToken, checkPermission('influencer.view'
     const totalIn = logs.filter(l => l.type === 'IN').reduce((acc, l) => acc + (l.amount || 0), 0);
     const totalOut = logs.filter(l => l.type === 'OUT').reduce((acc, l) => acc + (l.amount || 0), 0);
 
-    return res.json({
+    return res.status(200).json({
       success: true,
       data: logs,
       metrics: {
@@ -404,7 +405,8 @@ router.get('/payment-logs', authenticateToken, checkPermission('influencer.view'
         totalOut,
         netBalance: totalIn - totalOut,
         totalCount: logs.length
-      }
+      },
+      message: logs.length === 0 ? 'No records found' : 'Payment logs fetched successfully'
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error fetching payment logs', error });
@@ -452,7 +454,7 @@ router.post('/payment-logs', authenticateToken, checkPermission('influencer.crea
       }
     }
 
-    return res.status(201).json({ success: true, message: 'Payment log created successfully', data: newLog });
+    return res.status(200).json({ success: true, message: 'Payment log created successfully', data: newLog });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error creating payment log', error });
   }
@@ -461,8 +463,11 @@ router.post('/payment-logs', authenticateToken, checkPermission('influencer.crea
 // DELETE /api/v1/influencers/payment-logs/:id
 router.delete('/payment-logs/:id', authenticateToken, checkPermission('influencer.delete'), async (req: AuthRequest, res: Response) => {
   try {
-    await PaymentLog.findByIdAndDelete(req.params.id);
-    return res.json({ success: true, message: 'Payment log deleted successfully' });
+    const deleted = await PaymentLog.findByIdAndDelete(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: 'No record exists for this payment log' });
+    }
+    return res.status(200).json({ success: true, message: 'Payment log deleted successfully' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error deleting payment log', error });
   }

@@ -77,7 +77,12 @@ router.get('/', authenticateToken, checkPermission('performance.view'), async (r
       })
     );
 
-    return res.json({ success: true, count: performanceReport.length, data: performanceReport });
+    return res.status(200).json({ 
+      success: true, 
+      count: performanceReport.length, 
+      data: performanceReport,
+      message: performanceReport.length === 0 ? 'No records found' : 'Performance report fetched successfully'
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to calculate performance metrics', error });
   }
@@ -87,7 +92,7 @@ router.get('/', authenticateToken, checkPermission('performance.view'), async (r
 router.get('/:employeeId', authenticateToken, checkPermission('performance.view'), async (req: AuthRequest, res: Response) => {
   try {
     const emp = await Employee.findById(req.params.employeeId);
-    if (!emp) return res.status(404).json({ success: false, message: 'Employee not found' });
+    if (!emp) return res.status(404).json({ success: false, message: 'No record exists for this employee' });
 
     const tasks = await Task.find({ employeeId: emp._id }).populate('brandId', 'brandName');
     const totalAssigned = tasks.length;
@@ -99,8 +104,9 @@ router.get('/:employeeId', authenticateToken, checkPermission('performance.view'
     const completionRate = totalAssigned > 0 ? Math.round((completed / totalAssigned) * 100) : 0;
     const brands = await EmployeeBrand.find({ employeeId: emp._id, status: 'Active' }).populate('brandId');
 
-    return res.json({
+    return res.status(200).json({
       success: true,
+      message: 'Employee performance data fetched successfully',
       data: {
         employee: emp,
         metrics: {

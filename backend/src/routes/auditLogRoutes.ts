@@ -27,14 +27,15 @@ router.get('/', authenticateToken, checkPermission('audit.view'), async (req: Au
 
     const totalPages = Math.ceil(total / limitNum) || 1;
 
-    return res.json({ 
+    return res.status(200).json({ 
       success: true, 
       count: logs.length, 
       total, 
       page: pageNum, 
       totalPages, 
       limit: limitNum, 
-      data: logs 
+      data: logs,
+      message: logs.length === 0 ? 'No records found' : 'Audit logs fetched successfully'
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to fetch audit logs', error });

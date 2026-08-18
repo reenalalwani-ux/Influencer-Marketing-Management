@@ -1,12 +1,9 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
 
-const getHeaders = () => {
-  const token = localStorage.getItem('token');
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {})
-  };
-};
+const getHeaders = () => ({
+  'Content-Type': 'application/json'
+  // No Authorization header needed — HttpOnly cookie is sent automatically by the browser
+});
 
 const parseJsonResponse = async (res: Response) => {
   const contentType = res.headers.get('content-type');
@@ -22,7 +19,8 @@ const parseJsonResponse = async (res: Response) => {
 export const api = {
   async get(endpoint: string) {
     const res = await fetch(`${API_BASE_URL}${endpoint}`, {
-      headers: getHeaders()
+      headers: getHeaders(),
+      credentials: 'include'  // Send HttpOnly cookie automatically
     });
     return parseJsonResponse(res);
   },
@@ -31,6 +29,7 @@ export const api = {
     const res = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'POST',
       headers: getHeaders(),
+      credentials: 'include',  // Send HttpOnly cookie automatically
       body: JSON.stringify(body)
     });
     return parseJsonResponse(res);
@@ -40,6 +39,7 @@ export const api = {
     const res = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'PUT',
       headers: getHeaders(),
+      credentials: 'include',  // Send HttpOnly cookie automatically
       body: JSON.stringify(body)
     });
     return parseJsonResponse(res);
@@ -49,6 +49,7 @@ export const api = {
     const res = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'PATCH',
       headers: getHeaders(),
+      credentials: 'include',  // Send HttpOnly cookie automatically
       body: body ? JSON.stringify(body) : undefined
     });
     return parseJsonResponse(res);
@@ -57,7 +58,8 @@ export const api = {
   async delete(endpoint: string) {
     const res = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'DELETE',
-      headers: getHeaders()
+      headers: getHeaders(),
+      credentials: 'include'  // Send HttpOnly cookie automatically
     });
     return parseJsonResponse(res);
   }

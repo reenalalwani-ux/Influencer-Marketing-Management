@@ -11,7 +11,12 @@ const router = Router();
 router.get('/', authenticateToken, checkPermission('employee.view'), async (req: AuthRequest, res: Response) => {
   try {
     const employees = await Employee.find().populate('reportingManagerId', 'name employeeId designation').sort({ createdAt: -1 });
-    return res.json({ success: true, count: employees.length, data: employees });
+    return res.status(200).json({ 
+      success: true, 
+      count: employees.length, 
+      data: employees,
+      message: employees.length === 0 ? 'No records found' : 'Employees fetched successfully'
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error fetching employees', error });
   }
@@ -21,8 +26,8 @@ router.get('/', authenticateToken, checkPermission('employee.view'), async (req:
 router.get('/:id', authenticateToken, checkPermission('employee.view'), async (req: AuthRequest, res: Response) => {
   try {
     const employee = await Employee.findById(req.params.id).populate('reportingManagerId', 'name employeeId email designation');
-    if (!employee) return res.status(404).json({ success: false, message: 'Employee not found' });
-    return res.json({ success: true, data: employee });
+    if (!employee) return res.status(404).json({ success: false, message: 'No record exists for this employee' });
+    return res.status(200).json({ success: true, data: employee, message: 'Employee fetched successfully' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error fetching employee', error });
   }
@@ -88,7 +93,7 @@ router.post('/', authenticateToken, checkPermission('employee.create'), async (r
       newValue: { employeeId, name, email, role, department }
     });
 
-    return res.status(201).json({ success: true, message: 'Employee created successfully', data: employee });
+    return res.status(200).json({ success: true, message: 'Employee created successfully', data: employee });
   } catch (error) {
     console.error('Create employee error:', error);
     return res.status(500).json({ success: false, message: 'Failed to create employee', error });
@@ -99,7 +104,7 @@ router.post('/', authenticateToken, checkPermission('employee.create'), async (r
 router.put('/:id', authenticateToken, checkPermission('employee.update'), async (req: AuthRequest, res: Response) => {
   try {
     const employee = await Employee.findById(req.params.id);
-    if (!employee) return res.status(404).json({ success: false, message: 'Employee not found' });
+    if (!employee) return res.status(404).json({ success: false, message: 'No record exists for this employee' });
 
     const oldValue = { ...employee.toObject() };
     const { name, phone, department, designation, role, reportingManagerId, status } = req.body;
@@ -131,7 +136,7 @@ router.put('/:id', authenticateToken, checkPermission('employee.update'), async 
       newValue: employee.toObject()
     });
 
-    return res.json({ success: true, message: 'Employee updated successfully', data: employee });
+    return res.status(200).json({ success: true, message: 'Employee updated successfully', data: employee });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to update employee', error });
   }
@@ -141,7 +146,7 @@ router.put('/:id', authenticateToken, checkPermission('employee.update'), async 
 router.delete('/:id', authenticateToken, checkPermission('employee.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const employee = await Employee.findById(req.params.id);
-    if (!employee) return res.status(404).json({ success: false, message: 'Employee not found' });
+    if (!employee) return res.status(404).json({ success: false, message: 'No record exists for this employee' });
 
     await User.findOneAndDelete({ email: employee.email });
     await Employee.findByIdAndDelete(req.params.id);
@@ -156,7 +161,7 @@ router.delete('/:id', authenticateToken, checkPermission('employee.delete'), asy
       oldValue: employee.toObject()
     });
 
-    return res.json({ success: true, message: 'Employee deleted successfully' });
+    return res.status(200).json({ success: true, message: 'Employee deleted successfully' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to delete employee', error });
   }
