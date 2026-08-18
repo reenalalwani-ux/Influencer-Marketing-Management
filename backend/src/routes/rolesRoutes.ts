@@ -66,7 +66,7 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res: Response) =>
   const { description, permissions } = req.body;
 
   try {
-    let role = null;
+    let role: any = null;
     if (req.params.id && req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
       role = await Role.findById(req.params.id);
     }
