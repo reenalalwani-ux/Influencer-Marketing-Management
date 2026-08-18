@@ -165,6 +165,68 @@ export interface EmployeePerformanceData {
   qualifyingDeals?: QualifyingDeal[];
 }
 
+export interface MemberTargetItem {
+  employee: {
+    id: string;
+    employeeId: string;
+    name: string;
+    email: string;
+    department?: string;
+    designation: string;
+    assignedBrandsCount: number;
+  };
+  individualTarget: number;
+  individualBarterTarget?: number;
+  barterAchievedPercent?: number;
+  netMargin: number;
+  targetAchievedPercent: number;
+  targetTier: string;
+  targetIncentivePercentage: number;
+  targetIncentiveAmount: number;
+  qualifyingBonusDealsCount: number;
+  orderBonusAmount: number;
+  totalTakeHomeIncentive: number;
+  barterCount: number;
+  paidCount: number;
+  assignedBrands?: Array<{
+    id: string;
+    name: string;
+    brandType: string;
+    targetBarterCollabs: number;
+    targetPaidCollabs: number;
+    targetTotalCollabs: number;
+  }>;
+  deals?: Array<{
+    id: string;
+    transactionDate: string;
+    influencerName: string;
+    brandName: string;
+    category: string;
+    brandOnboardingAmt: number;
+    influencerOnboardingAmt: number;
+    ad2shipMargin: number;
+    ordersGenerated: number;
+    isOrderBonusQualified: boolean;
+    videoType?: string;
+    status?: string;
+  }>;
+}
+
+export interface TeamTargetBreakdown {
+  teamSize: number;
+  perMemberTarget: number;
+  teamTargetAmount: number;
+  teamAchievedMargin: number;
+  teamCompletionPercent: number;
+  teamSlab: string;
+  teamBarterTarget?: number;
+  teamAchievedBarterCount?: number;
+  teamBarterCompletionPercent?: number;
+  teamQualifyingVideosCount: number;
+  teamTotalBonus: number;
+  members: MemberTargetItem[];
+}
+
 export interface TargetItem {
   _id: string;
   title: string;

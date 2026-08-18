@@ -1,38 +1,120 @@
 import { Router, Response } from 'express';
-import { Target, Influencer } from '../models/allModels';
+import { Target, Influencer, Employee, EmployeeBrand, Brand } from '../models/allModels';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 import { logActivity } from '../middleware/auditLog';
 
 const router = Router();
 
-// Helper to auto-calculate target progress from actual Influencer transactions
-export const recalculateTargetProgress = async (target: any) => {
-  if (!target || target.autoSync === false) return target;
+// Helper to get active team members in Influencer Marketing
+export const getActiveInfluencerMembers = async () => {
+  return await Employee.find({
+    status: 'Active',
+    department: 'Influencer Marketing'
+  }).sort({ employeeId: 1, name: 1 });
+};
 
+// Helper to build date range filter from timeframe, year, month, or target period
+export const buildDateFilter = (timeframe?: string, year?: string | number, month?: string | number) => {
+  const filter: any = {};
   const now = new Date();
-  let startDate = target.startDate;
-  let endDate = target.endDate;
+  const currentYear = Number(year) || now.getFullYear();
+  const currentMonth = month !== undefined ? Number(month) - 1 : now.getMonth();
 
-  if (!startDate || !endDate) {
-    startDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
-    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  if (timeframe && typeof timeframe === 'string' && timeframe.includes('_')) {
+    const parts = timeframe.split('_');
+    const monthNames: Record<string, number> = {
+      january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
+      july: 6, august: 7, september: 8, october: 9, november: 10, december: 11
+    };
+    const mIdx = monthNames[parts[0].toLowerCase()];
+    const yr = Number(parts[1]) || 2026;
+    if (mIdx !== undefined) {
+      const startOfMonth = new Date(yr, mIdx, 1, 0, 0, 0);
+      const endOfMonth = new Date(yr, mIdx + 1, 0, 23, 59, 59);
+      filter.transactionDate = { $gte: startOfMonth, $lte: endOfMonth };
+    }
+  } else if (timeframe === 'today') {
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+    filter.transactionDate = { $gte: startOfDay, $lte: endOfDay };
+  } else if (timeframe === 'monthly' || timeframe === 'Month') {
+    const startOfMonth = new Date(currentYear, currentMonth, 1, 0, 0, 0);
+    const endOfMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
+    filter.transactionDate = { $gte: startOfMonth, $lte: endOfMonth };
+  } else if (timeframe === 'yearly' || timeframe === 'Year') {
+    const startOfYear = new Date(currentYear, 0, 1, 0, 0, 0);
+    const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59);
+    filter.transactionDate = { $gte: startOfYear, $lte: endOfYear };
+  }
+  return filter;
+};
+
+// Helper to auto-calculate target progress and auto-fill team targets from actual Influencer transactions
+export const recalculateTargetProgress = async (target: any, customDateFilter?: any) => {
+  if (!target) return target;
+
+  let filter: any = {};
+  if (customDateFilter && customDateFilter.transactionDate) {
+    filter.transactionDate = customDateFilter.transactionDate;
+  } else {
+    const now = new Date();
+    let startDate = target.startDate;
+    let endDate = target.endDate;
+
+    if (!startDate || !endDate) {
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    }
+    filter.transactionDate = { $gte: startDate, $lte: endDate };
   }
 
   if (target.targetType === 'Barter') {
+    if (target.autoSync !== false) {
+      const activeMembers = await getActiveInfluencerMembers();
+      const activeMemberIds = activeMembers.map(m => m._id.toString());
+      
+      const assignments = await EmployeeBrand.find({ 
+        status: 'Active',
+        employeeId: { $in: activeMemberIds }
+      });
+      const assignedBrandIds = assignments.map(a => a.brandId.toString());
+      const assignedBrands = await Brand.find({ _id: { $in: assignedBrandIds } });
+      
+      const totalBarterQuota = assignedBrands.reduce((sum, b) => {
+        const quota = b.targetBarterCollabs || (b.brandType === 'New' ? 8 : 7);
+        return sum + quota;
+      }, 0);
+
+      target.targetAmount = totalBarterQuota || 120;
+      target.targetCount = totalBarterQuota || 120;
+      target.description = `Auto-calculated monthly barter volume across ${assignedBrands.length} assigned brands (${totalBarterQuota} Collabs).`;
+    }
+
     const barterCount = await Influencer.countDocuments({
       category: 'Barter',
-      transactionDate: { $gte: startDate, $lte: endDate }
+      ...filter
     });
     target.achievedCount = barterCount;
     target.achievedAmount = barterCount;
   } else {
-    // Paid Target: Sum ad2shipMargin from Paid collabs
+    // Paid Target: Auto-fill targetAmount based on active team members (N * ₹1,20,000)
+    if (target.autoSync !== false) {
+      const activeMembers = await getActiveInfluencerMembers();
+      const memberCount = Math.max(1, activeMembers.length);
+      target.targetAmount = memberCount * 120000;
+      target.description = `Monthly AD2ship team profit margin target (₹1.2L per executive across ${memberCount} team members).`;
+    }
+
+    // Sum ad2shipMargin from Paid collabs
     const paidRecords = await Influencer.find({
       category: 'Paid',
-      transactionDate: { $gte: startDate, $lte: endDate }
+      ...filter
     });
-    const totalMargin = paidRecords.reduce((acc, curr) => acc + (curr.ad2shipMargin || 0), 0);
+    const totalMargin = paidRecords.reduce((acc, curr) => {
+      const m = curr.ad2shipMargin || ((curr.brandOnboardingAmt || curr.inAmount || 0) - (curr.influencerOnboardingAmt || curr.outAmount || 0));
+      return acc + m;
+    }, 0);
     target.achievedAmount = totalMargin;
   }
 
@@ -40,12 +122,185 @@ export const recalculateTargetProgress = async (target: any) => {
   return target;
 };
 
+// GET /api/v1/targets/team-breakdown - Live auto-filled breakdown for all active team members (Month-Filtered)
+router.get('/team-breakdown', authenticateToken, checkPermission('target.view'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { timeframe, year, month } = req.query;
+    const dateFilter = buildDateFilter(timeframe as string, year as string, month as string);
+
+    const members = await getActiveInfluencerMembers();
+    const teamSize = members.length;
+    const perMemberTarget = 120000;
+    const teamTargetAmount = teamSize * perMemberTarget;
+
+    const allBrands = await Brand.find();
+    const allAssignments = await EmployeeBrand.find({ status: 'Active' });
+    const allPaidCollabs = await Influencer.find({ category: 'Paid', ...dateFilter }).sort({ transactionDate: -1 });
+    const allBarterCollabs = await Influencer.find({ category: 'Barter', ...dateFilter }).sort({ transactionDate: -1 });
+
+    let teamAchievedMargin = 0;
+    let teamQualifyingVideosCount = 0;
+    let teamTotalBonus = 0;
+    let teamBarterTarget = 0;
+    let teamAchievedBarterCount = 0;
+
+    const memberBreakdowns = members.map(emp => {
+      const assignedBrandIds = allAssignments
+        .filter(a => a.employeeId.toString() === emp._id.toString())
+        .map(a => a.brandId.toString());
+
+      const assignedBrandDocs = allBrands.filter(b => assignedBrandIds.includes((b._id as any).toString()));
+      const assignedBrandNames = assignedBrandDocs.map(b => b.brandName.toLowerCase());
+
+      const empName = emp.name.toLowerCase();
+
+      const memberPaid = allPaidCollabs.filter(c => {
+        const brandMatch = c.brandName && assignedBrandNames.includes(c.brandName.toLowerCase());
+        const mgrMatch = c.influencerManager && c.influencerManager.toLowerCase().includes(empName);
+        return brandMatch || mgrMatch;
+      });
+
+      const memberBarter = allBarterCollabs.filter(c => {
+        const brandMatch = c.brandName && assignedBrandNames.includes(c.brandName.toLowerCase());
+        const mgrMatch = c.influencerManager && c.influencerManager.toLowerCase().includes(empName);
+        return brandMatch || mgrMatch;
+      });
+
+      const netMargin = memberPaid.reduce((acc, curr) => {
+        const m = curr.ad2shipMargin || ((curr.brandOnboardingAmt || curr.inAmount || 0) - (curr.influencerOnboardingAmt || curr.outAmount || 0));
+        return acc + m;
+      }, 0);
+
+      teamAchievedMargin += netMargin;
+
+      // Auto-calculate Barter Target for this member based on assigned brands
+      const individualBarterTarget = assignedBrandDocs.reduce((sum, b) => {
+        const quota = b.targetBarterCollabs || (b.brandType === 'New' ? 8 : 7);
+        return sum + quota;
+      }, 0);
+
+      teamBarterTarget += individualBarterTarget;
+      teamAchievedBarterCount += memberBarter.length;
+
+      const barterAchievedPercent = individualBarterTarget > 0 
+        ? Math.min(100, Math.round((memberBarter.length / individualBarterTarget) * 100))
+        : 0;
+
+      // Slab Calculation: 80k gives 5% incentive, 1L+ gives 10% incentive
+      let targetTier: '0%' | '5%' | '10%' = '0%';
+      let targetIncentivePercentage = 0;
+      if (netMargin >= 100000) {
+        targetTier = '10%';
+        targetIncentivePercentage = 10;
+      } else if (netMargin >= 80000) {
+        targetTier = '5%';
+        targetIncentivePercentage = 5;
+      }
+
+      const targetIncentiveAmount = Math.round((netMargin * targetIncentivePercentage) / 100);
+
+      // 100+ Orders Video Performance Bonus (10% per video margin)
+      const qualifyingDeals = memberPaid.filter(c => (c.ordersGenerated || c.ordersCount || 0) >= 100);
+      const qualifyingBonusDealsCount = qualifyingDeals.length;
+      teamQualifyingVideosCount += qualifyingBonusDealsCount;
+
+      const orderBonusAmount = qualifyingDeals.reduce((acc, curr) => {
+        const dealMargin = curr.ad2shipMargin || ((curr.brandOnboardingAmt || curr.inAmount || 0) - (curr.influencerOnboardingAmt || curr.outAmount || 0));
+        return acc + Math.round(dealMargin * 0.10);
+      }, 0);
+
+      const totalTakeHomeIncentive = targetIncentiveAmount + orderBonusAmount;
+      teamTotalBonus += totalTakeHomeIncentive;
+
+      const targetAchievedPercent = Math.min(100, Math.round((netMargin / perMemberTarget) * 100));
+
+      const assignedBrandsData = assignedBrandDocs.map(b => ({
+        id: b._id,
+        name: b.brandName,
+        brandType: b.brandType || 'Running',
+        targetBarterCollabs: b.targetBarterCollabs || 7,
+        targetPaidCollabs: b.targetPaidCollabs || 3,
+        targetTotalCollabs: b.targetTotalCollabs || 10
+      }));
+
+      const dealsData = [...memberPaid, ...memberBarter].map(d => ({
+        id: d._id,
+        transactionDate: d.transactionDate,
+        influencerName: d.influencerName,
+        brandName: d.brandName,
+        category: d.category,
+        brandOnboardingAmt: d.brandOnboardingAmt || d.inAmount || 0,
+        influencerOnboardingAmt: d.influencerOnboardingAmt || d.outAmount || 0,
+        ad2shipMargin: d.ad2shipMargin || ((d.brandOnboardingAmt || d.inAmount || 0) - (d.influencerOnboardingAmt || d.outAmount || 0)),
+        ordersGenerated: d.ordersGenerated || d.ordersCount || 0,
+        isOrderBonusQualified: (d.ordersGenerated || d.ordersCount || 0) >= 100,
+        videoType: d.videoType || 'Single Product Video',
+        status: d.status || 'Completed'
+      }));
+
+      return {
+        employee: {
+          id: emp._id,
+          employeeId: emp.employeeId,
+          name: emp.name,
+          email: emp.email,
+          department: emp.department,
+          designation: emp.designation,
+          assignedBrandsCount: assignedBrandDocs.length
+        },
+        individualTarget: perMemberTarget,
+        individualBarterTarget,
+        barterAchievedPercent,
+        netMargin,
+        targetAchievedPercent,
+        targetTier,
+        targetIncentivePercentage,
+        targetIncentiveAmount,
+        qualifyingBonusDealsCount,
+        orderBonusAmount,
+        totalTakeHomeIncentive,
+        barterCount: memberBarter.length,
+        paidCount: memberPaid.length,
+        assignedBrands: assignedBrandsData,
+        deals: dealsData
+      };
+    });
+
+    const teamCompletionPercent = Math.min(100, Math.round((teamAchievedMargin / (teamTargetAmount || 1)) * 100));
+    const teamSlab = teamAchievedMargin >= teamTargetAmount ? '10%' : teamAchievedMargin >= (teamSize * 80000) ? '5%' : '0%';
+    const teamBarterCompletionPercent = Math.min(100, Math.round((teamAchievedBarterCount / (teamBarterTarget || 1)) * 100));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        teamSize,
+        perMemberTarget,
+        teamTargetAmount,
+        teamAchievedMargin,
+        teamCompletionPercent,
+        teamSlab,
+        teamBarterTarget,
+        teamAchievedBarterCount,
+        teamBarterCompletionPercent,
+        teamQualifyingVideosCount,
+        teamTotalBonus,
+        members: memberBreakdowns
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Error fetching team target breakdown', error });
+  }
+});
+
 // GET /api/v1/targets - Fetch all targets
 router.get('/', authenticateToken, checkPermission('target.view'), async (req: AuthRequest, res: Response) => {
   try {
+    const { timeframe, year, month } = req.query;
+    const dateFilter = buildDateFilter(timeframe as string, year as string, month as string);
+
     const targets = await Target.find().sort({ createdAt: -1 }).populate('createdBy', 'name email role');
     for (const target of targets) {
-      await recalculateTargetProgress(target);
+      await recalculateTargetProgress(target, dateFilter);
     }
     return res.status(200).json({ 
       success: true, 
@@ -61,6 +316,9 @@ router.get('/', authenticateToken, checkPermission('target.view'), async (req: A
 // GET /api/v1/targets/active - Fetch current active target for top banner display
 router.get('/active', authenticateToken, checkPermission('target.view'), async (req: AuthRequest, res: Response) => {
   try {
+    const { timeframe, year, month } = req.query;
+    const dateFilter = buildDateFilter(timeframe as string, year as string, month as string);
+
     let activeTarget = await Target.findOne({ isActive: true, status: 'Active' }).sort({ updatedAt: -1 }).populate('createdBy', 'name email role');
     
     // Fallback: If no target is explicitly marked isActive, pick the most recent Active target
@@ -69,7 +327,7 @@ router.get('/active', authenticateToken, checkPermission('target.view'), async (
     }
 
     if (activeTarget) {
-      await recalculateTargetProgress(activeTarget);
+      await recalculateTargetProgress(activeTarget, dateFilter);
     }
 
     return res.status(200).json({ 

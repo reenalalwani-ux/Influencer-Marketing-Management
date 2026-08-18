@@ -1,7 +1,9 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import dotenv from 'dotenv';
 import { connectDB } from './config/db';
 import { seedDatabase } from './seed/seedData';
 
@@ -24,8 +26,6 @@ import dbRoutes from './routes/dbRoutes';
 import targetRoutes from './routes/targetRoutes';
 import influencerRoutes from './routes/influencerRoutes';
 import contentCalendarRoutes from './routes/contentCalendarRoutes';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;

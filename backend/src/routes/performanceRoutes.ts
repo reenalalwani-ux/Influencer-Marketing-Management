@@ -2,12 +2,16 @@ import { Router, Response } from 'express';
 import { Employee, Task, EmployeeBrand, Influencer, Brand } from '../models/allModels';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
+import { buildDateFilter } from './targetRoutes';
 
 const router = Router();
 
 // GET /api/v1/performance
 router.get('/', authenticateToken, checkPermission('performance.view'), async (req: AuthRequest, res: Response) => {
   try {
+    const { timeframe, year, month, search } = req.query;
+    const dateFilter = buildDateFilter(timeframe as string, year as string, month as string);
+
     let filter: any = { status: 'Active' };
 
     // Employee Role Isolation: If user is an employee, only return their own performance data
@@ -41,15 +45,20 @@ router.get('/', authenticateToken, checkPermission('performance.view'), async (r
           .map((a: any) => a.brandId?._id)
           .filter(Boolean);
 
-        // Fetch Influencer Deals for this employee's assigned brands or executive name
-        const deals = await Influencer.find({
+        // Fetch Influencer Deals for this employee's assigned brands or executive name with Date Filtering
+        const dealFilter: any = {
           $or: [
             { brandName: { $in: assignedBrandNames } },
             { brandId: { $in: assignedBrandIds } },
             { influencerManager: new RegExp(emp.name, 'i') },
             { assignedExecutive: new RegExp(emp.name, 'i') }
           ]
-        });
+        };
+        if (dateFilter.transactionDate) {
+          dealFilter.transactionDate = dateFilter.transactionDate;
+        }
+
+        const deals = await Influencer.find(dealFilter);
 
         const barterDeals = deals.filter(d => d.category === 'Barter');
         const paidDeals = deals.filter(d => d.category === 'Paid');

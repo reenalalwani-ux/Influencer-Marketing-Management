@@ -5,11 +5,19 @@ import { EmployeePerformanceData } from '../types';
 import { Pagination } from '../components/Pagination';
 import { PageLoader } from '../components/PageLoader';
 import { DataTable, DataTableColumn } from '../components/DataTable';
+import { MonthDatePicker } from '../components/MonthDatePicker';
+
+const getCurrentMonthTimeframe = () => {
+  const now = new Date();
+  const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+  return `${monthNames[now.getMonth()]}_${now.getFullYear()}`;
+};
 
 export const EmployeePerformanceView: React.FC = () => {
   const [performanceData, setPerformanceData] = useState<EmployeePerformanceData[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+  const [timeframe, setTimeframe] = useState<string>(getCurrentMonthTimeframe());
 
   // Pagination & Filtering
   const [searchTerm, setSearchTerm] = useState('');
@@ -17,8 +25,10 @@ export const EmployeePerformanceView: React.FC = () => {
   const itemsPerPage = viewMode === 'table' ? 10 : 4;
 
   const fetchPerformance = async () => {
+    setLoading(true);
     try {
-      const res = await api.get('/performance');
+      const now = new Date();
+      const res = await api.get(`/performance?timeframe=${timeframe}&year=${now.getFullYear()}&month=${now.getMonth() + 1}`);
       if (res.success) setPerformanceData(res.data);
     } catch (err) {
       console.error(err);
@@ -29,7 +39,7 @@ export const EmployeePerformanceView: React.FC = () => {
 
   useEffect(() => {
     fetchPerformance();
-  }, []);
+  }, [timeframe]);
 
   // Filter performance data by search term
   const filteredData = performanceData.filter(item => {
@@ -202,7 +212,13 @@ export const EmployeePerformanceView: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Visual Month / Calendar Picker */}
+          <MonthDatePicker 
+            timeframe={timeframe} 
+            onChange={(newTimeframe) => setTimeframe(newTimeframe)} 
+          />
+
           {/* View Toggle */}
           <div className="bg-white p-1 rounded-xl border border-slate-200 flex items-center gap-1 shadow-2xs">
             <button
@@ -226,7 +242,7 @@ export const EmployeePerformanceView: React.FC = () => {
           </div>
 
           {/* Search Input */}
-          <div className="relative w-full sm:w-64">
+          <div className="relative w-full sm:w-56">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -283,45 +299,49 @@ export const EmployeePerformanceView: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Net Margin & Slabs Box */}
-                    <div className="p-3 bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-xl space-y-2">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-slate-300 font-bold">Net Ad2ship Margin:</span>
-                        <span className="text-base font-black text-emerald-400">
+                    {/* Net Margin & Slabs Box (Clean Light Theme) */}
+                    <div className="p-3.5 bg-gradient-to-br from-slate-50 via-purple-50/40 to-emerald-50/40 border border-slate-200/90 rounded-2xl space-y-2.5 shadow-2xs">
+                      <div className="flex justify-between items-center text-xs font-bold">
+                        <span className="text-slate-600">Net Ad2ship Margin:</span>
+                        <span className="text-base font-black text-slate-900">
                           ₹{new Intl.NumberFormat().format(margin)}
                         </span>
                       </div>
 
                       <div className="space-y-1">
-                        <div className="flex justify-between text-[11px] font-semibold text-slate-400">
+                        <div className="flex justify-between text-[11px] font-bold text-slate-500">
                           <span>Target Progress ({targetPct}%)</span>
-                          <span>Target: ₹1,20,000</span>
+                          <span className="text-purple-600">Target: ₹1,20,000</span>
                         </div>
-                        <div className="w-full bg-slate-700 rounded-full h-2 overflow-hidden">
+                        <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
                           <div
-                            className="bg-emerald-400 h-full rounded-full transition-all duration-500"
+                            className="bg-gradient-to-r from-purple-600 via-indigo-600 to-emerald-500 h-full rounded-full transition-all duration-500"
                             style={{ width: `${Math.min(targetPct, 100)}%` }}
                           />
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between pt-1 border-t border-slate-700 text-xs">
-                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
-                          tier === '10%' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : tier === '5%' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40' : 'bg-slate-700 text-slate-400'
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-200/80 text-xs">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${
+                          tier === '10%' 
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300' 
+                            : tier === '5%' 
+                              ? 'bg-blue-100 text-blue-800 border-blue-300' 
+                              : 'bg-slate-100 text-slate-600 border-slate-200'
                         }`}>
                           {tier === '10%' ? '🏆 10% Slab (1L+)' : tier === '5%' ? '🥈 5% Slab (80k+)' : '0% Slab (<80k)'}
                         </span>
-                        <span className="text-xs font-bold text-slate-200">
-                          Target Bonus: <strong className="text-emerald-400 font-black">₹{new Intl.NumberFormat().format(incentiveSummary?.targetIncentiveAmount || 0)}</strong>
+                        <span className="text-xs font-semibold text-slate-600">
+                          Target Bonus: <strong className="text-emerald-700 font-extrabold">₹{new Intl.NumberFormat().format(incentiveSummary?.targetIncentiveAmount || 0)}</strong>
                         </span>
                       </div>
 
                       {bonusCount > 0 && (
-                        <div className="flex items-center justify-between pt-1 border-t border-slate-700 text-xs">
-                          <span className="text-amber-400 font-bold flex items-center gap-1 text-[11px]">
+                        <div className="flex items-center justify-between pt-1.5 border-t border-slate-200/80 text-xs">
+                          <span className="text-amber-800 font-bold flex items-center gap-1 text-[11px] bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
                             🌟 {bonusCount} Videos (100+ Orders)
                           </span>
-                          <span className="text-amber-300 font-black text-xs">
+                          <span className="text-amber-700 font-black text-xs">
                             +₹{new Intl.NumberFormat().format(incentiveSummary?.orderBonusAmount || 0)}
                           </span>
                         </div>
