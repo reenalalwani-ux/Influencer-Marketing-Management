@@ -28,6 +28,7 @@ export const Navbar: React.FC<NavbarProps> = ({ user, onLogout, activeView, setA
   const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const fetchNotifications = async () => {
+    if (typeof document !== 'undefined' && document.hidden) return;
     try {
       const res = await api.get('/notifications');
       if (res.success) {

@@ -148,6 +148,9 @@ const EmployeeBrandSchema = new Schema<IEmployeeBrand>({
   status: { type: String, enum: ['Active', 'Completed', 'Removed'], default: 'Active' }
 }, { timestamps: true });
 
+EmployeeBrandSchema.index({ employeeId: 1, status: 1 });
+EmployeeBrandSchema.index({ brandId: 1, status: 1 });
+
 // 7. Task / Content Schema
 export interface ITask extends Document {
   taskId: string;
@@ -205,6 +208,10 @@ const TaskSchema = new Schema<ITask>({
   parentTaskId: { type: Schema.Types.ObjectId, ref: 'Task' }
 }, { timestamps: true });
 
+TaskSchema.index({ scheduledDate: 1, status: 1 });
+TaskSchema.index({ employeeId: 1, scheduledDate: 1 });
+TaskSchema.index({ brandId: 1 });
+
 // 10. Notification Schema
 export interface INotification extends Document {
   userId: mongoose.Types.ObjectId;
@@ -223,6 +230,8 @@ const NotificationSchema = new Schema<INotification>({
   relatedId: { type: String },
   read: { type: Boolean, default: false }
 }, { timestamps: true });
+
+NotificationSchema.index({ userId: 1, read: 1, createdAt: -1 });
 
 // 11. Audit Log Schema
 export interface IAuditLog extends Document {
@@ -248,6 +257,8 @@ const AuditLogSchema = new Schema<IAuditLog>({
   newValue: { type: Schema.Types.Mixed },
   timestamp: { type: Date, default: Date.now }
 }, { timestamps: true });
+
+AuditLogSchema.index({ timestamp: -1 });
 
 // 12. System Settings Schema
 export interface ISetting extends Document {
@@ -302,6 +313,8 @@ const TargetSchema = new Schema<ITarget>({
   description: { type: String },
   createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
+
+TargetSchema.index({ isActive: 1, status: 1 });
 
 // 14. Influencer Schema
 export interface IInfluencer extends Document {
@@ -399,6 +412,9 @@ const InfluencerSchema = new Schema<IInfluencer>({
   remark: { type: String, default: '' },
   createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
+
+InfluencerSchema.index({ category: 1, status: 1, transactionDate: -1 });
+InfluencerSchema.index({ brandName: 1 });
 
 export interface IPaymentLog extends Document {
   influencerId?: mongoose.Types.ObjectId;

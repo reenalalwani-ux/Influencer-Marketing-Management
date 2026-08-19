@@ -352,9 +352,11 @@ router.post('/logout', async (req: AuthRequest, res: Response) => {
 router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => {
   if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-  const roleDoc = await Role.findOne({ name: req.user.role });
+  const [roleDoc, employee] = await Promise.all([
+    Role.findOne({ name: req.user.role }).lean(),
+    Employee.findOne({ email: req.user.email }).lean()
+  ]);
   const permissions = roleDoc ? roleDoc.permissions : [];
-  const employee = await Employee.findOne({ email: req.user.email });
 
   return res.status(200).json({
     success: true,

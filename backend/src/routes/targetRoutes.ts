@@ -68,7 +68,7 @@ export const buildDateFilter = (timeframe?: string, year?: string | number, mont
 };
 
 // Helper to auto-calculate target progress and auto-fill team targets from actual Influencer transactions
-export const recalculateTargetProgress = async (target: any, customDateFilter?: any) => {
+export const recalculateTargetProgress = async (target: any, customDateFilter?: any, shouldSave: boolean = false) => {
   if (!target) return target;
 
   let filter: any = {};
@@ -110,9 +110,9 @@ export const recalculateTargetProgress = async (target: any, customDateFilter?: 
       const assignments = await EmployeeBrand.find({ 
         status: 'Active',
         employeeId: { $in: activeMemberIds }
-      });
+      }).lean();
       const assignedBrandIds = assignments.map(a => a.brandId.toString());
-      const assignedBrands = await Brand.find({ _id: { $in: assignedBrandIds } });
+      const assignedBrands = await Brand.find({ _id: { $in: assignedBrandIds } }).lean();
       
       const totalBarterQuota = assignedBrands.reduce((sum, b) => {
         const quota = b.targetBarterCollabs || (b.brandType === 'New' ? 8 : 7);
@@ -161,7 +161,10 @@ export const recalculateTargetProgress = async (target: any, customDateFilter?: 
     }
   }
 
-  await target.save();
+  // Only perform a database save if explicitly requested (e.g. on create/update routes)
+  if (shouldSave && typeof target.save === 'function') {
+    await target.save();
+  }
   return target;
 };
 
@@ -171,16 +174,18 @@ router.get('/team-breakdown', authenticateToken, checkPermission('target.view'),
     const { timeframe, year, month } = req.query;
     const dateFilter = buildDateFilter(timeframe as string, year as string, month as string);
 
-    const members = await getActiveInfluencerMembers();
+    const [members, activePaidTarget, allBrands, allAssignments, allPaidCollabs, allBarterCollabs] = await Promise.all([
+      getActiveInfluencerMembers(),
+      Target.findOne({ isActive: true, status: 'Active', targetType: 'Paid' }).sort({ updatedAt: -1 }).lean(),
+      Brand.find().lean(),
+      EmployeeBrand.find({ status: 'Active' }).lean(),
+      Influencer.find({ category: 'Paid', status: { $in: ['Completed', 'Approved', 'Settled', 'completed', 'approved', 'settled'] }, ...dateFilter }).sort({ transactionDate: -1 }).lean(),
+      Influencer.find({ category: 'Barter', status: { $in: ['Completed', 'Approved', 'Settled', 'completed', 'approved', 'settled'] }, ...dateFilter }).sort({ transactionDate: -1 }).lean()
+    ]);
+
     const teamSize = members.length;
     const perMemberTarget = 120000;
-    const activePaidTarget = await Target.findOne({ isActive: true, status: 'Active', targetType: 'Paid' }).sort({ updatedAt: -1 });
     const teamTargetAmount = activePaidTarget ? activePaidTarget.targetAmount : (teamSize * perMemberTarget);
-
-    const allBrands = await Brand.find();
-    const allAssignments = await EmployeeBrand.find({ status: 'Active' });
-    const allPaidCollabs = await Influencer.find({ category: 'Paid', status: { $in: ['Completed', 'Approved', 'Settled', 'completed', 'approved', 'settled'] }, ...dateFilter }).sort({ transactionDate: -1 });
-    const allBarterCollabs = await Influencer.find({ category: 'Barter', status: { $in: ['Completed', 'Approved', 'Settled', 'completed', 'approved', 'settled'] }, ...dateFilter }).sort({ transactionDate: -1 });
 
     let teamAchievedMargin = 0;
     let teamQualifyingVideosCount = 0;
@@ -417,7 +422,7 @@ router.post('/', authenticateToken, checkPermission('target.create'), async (req
       createdBy: req.user?._id
     });
 
-    await recalculateTargetProgress(newTarget);
+    await recalculateTargetProgress(newTarget, undefined, true);
 
     await logActivity({
       userId: req.user?._id,
@@ -463,7 +468,7 @@ router.put('/:id', authenticateToken, checkPermission('target.update'), async (r
     if (req.body.autoSync !== undefined) target.autoSync = req.body.autoSync;
     if (req.body.description !== undefined) target.description = req.body.description;
 
-    await recalculateTargetProgress(target);
+    await recalculateTargetProgress(target, undefined, true);
     await target.save();
 
     await logActivity({
@@ -492,7 +497,7 @@ router.patch('/:id/active', authenticateToken, checkPermission('target.update'),
     // Set all targets to isActive: false, then set this one to true
     await Target.updateMany({}, { isActive: false });
     target.isActive = true;
-    await recalculateTargetProgress(target);
+    await recalculateTargetProgress(target, undefined, true);
     await target.save();
 
     await logActivity({
