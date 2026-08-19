@@ -27,15 +27,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
 
   const fetchDashboardStats = async () => {
     try {
-      const [dashRes, perfRes] = await Promise.all([
-        api.get('/dashboard/stats'),
-        api.get('/performance'),
-      ]);
+      const isEmp = user?.role === 'Employee';
+      
+      // Fetch stats first
+      const dashRes = await api.get('/dashboard/stats');
       if (dashRes.success) {
         setData(dashRes.data);
         setLocalTasks(dashRes.data?.todaysTasks || []);
       }
-      if (perfRes.success) setPerfData(perfRes.data || []);
+
+      // Fetch company performance leaderboard ONLY for Manager / Admin roles
+      if (!isEmp) {
+        const perfRes = await api.get('/performance');
+        if (perfRes.success) setPerfData(perfRes.data || []);
+      }
     } catch (err) {
       console.error('Failed to fetch dashboard stats', err);
     } finally {
@@ -96,7 +101,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-100/80 text-purple-800 text-xs font-black mb-2 border border-purple-200">
             <Sparkles size={14} className="text-purple-600" />
-            <span>{isEmployee ? 'Employee Operations Portal' : 'Executive Overview'}</span>
+            <span>{isEmployee ? 'Member Operations Portal' : 'Executive Overview'}</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
             Welcome back, {user?.name || 'Vikram Sethi'}! 👋
@@ -512,10 +517,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
             <div>
               <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
                 <Trophy size={20} className="text-amber-500 fill-amber-400" />
-                Team Performance & Employee Productivity
+                Team Performance & Member Productivity
               </h3>
               <p className="text-xs text-slate-500 font-semibold mt-0.5">
-                Real-time operational task completion, verification rates, and employee performance rankings.
+                Real-time operational task completion, verification rates, and member performance rankings.
               </p>
             </div>
             <button
@@ -532,7 +537,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
               <thead className="bg-slate-50 text-[11px] uppercase font-black text-slate-500 border-b border-slate-200">
                 <tr>
                   <th className="px-4 py-3">Rank</th>
-                  <th className="px-4 py-3">Employee</th>
+                  <th className="px-4 py-3">Member</th>
                   <th className="px-4 py-3">Designation</th>
                   <th className="px-4 py-3">Assigned Brands</th>
                   <th className="px-4 py-3">Completed Tasks</th>

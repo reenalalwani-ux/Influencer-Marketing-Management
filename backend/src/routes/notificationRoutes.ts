@@ -9,11 +9,13 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
   if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
   try {
-    const notifications = await Notification.find({ userId: req.user._id })
-      .sort({ createdAt: -1 })
-      .limit(30);
-
-    const unreadCount = await Notification.countDocuments({ userId: req.user._id, read: false });
+    const [notifications, unreadCount] = await Promise.all([
+      Notification.find({ userId: req.user._id })
+        .sort({ createdAt: -1 })
+        .limit(30)
+        .lean(),
+      Notification.countDocuments({ userId: req.user._id, read: false })
+    ]);
 
     return res.status(200).json({ 
       success: true, 

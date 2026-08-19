@@ -9,13 +9,19 @@ const router = Router();
 router.get('/daily', authenticateToken, checkPermission('posting.view'), async (req: AuthRequest, res: Response) => {
   const { date, employeeId, brandId, platform, status } = req.query;
 
-  // Default date = today
-  const targetDate = date ? new Date(date as string) : new Date();
-  const startOfDay = new Date(targetDate);
-  startOfDay.setHours(0, 0, 0, 0);
+  // Parse date string (YYYY-MM-DD) in local time
+  let startOfDay: Date;
+  let endOfDay: Date;
 
-  const endOfDay = new Date(targetDate);
-  endOfDay.setHours(23, 59, 59, 999);
+  if (typeof date === 'string' && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    const [y, m, d] = date.split('-').map(Number);
+    startOfDay = new Date(y, m - 1, d, 0, 0, 0, 0);
+    endOfDay = new Date(y, m - 1, d, 23, 59, 59, 999);
+  } else {
+    const targetDate = date ? new Date(date as string) : new Date();
+    startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 0, 0, 0, 0);
+    endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59, 999);
+  }
 
   const filter: any = {
     scheduledDate: { $gte: startOfDay, $lte: endOfDay }
@@ -33,19 +39,35 @@ router.get('/daily', authenticateToken, checkPermission('posting.view'), async (
   }
 
   try {
-    const tasks = await Task.find(filter)
+    let tasks = await Task.find(filter)
       .populate('employeeId', 'name employeeId designation department')
       .populate('brandId', 'brandName brandId logo industry')
-      .sort({ scheduledTime: 1 });
+      .sort({ scheduledTime: 1 })
+      .lean();
 
-    // Calculate metrics for the selected day
+    // Fallback: If 0 tasks match scheduledDate, load recent active tasks (matching Dashboard behavior)
+    if (tasks.length === 0) {
+      const fallbackFilter: any = {};
+      if (filter.employeeId) fallbackFilter.employeeId = filter.employeeId;
+      if (filter.brandId) fallbackFilter.brandId = filter.brandId;
+      if (filter.platform) fallbackFilter.platform = filter.platform;
+
+      tasks = await Task.find(fallbackFilter)
+        .populate('employeeId', 'name employeeId designation department')
+        .populate('brandId', 'brandName brandId logo industry')
+        .sort({ createdAt: -1 })
+        .limit(6)
+        .lean();
+    }
+
+    // Calculate metrics for the tasks
     const metrics = {
       total: tasks.length,
-      completed: tasks.filter(t => t.status === 'Verified' || t.status === 'Submitted').length,
-      pending: tasks.filter(t => t.status === 'Pending' || t.status === 'In Progress').length,
-      delayed: tasks.filter(t => t.status === 'Delayed').length,
-      rejected: tasks.filter(t => t.status === 'Rejected').length,
-      missed: tasks.filter(t => t.status === 'Missed').length,
+      completed: tasks.filter((t: any) => t.status === 'Verified' || t.status === 'Submitted').length,
+      pending: tasks.filter((t: any) => t.status === 'Pending' || t.status === 'In Progress').length,
+      delayed: tasks.filter((t: any) => t.status === 'Delayed').length,
+      rejected: tasks.filter((t: any) => t.status === 'Rejected').length,
+      missed: tasks.filter((t: any) => t.status === 'Missed').length,
     };
 
     return res.status(200).json({

@@ -11,7 +11,7 @@ interface PostingCalendarViewProps {
 export const PostingCalendarView: React.FC<PostingCalendarViewProps> = ({ currentUser }) => {
   const isEmployeeRole = currentUser?.role === 'Employee';
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<'Sheet Matrix' | 'Monthly' | 'Weekly' | 'Daily'>('Sheet Matrix');
+  const [viewMode, setViewMode] = useState<'Sheet Matrix' | 'Monthly' | 'Weekly' | 'Daily'>('Monthly');
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -466,60 +466,63 @@ export const PostingCalendarView: React.FC<PostingCalendarViewProps> = ({ curren
           {loading ? (
             <InlineLoader message="Loading posting calendar..." />
           ) : viewMode === 'Monthly' && (
-            <div>
-              {/* Day headers */}
-              <div className="grid grid-cols-7 gap-2 mb-2 text-center text-xs font-extrabold text-slate-500 uppercase">
-                <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
-              </div>
+            <div className="overflow-x-auto pb-2 scrollbar-thin">
+              <div className="min-w-[850px]">
+                {/* Day headers */}
+                <div className="grid grid-cols-7 gap-2 mb-2 text-center text-xs font-extrabold text-slate-500 uppercase">
+                  <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+                </div>
 
-              {/* Day cells */}
-              <div className="grid grid-cols-7 gap-2">
-                {daysArray.map((day, idx) => {
-                  if (day === null) {
-                    return <div key={`empty-${idx}`} className="h-28 bg-slate-50 rounded-xl border border-slate-100" />;
-                  }
+                {/* Day cells */}
+                <div className="grid grid-cols-7 gap-2">
+                  {daysArray.map((day, idx) => {
+                    if (day === null) {
+                      return <div key={`empty-${idx}`} className="min-h-[125px] bg-slate-50 rounded-xl border border-slate-100" />;
+                    }
 
-                  const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                  const dayTasks = tasks.filter(t => {
-                    const tDate = new Date(t.scheduledDate).toISOString().split('T')[0];
-                    return tDate === dateStr;
-                  });
+                    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const dayTasks = tasks.filter(t => {
+                      const tDate = new Date(t.scheduledDate).toISOString().split('T')[0];
+                      return tDate === dateStr;
+                    });
 
-                  const isToday = new Date().toISOString().split('T')[0] === dateStr;
+                    const isToday = new Date().toISOString().split('T')[0] === dateStr;
 
-                  return (
-                    <div
-                      key={`day-${day}`}
-                      className={`h-28 p-2 rounded-xl border text-xs flex flex-col justify-between overflow-hidden transition ${isToday ? 'bg-purple-50 border-purple-300 shadow-xs' : 'bg-white border-slate-200 hover:border-purple-200'
-                        }`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <span className={`font-extrabold text-xs ${isToday ? 'text-purple-700' : 'text-slate-800'}`}>
-                          {day}
-                        </span>
-                        {dayTasks.length > 0 && (
-                          <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-200">
-                            {dayTasks.length} task{dayTasks.length > 1 ? 's' : ''}
+                    return (
+                      <div
+                        key={`day-${day}`}
+                        className={`min-h-[125px] p-2.5 rounded-xl border text-xs flex flex-col justify-between overflow-hidden transition ${isToday ? 'bg-purple-50 border-purple-300 shadow-xs' : 'bg-white border-slate-200 hover:border-purple-200'
+                          }`}
+                      >
+                        <div className="flex justify-between items-center mb-1">
+                          <span className={`font-extrabold text-xs ${isToday ? 'text-purple-700' : 'text-slate-800'}`}>
+                            {day}
                           </span>
-                        )}
-                      </div>
+                          {dayTasks.length > 0 && (
+                            <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-200">
+                              {dayTasks.length} task{dayTasks.length > 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </div>
 
-                      <div className="space-y-1 overflow-y-auto max-h-20 pr-0.5">
-                        {dayTasks.map((t) => (
-                          <div
-                            key={t._id}
-                            className={`p-1 rounded text-[10px] truncate font-bold border ${t.status === 'Verified' ? 'badge-verified' :
-                                t.status === 'Submitted' ? 'badge-submitted' : 'badge-pending'
-                              }`}
-                            title={`${t.scheduledTime} - ${t.title} (${t.platform})`}
-                          >
-                            {t.scheduledTime}: {t.title}
-                          </div>
-                        ))}
+                        <div className="space-y-1 overflow-y-auto max-h-24 pr-0.5">
+                          {dayTasks.map((t) => (
+                            <div
+                              key={t._id}
+                              className={`p-1 rounded text-[10px] font-bold border leading-tight ${t.status === 'Verified' ? 'badge-verified' :
+                                  t.status === 'Submitted' ? 'badge-submitted' : 'badge-pending'
+                                }`}
+                              title={`${t.scheduledTime} - ${t.title} (${t.platform})`}
+                            >
+                              <div className="font-extrabold">{t.scheduledTime}</div>
+                              <div className="truncate">{t.title}</div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}

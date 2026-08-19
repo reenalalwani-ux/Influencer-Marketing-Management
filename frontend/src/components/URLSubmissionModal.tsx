@@ -11,9 +11,16 @@ interface URLSubmissionModalProps {
 }
 
 export const URLSubmissionModal: React.FC<URLSubmissionModalProps> = ({ task, onClose, onSuccess }) => {
-  const [publishedUrl, setPublishedUrl] = useState('');
+  const [publishedUrl, setPublishedUrl] = useState(task?.publishedUrl || '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  React.useEffect(() => {
+    if (task) {
+      setPublishedUrl(task.publishedUrl || '');
+      setError('');
+    }
+  }, [task]);
 
   if (!task) return null;
 

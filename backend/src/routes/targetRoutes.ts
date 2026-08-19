@@ -120,7 +120,7 @@ export const recalculateTargetProgress = async (target: any, customDateFilter?: 
         category: 'Paid',
         status: { $in: ['Completed', 'Approved', 'Settled', 'completed', 'approved', 'settled'] },
         ...filter
-      });
+      }).select('ad2shipMargin brandOnboardingAmt inAmount influencerOnboardingAmt outAmount').lean();
       const totalMargin = paidRecords.reduce((acc, curr) => {
         const m = curr.ad2shipMargin || ((curr.brandOnboardingAmt || curr.inAmount || 0) - (curr.influencerOnboardingAmt || curr.outAmount || 0));
         return acc + m;

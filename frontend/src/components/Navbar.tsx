@@ -42,7 +42,7 @@ export const Navbar: React.FC<NavbarProps> = ({ user, onLogout, activeView, setA
   useEffect(() => {
     if (user) {
       fetchNotifications();
-      const interval = setInterval(fetchNotifications, 15000);
+      const interval = setInterval(fetchNotifications, 30000);
       return () => clearInterval(interval);
     }
   }, [user]);
@@ -197,7 +197,7 @@ export const Navbar: React.FC<NavbarProps> = ({ user, onLogout, activeView, setA
                   </div>
                   <div className="flex items-center gap-1 mt-1">
                     <Shield size={10} className="text-purple-600" />
-                    <span className="text-[11px] text-purple-700 font-black">{user.role}</span>
+                    <span className="text-[11px] text-purple-700 font-black">{user.role === 'Employee' ? 'Member' : user.role}</span>
                   </div>
                 </div>
               </div>

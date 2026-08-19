@@ -14,47 +14,48 @@ router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response) 
   const endOfDay = new Date(today.setHours(23, 59, 59, 999));
 
   try {
-    // Fetch Active Target
-    let activeTarget = await Target.findOne({ isActive: true, status: 'Active' }).sort({ updatedAt: -1 });
-    if (!activeTarget) {
-      activeTarget = await Target.findOne({ status: 'Active' }).sort({ createdAt: -1 });
-    }
-
     if (role === 'Employee') {
-      // Find employee document
       const emp = await Employee.findOne({ email: req.user.email });
       if (!emp) {
         return res.status(404).json({ success: false, message: 'No record exists for employee profile' });
       }
 
-      // My Brands
-      const myBrands = await EmployeeBrand.find({ employeeId: emp._id, status: 'Active' })
-        .populate('brandId', 'brandName brandId logo industry');
+      const nextWeek = new Date();
+      nextWeek.setDate(nextWeek.getDate() + 7);
 
-      // Today's Tasks
-      let todaysTasks = await Task.find({
-        employeeId: emp._id,
-        scheduledDate: { $gte: startOfDay, $lte: endOfDay }
-      }).populate('brandId', 'brandName logo').sort({ scheduledTime: 1 });
+      // Run all queries concurrently for ultra-fast response
+      const [myBrands, todaysTasksInitial, upcomingTasks, activeTargetFound] = await Promise.all([
+        EmployeeBrand.find({ employeeId: emp._id, status: 'Active' })
+          .populate('brandId', 'brandName brandId logo industry')
+          .lean(),
+        Task.find({
+          employeeId: emp._id,
+          scheduledDate: { $gte: startOfDay, $lte: endOfDay }
+        }).populate('brandId', 'brandName logo').sort({ scheduledTime: 1 }).lean(),
+        Task.find({
+          employeeId: emp._id,
+          scheduledDate: { $gt: endOfDay, $lte: nextWeek }
+        }).populate('brandId', 'brandName logo').limit(10).sort({ scheduledDate: 1 }).lean(),
+        Target.findOne({ isActive: true, status: 'Active' }).sort({ updatedAt: -1 }).lean()
+      ]);
 
+      let activeTarget = activeTargetFound;
+      if (!activeTarget) {
+        activeTarget = await Target.findOne({ status: 'Active' }).sort({ createdAt: -1 }).lean();
+      }
+
+      let todaysTasks = todaysTasksInitial;
       if (todaysTasks.length === 0) {
         todaysTasks = await Task.find({ employeeId: emp._id })
           .populate('brandId', 'brandName logo')
           .sort({ createdAt: -1 })
-          .limit(6);
+          .limit(6)
+          .lean();
       }
 
-      const completedCount = todaysTasks.filter(t => t.status === 'Verified' || t.status === 'Submitted').length;
-      const pendingCount = todaysTasks.filter(t => t.status === 'Pending' || t.status === 'In Progress').length;
-      const delayedCount = todaysTasks.filter(t => t.status === 'Delayed').length;
-
-      // Upcoming Tasks (next 7 days)
-      const nextWeek = new Date();
-      nextWeek.setDate(nextWeek.getDate() + 7);
-      const upcomingTasks = await Task.find({
-        employeeId: emp._id,
-        scheduledDate: { $gt: endOfDay, $lte: nextWeek }
-      }).populate('brandId', 'brandName logo').limit(10).sort({ scheduledDate: 1 });
+      const completedCount = todaysTasks.filter((t: any) => t.status === 'Verified' || t.status === 'Submitted').length;
+      const pendingCount = todaysTasks.filter((t: any) => t.status === 'Pending' || t.status === 'In Progress').length;
+      const delayedCount = todaysTasks.filter((t: any) => t.status === 'Delayed').length;
 
       return res.status(200).json({
         success: true,
@@ -75,34 +76,38 @@ router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response) 
       });
     }
 
-    // Manager / Super Admin / Admin Dashboard
-    const totalEmployees = await Employee.countDocuments({ status: 'Active' });
-    const totalBrands = await Brand.countDocuments({ status: 'Active' });
+    // Manager / Super Admin / Admin Dashboard — Parallel Queries
+    const [totalEmployees, totalBrands, todaysTasksInitial, upcomingPostings, recentAuditLogs, activeTargetFound] = await Promise.all([
+      Employee.countDocuments({ status: 'Active' }),
+      Brand.countDocuments({ status: 'Active' }),
+      Task.find({
+        scheduledDate: { $gte: startOfDay, $lte: endOfDay }
+      }).populate('employeeId', 'name designation').populate('brandId', 'brandName logo').lean(),
+      Task.find({
+        scheduledDate: { $gt: endOfDay }
+      }).populate('employeeId', 'name').populate('brandId', 'brandName logo').sort({ scheduledDate: 1 }).limit(5).lean(),
+      AuditLog.find().sort({ timestamp: -1 }).limit(8).lean(),
+      Target.findOne({ isActive: true, status: 'Active' }).sort({ updatedAt: -1 }).lean()
+    ]);
 
-    // Today's System Tasks
-    let todaysTasks = await Task.find({
-      scheduledDate: { $gte: startOfDay, $lte: endOfDay }
-    }).populate('employeeId', 'name designation').populate('brandId', 'brandName logo');
+    let activeTarget = activeTargetFound;
+    if (!activeTarget) {
+      activeTarget = await Target.findOne({ status: 'Active' }).sort({ createdAt: -1 }).lean();
+    }
 
+    let todaysTasks = todaysTasksInitial;
     if (todaysTasks.length === 0) {
       todaysTasks = await Task.find({ status: { $in: ['Pending', 'Submitted', 'Verified'] } })
         .populate('employeeId', 'name designation')
         .populate('brandId', 'brandName logo')
         .sort({ createdAt: -1 })
-        .limit(6);
+        .limit(6)
+        .lean();
     }
 
     const completed = todaysTasks.filter(t => t.status === 'Verified' || t.status === 'Submitted').length;
     const pending = todaysTasks.filter(t => t.status === 'Pending' || t.status === 'In Progress').length;
     const delayed = todaysTasks.filter(t => t.status === 'Delayed').length;
-
-    // Upcoming Postings (next 5)
-    const upcomingPostings = await Task.find({
-      scheduledDate: { $gt: endOfDay }
-    }).populate('employeeId', 'name').populate('brandId', 'brandName logo').sort({ scheduledDate: 1 }).limit(5);
-
-    // Recent Audit Logs
-    const recentAuditLogs = await AuditLog.find().sort({ timestamp: -1 }).limit(8);
 
     return res.status(200).json({
       success: true,
