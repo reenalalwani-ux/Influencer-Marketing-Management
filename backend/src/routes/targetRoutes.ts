@@ -93,6 +93,7 @@ export const recalculateTargetProgress = async (target: any, customDateFilter?: 
 
     const barterCount = await Influencer.countDocuments({
       category: 'Barter',
+      status: { $in: ['Completed', 'Approved', 'Settled', 'completed', 'approved', 'settled'] },
       ...filter
     });
     target.achievedCount = barterCount;
@@ -109,6 +110,7 @@ export const recalculateTargetProgress = async (target: any, customDateFilter?: 
     // Sum ad2shipMargin from Paid collabs
     const paidRecords = await Influencer.find({
       category: 'Paid',
+      status: { $in: ['Completed', 'Approved', 'Settled', 'completed', 'approved', 'settled'] },
       ...filter
     });
     const totalMargin = paidRecords.reduce((acc, curr) => {
@@ -135,8 +137,8 @@ router.get('/team-breakdown', authenticateToken, checkPermission('target.view'),
 
     const allBrands = await Brand.find();
     const allAssignments = await EmployeeBrand.find({ status: 'Active' });
-    const allPaidCollabs = await Influencer.find({ category: 'Paid', ...dateFilter }).sort({ transactionDate: -1 });
-    const allBarterCollabs = await Influencer.find({ category: 'Barter', ...dateFilter }).sort({ transactionDate: -1 });
+    const allPaidCollabs = await Influencer.find({ category: 'Paid', status: { $in: ['Completed', 'Approved', 'Settled', 'completed', 'approved', 'settled'] }, ...dateFilter }).sort({ transactionDate: -1 });
+    const allBarterCollabs = await Influencer.find({ category: 'Barter', status: { $in: ['Completed', 'Approved', 'Settled', 'completed', 'approved', 'settled'] }, ...dateFilter }).sort({ transactionDate: -1 });
 
     let teamAchievedMargin = 0;
     let teamQualifyingVideosCount = 0;

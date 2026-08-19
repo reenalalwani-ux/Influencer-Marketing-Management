@@ -18,6 +18,7 @@ const triggerTargetSync = async () => {
       if (target.targetType === 'Barter') {
         const count = await Influencer.countDocuments({
           category: 'Barter',
+          status: { $in: ['Completed', 'Approved', 'Settled', 'completed', 'approved', 'settled'] },
           transactionDate: { $gte: startDate, $lte: endDate }
         });
         target.achievedCount = count;
@@ -25,6 +26,7 @@ const triggerTargetSync = async () => {
       } else {
         const paidRecords = await Influencer.find({
           category: 'Paid',
+          status: { $in: ['Completed', 'Approved', 'Settled', 'completed', 'approved', 'settled'] },
           transactionDate: { $gte: startDate, $lte: endDate }
         });
         target.achievedAmount = paidRecords.reduce((acc, curr) => acc + (curr.ad2shipMargin || 0), 0);
@@ -42,6 +44,27 @@ router.get('/', authenticateToken, checkPermission('influencer.view'), async (re
     const { category, timeframe, year, month, search } = req.query;
     const filter: any = {};
 
+
+    // 0. Employee Role Scoping (Only show data for assigned brands or managed deals)
+    if (req.user?.role === 'Employee') {
+      const employeeDoc = await Employee.findOne({ email: req.user.email });
+      if (employeeDoc) {
+        const assignments = await EmployeeBrand.find({ employeeId: employeeDoc._id, status: 'Active' });
+        const assignedBrandIds = assignments.map(a => a.brandId);
+        const assignedBrandDocs = await Brand.find({ _id: { $in: assignedBrandIds } });
+        const assignedBrandNames = assignedBrandDocs.map(b => b.brandName);
+        const empNameRegex = new RegExp(employeeDoc.name, 'i');
+
+        filter.$and = filter.$and || [];
+        filter.$and.push({
+          $or: [
+            { brandId: { $in: assignedBrandIds } },
+            { brandName: { $in: assignedBrandNames } },
+            { influencerManager: empNameRegex }
+          ]
+        });
+      }
+    }
 
     // 1. Sub-module Category Filter (Paid vs Barter)
     if (category && category !== 'All') {
@@ -360,6 +383,25 @@ router.get('/payment-logs', authenticateToken, checkPermission('influencer.view'
 
     if (type && type !== 'All') {
       filter.type = type;
+    }
+
+    if (req.user?.role === 'Employee') {
+      const employeeDoc = await Employee.findOne({ email: req.user.email });
+      if (employeeDoc) {
+        const assignments = await EmployeeBrand.find({ employeeId: employeeDoc._id, status: 'Active' });
+        const assignedBrandIds = assignments.map(a => a.brandId);
+        const assignedBrandDocs = await Brand.find({ _id: { $in: assignedBrandIds } });
+        const assignedBrandNames = assignedBrandDocs.map(b => b.brandName);
+        const empNameRegex = new RegExp(employeeDoc.name, 'i');
+
+        filter.$and = filter.$and || [];
+        filter.$and.push({
+          $or: [
+            { brandName: { $in: assignedBrandNames } },
+            { handledBy: empNameRegex }
+          ]
+        });
+      }
     }
 
     const now = new Date();

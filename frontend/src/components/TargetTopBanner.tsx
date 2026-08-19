@@ -86,11 +86,17 @@ export const TargetTopBanner: React.FC<TargetTopBannerProps> = ({ user, onNaviga
                     ? 'bg-blue-500/30 text-blue-300 border-blue-400/50'
                     : 'bg-amber-500/30 text-amber-300 border-amber-400/50'
               }`}>
-                {target.achievedAmount >= 720000 || percentage >= 100 ? '🏆 10% Slab Unlocked' : target.achievedAmount >= 480000 || percentage >= 67 ? '🥈 5% Slab Unlocked' : '⚡ 0% (<₹80k/exec)'}
+                {isManagerOrAdmin 
+                  ? (target.achievedAmount >= 720000 || percentage >= 100 ? '🏆 10% Slab Unlocked' : target.achievedAmount >= 480000 || percentage >= 67 ? '🥈 5% Slab Unlocked' : '⚡ 0% (<₹80k/exec)')
+                  : (percentage >= 100 ? '🏆 10% Slab Unlocked' : percentage >= 67 ? '🥈 5% Slab Unlocked' : '⚡ 0% Slab')}
               </span>
             </div>
             <p className="text-[11px] text-slate-300 font-medium">
-              Net Margin Target: <span className="font-bold text-emerald-400">{target.currency}{formattedTarget}</span> | Achieved: <span className="font-bold text-purple-300">{target.currency}{formattedAchieved}</span> ({percentage}%)
+              {isManagerOrAdmin ? (
+                <>Net Margin Target: <span className="font-bold text-emerald-400">{target.currency}{formattedTarget}</span> | Achieved: <span className="font-bold text-purple-300">{target.currency}{formattedAchieved}</span> ({percentage}%)</>
+              ) : (
+                <>Monthly Target Quota | Performance: <span className="font-bold text-purple-300">{percentage}% Quota Met</span></>
+              )}
             </p>
           </div>
         </div>
@@ -102,7 +108,7 @@ export const TargetTopBanner: React.FC<TargetTopBannerProps> = ({ user, onNaviga
               <TrendingUp size={12} /> {percentage}% Completed
             </span>
             <span className="text-slate-400">
-              {remaining === 0 ? '🎯 Target Reached!' : `${target.currency}${formattedRemaining} Remaining`}
+              {remaining === 0 ? '🎯 Target Reached!' : isManagerOrAdmin ? `${target.currency}${formattedRemaining} Remaining` : `${100 - percentage}% Quota Remaining`}
             </span>
           </div>
           <div className="w-full bg-slate-800/80 rounded-full h-2.5 overflow-hidden border border-slate-700 p-0.5">

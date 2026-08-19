@@ -15,6 +15,7 @@ import { MonthDatePicker } from '../components/MonthDatePicker';
 
 interface InfluencerManagementViewProps {
   userRole?: string;
+  currentUser?: any;
   initialTab?: 'targets' | 'paid' | 'barter' | 'payments' | 'all';
   onTargetUpdated?: () => void;
 }
@@ -82,6 +83,7 @@ const ApprovalPillDropdown: React.FC<{
 
 export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> = ({
   userRole,
+  currentUser,
   initialTab = 'paid',
   onTargetUpdated
 }) => {
@@ -167,6 +169,26 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
   };
 
   const isManagerOrAdmin = userRole === 'Super Admin' || userRole === 'Admin' || userRole === 'Marketing Manager' || userRole === 'Team Leader';
+  const isEmployee = userRole === 'Employee';
+
+  const myMember = (teamBreakdown?.members || []).find(m => {
+    if (!currentUser) return false;
+    const cId = currentUser.id || currentUser._id;
+    const cEmpId = currentUser.employeeId;
+    const cEmail = currentUser.email?.toLowerCase();
+    const cName = currentUser.name?.toLowerCase();
+
+    return (
+      (m.employee.id && cId && m.employee.id.toString() === cId.toString()) ||
+      (m.employee.employeeId && cEmpId && m.employee.employeeId === cEmpId) ||
+      (m.employee.email && cEmail && m.employee.email.toLowerCase() === cEmail) ||
+      (m.employee.name && cName && m.employee.name.toLowerCase() === cName)
+    );
+  }) || (teamBreakdown?.members || [])[0];
+
+  const displayedMembers = isEmployee
+    ? (myMember ? [myMember] : (teamBreakdown?.members || []).slice(0, 1))
+    : (teamBreakdown?.members || []);
 
   // Modal State — Influencer Record
   const [showModal, setShowModal] = useState(false);
@@ -677,9 +699,16 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     return 0;
   });
 
-  // Calculate Metrics from Current View
-  const paidCollabs = influencers.filter(i => i.category === 'Paid');
-  const barterCollabs = influencers.filter(i => i.category === 'Barter');
+  // Helper to check if status is achieved (Completed, Approved, Settled)
+  const isAchievedStatus = (s?: string) => {
+    if (!s) return false;
+    const st = s.toLowerCase();
+    return st === 'completed' || st === 'approved' || st === 'settled';
+  };
+
+  // Calculate Metrics from Current View (Only count completed/approved/settled records toward achieved)
+  const paidCollabs = influencers.filter(i => i.category === 'Paid' && isAchievedStatus(i.status));
+  const barterCollabs = influencers.filter(i => i.category === 'Barter' && isAchievedStatus(i.status));
 
   const totalBrandBilling = paidCollabs.reduce((acc, curr) => acc + (curr.brandOnboardingAmt || curr.inAmount || 0), 0);
   const totalInfluencerCost = paidCollabs.reduce((acc, curr) => acc + (curr.influencerOnboardingAmt || curr.outAmount || 0), 0);
@@ -701,8 +730,14 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
   const paidGoal = activePaidTarget ? activePaidTarget.targetAmount : (teamBreakdown?.teamTargetAmount || 720000);
   const paidPct = paidGoal > 0 ? Math.min(100, Math.round((paidAchieved / paidGoal) * 100)) : 0;
 
-  const barterAchieved = activeBarterTarget ? (activeBarterTarget.achievedCount || activeBarterTarget.achievedAmount || 0) : (teamBreakdown?.teamAchievedBarterCount || barterCollabs.length);
-  const barterGoal = (activeBarterTarget && activeBarterTarget.targetAmount) ? (activeBarterTarget.targetCount || activeBarterTarget.targetAmount) : (teamBreakdown?.teamBarterTarget || 0);
+  const barterAchieved = isEmployee
+    ? (myMember?.barterCount !== undefined ? myMember.barterCount : barterCollabs.length)
+    : (activeBarterTarget ? (activeBarterTarget.achievedCount || activeBarterTarget.achievedAmount || 0) : (teamBreakdown?.teamAchievedBarterCount || barterCollabs.length));
+
+  const barterGoal = isEmployee
+    ? (myMember?.individualBarterTarget || (activeBarterTarget ? (activeBarterTarget.targetCount || activeBarterTarget.targetAmount) : 0))
+    : ((activeBarterTarget && activeBarterTarget.targetAmount) ? (activeBarterTarget.targetCount || activeBarterTarget.targetAmount) : (teamBreakdown?.teamBarterTarget || 0));
+
   const barterPct = barterGoal > 0 ? Math.min(100, Math.round((barterAchieved / barterGoal) * 100)) : 0;
 
   // Pagination
@@ -875,52 +910,98 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
       {/* VIEW 1: TARGETS & REVENUE GOALS */}
       {viewMode === 'Targets & Goals' && (
         <div className="space-y-6">
-          {/* Top Restructured Auto-Fill Summary Banner (Light Theme) */}
-          <div className="p-6 bg-gradient-to-r from-purple-50/90 via-indigo-50/80 to-emerald-50/90 text-slate-900 rounded-3xl border border-purple-200/90 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
-                  ⚡ Auto-Filled from Active Team Size
-                </span>
-                <span className="text-xs text-purple-700 font-extrabold">
-                  {teamBreakdown?.teamSize || 6} Active Influencer Marketing Executives
-                </span>
-              </div>
-              <h3 className="text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2.5">
-                <Target className="text-purple-600" size={24} />
-                Team Monthly Margin Target: <span className="text-emerald-700">₹{new Intl.NumberFormat().format(teamBreakdown?.teamTargetAmount || 720000)}</span>
-              </h3>
-              <p className="text-xs text-slate-600 font-medium">
-                Auto-calculated quota: <strong className="text-slate-900 font-black">₹1,20,000 Net Margin per member</strong> × {teamBreakdown?.teamSize || 6} executives.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-4 self-stretch md:self-auto justify-between md:justify-end bg-white/80 backdrop-blur-xs p-3.5 rounded-2xl border border-purple-100 shadow-2xs">
-              <div className="text-right">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">Team Achieved Margin</span>
-                <span className="text-2xl font-black text-emerald-600">
-                  ₹{new Intl.NumberFormat().format(teamBreakdown?.teamAchievedMargin || 0)}
-                </span>
-                <span className="text-[11px] font-extrabold text-purple-700 block">
-                  {teamBreakdown?.teamCompletionPercent || 0}% Team Quota Met
-                </span>
+          {/* Top Overview Banner (Personal for Employee, Team for Admin/Manager) */}
+          {isEmployee ? (
+            <div className="p-6 bg-gradient-to-r from-purple-50/90 via-indigo-50/80 to-emerald-50/90 text-slate-900 rounded-3xl border border-purple-200/90 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                    ⚡ Personal Quota & Performance Overview
+                  </span>
+                  <span className="text-xs text-purple-700 font-extrabold">
+                    {currentUser?.name || myMember?.employee?.name || 'Executive'} ({myMember?.employee?.employeeId || 'EMP'}) • {myMember?.employee?.assignedBrandsCount || 0} Assigned Brands
+                  </span>
+                </div>
+                <h3 className="text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2.5">
+                  <Target className="text-purple-600" size={24} />
+                  My Monthly Quota Target: <span className="text-emerald-700">₹1,20,000 Net Margin</span>
+                </h3>
+                <p className="text-xs text-slate-600 font-medium">
+                  Individual monthly target quota. Achieving ₹80k+ unlocks 5% incentive, ₹1L+ unlocks 10% incentive.
+                </p>
               </div>
 
-              <div className="h-10 w-px bg-slate-200 hidden sm:block" />
+              <div className="flex items-center gap-4 self-stretch md:self-auto justify-between md:justify-end bg-white/80 backdrop-blur-xs p-3.5 rounded-2xl border border-purple-100 shadow-2xs">
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block">My Quota Performance</span>
+                  <span className="text-2xl font-black text-emerald-600">
+                    {myMember?.targetAchievedPercent || 0}% Met
+                  </span>
+                  <span className="text-[11px] font-extrabold text-purple-700 block">
+                    {myMember?.targetAchievedPercent || 0}% Quota Achieved
+                  </span>
+                </div>
 
-              <span className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase border shadow-2xs ${
-                (teamBreakdown?.teamAchievedMargin || 0) >= (teamBreakdown?.teamTargetAmount || 720000)
-                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                  : (teamBreakdown?.teamAchievedMargin || 0) >= ((teamBreakdown?.teamSize || 6) * 80000)
-                    ? 'bg-blue-100 text-blue-800 border-blue-300'
-                    : 'bg-amber-100 text-amber-800 border-amber-300'
-              }`}>
-                {(teamBreakdown?.teamAchievedMargin || 0) >= (teamBreakdown?.teamTargetAmount || 720000) ? '🏆 10% Slab' : (teamBreakdown?.teamAchievedMargin || 0) >= ((teamBreakdown?.teamSize || 6) * 80000) ? '🥈 5% Slab (80k+)' : '⚡ 0% Slab'}
-              </span>
+                <div className="h-10 w-px bg-slate-200 hidden sm:block" />
+
+                <span className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase border shadow-2xs ${
+                  myMember?.targetTier === '10%'
+                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                    : myMember?.targetTier === '5%'
+                      ? 'bg-blue-100 text-blue-800 border-blue-300'
+                      : 'bg-amber-100 text-amber-800 border-amber-300'
+                }`}>
+                  {myMember?.targetTier === '10%' ? '🏆 10% Slab' : myMember?.targetTier === '5%' ? '🥈 5% Slab (80k+)' : '⚡ 0% Slab'}
+                </span>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="p-6 bg-gradient-to-r from-purple-50/90 via-indigo-50/80 to-emerald-50/90 text-slate-900 rounded-3xl border border-purple-200/90 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                    ⚡ Auto-Filled from Active Team Size
+                  </span>
+                  <span className="text-xs text-purple-700 font-extrabold">
+                    {teamBreakdown?.teamSize || 6} Active Influencer Marketing Executives
+                  </span>
+                </div>
+                <h3 className="text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2.5">
+                  <Target className="text-purple-600" size={24} />
+                  Team Monthly Margin Target: <span className="text-emerald-700">₹{new Intl.NumberFormat().format(teamBreakdown?.teamTargetAmount || 720000)}</span>
+                </h3>
+                <p className="text-xs text-slate-600 font-medium">
+                  Auto-calculated quota: <strong className="text-slate-900 font-black">₹1,20,000 Net Margin per member</strong> × {teamBreakdown?.teamSize || 6} executives.
+                </p>
+              </div>
 
-          {/* 3 Incentive Slabs & Restructuring Rules Visualizer Cards */}
+              <div className="flex items-center gap-4 self-stretch md:self-auto justify-between md:justify-end bg-white/80 backdrop-blur-xs p-3.5 rounded-2xl border border-purple-100 shadow-2xs">
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Team Achieved Margin</span>
+                  <span className="text-2xl font-black text-emerald-600">
+                    ₹{new Intl.NumberFormat().format(teamBreakdown?.teamAchievedMargin || 0)}
+                  </span>
+                  <span className="text-[11px] font-extrabold text-purple-700 block">
+                    {teamBreakdown?.teamCompletionPercent || 0}% Team Quota Met
+                  </span>
+                </div>
+
+                <div className="h-10 w-px bg-slate-200 hidden sm:block" />
+
+                <span className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase border shadow-2xs ${
+                  (teamBreakdown?.teamAchievedMargin || 0) >= (teamBreakdown?.teamTargetAmount || 720000)
+                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                    : (teamBreakdown?.teamAchievedMargin || 0) >= ((teamBreakdown?.teamSize || 6) * 80000)
+                      ? 'bg-blue-100 text-blue-800 border-blue-300'
+                      : 'bg-amber-100 text-amber-800 border-amber-300'
+                }`}>
+                  {(teamBreakdown?.teamAchievedMargin || 0) >= (teamBreakdown?.teamTargetAmount || 720000) ? '🏆 10% Slab' : (teamBreakdown?.teamAchievedMargin || 0) >= ((teamBreakdown?.teamSize || 6) * 80000) ? '🥈 5% Slab (80k+)' : '⚡ 0% Slab'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* 3 Incentive Slabs (Visible to all) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white p-4 rounded-2xl border border-emerald-200 shadow-xs space-y-2 bg-gradient-to-br from-emerald-50/50 to-white">
               <div className="flex items-center justify-between">
@@ -974,26 +1055,30 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
             </div>
           </div>
 
-          {/* Social Media & Influencer Marketing Team Quota Grid */}
+          {/* Quota Breakdown (Personal for Employee, Team for Admin/Manager) */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-6 space-y-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-3 border-b border-slate-100">
               <div>
                 <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
                   <Users size={20} className="text-purple-600" />
-                  Social Media & Influencer Marketing Team Quota Breakdown
+                  {isEmployee ? 'My Monthly Target & Incentive Quota' : 'Social Media & Influencer Marketing Team Quota Breakdown'}
                 </h3>
                 <p className="text-xs text-slate-500 font-semibold mt-0.5">
-                  Auto-filled ₹1,20,000 monthly quota per active executive. Click any card to view detailed brand assignments & deal breakdown.
+                  {isEmployee
+                    ? 'Your auto-calculated monthly ₹1,20,000 quota, barter target, slab progress, and calculated take-home incentive.'
+                    : 'Auto-filled ₹1,20,000 monthly quota per active executive. Click any card to view detailed brand assignments & deal breakdown.'}
                 </p>
               </div>
 
               <div className="text-xs font-bold text-slate-600 bg-purple-50 px-3 py-1.5 rounded-xl border border-purple-100">
-                Total Team Members: <strong className="text-purple-700 font-extrabold">{teamBreakdown?.teamSize || 6} Executives</strong>
+                {isEmployee
+                  ? <>Member ID: <strong className="text-purple-700 font-extrabold">{myMember?.employee?.employeeId || 'Personal Quota'}</strong></>
+                  : <>Total Team Members: <strong className="text-purple-700 font-extrabold">{teamBreakdown?.teamSize || 6} Executives</strong></>}
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {(teamBreakdown?.members || []).map((m) => {
+              {displayedMembers.map((m) => {
                 const isTier1 = m.targetTier === '10%';
                 const isTier2 = m.targetTier === '5%';
 
@@ -1030,8 +1115,14 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                     {/* Progress Bar */}
                     <div className="space-y-1">
                       <div className="flex justify-between text-[11px] font-bold">
-                        <span className="text-slate-600">Net Margin: <strong className="text-slate-900">₹{new Intl.NumberFormat().format(m.netMargin)}</strong></span>
-                        <span className="text-purple-600">{m.targetAchievedPercent}% of ₹1.2L</span>
+                        <span className="text-slate-600">
+                          {isEmployee ? (
+                            <>Quota Progress: <strong className="text-slate-900">{m.targetAchievedPercent}% Met</strong></>
+                          ) : (
+                            <>Net Margin: <strong className="text-slate-900">₹{new Intl.NumberFormat().format(m.netMargin)}</strong></>
+                          )}
+                        </span>
+                        <span className="text-purple-600">{m.targetAchievedPercent}% {isEmployee ? 'of Goal' : 'of ₹1.2L'}</span>
                       </div>
                       <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
                         <div
@@ -1167,7 +1258,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
               )}
             </div>
 
-            {/* Card 2: Barter Target (120 Collabs) */}
+            {/* Card 2: Barter Target (Personalized for Employee, Team for Admin) */}
             <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2.5">
@@ -1176,10 +1267,10 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                   </div>
                   <div>
                     <span className="text-[10px] font-black uppercase text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
-                      Barter Collabs Goal
+                      {isEmployee ? 'Personal Barter Goal' : 'Barter Collabs Goal'}
                     </span>
                     <h3 className="text-sm font-extrabold text-slate-900 mt-0.5">
-                      {activeBarterTarget ? activeBarterTarget.title : 'Monthly Barter Target'}
+                      {isEmployee ? 'My Assigned Brands Barter Goal' : (activeBarterTarget ? activeBarterTarget.title : 'Monthly Barter Target')}
                     </h3>
                   </div>
                 </div>
@@ -1190,13 +1281,13 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
 
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase">Target Collab Volume</p>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase">{isEmployee ? 'My Target Collab Volume' : 'Target Collab Volume'}</p>
                   <p className="text-lg font-black text-slate-900 mt-0.5">
                     {barterGoal} <span className="text-xs font-normal text-slate-400">Collabs</span>
                   </p>
                 </div>
                 <div className="bg-purple-50/50 p-2.5 rounded-xl border border-purple-100">
-                  <p className="text-[10px] font-bold text-purple-700 uppercase">Achieved Barter Deals</p>
+                  <p className="text-[10px] font-bold text-purple-700 uppercase">{isEmployee ? 'My Achieved Deals' : 'Achieved Barter Deals'}</p>
                   <p className="text-lg font-black text-purple-600 mt-0.5">
                     {barterAchieved} <span className="text-xs font-normal text-slate-400">Done</span>
                   </p>
@@ -1299,8 +1390,12 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                   ) : (
                     targets.map((t) => {
                       const isBarter = t.targetType === 'Barter';
-                      const goalVal = isBarter ? (t.targetCount || t.targetAmount) : t.targetAmount;
-                      const achVal = isBarter ? (t.achievedCount || t.achievedAmount || 0) : t.achievedAmount;
+                      const goalVal = isBarter 
+                        ? (isEmployee ? barterGoal : (t.targetCount || t.targetAmount))
+                        : t.targetAmount;
+                      const achVal = isBarter 
+                        ? (isEmployee ? barterAchieved : (t.achievedCount || t.achievedAmount || 0))
+                        : t.achievedAmount;
                       const pct = Math.min(100, Math.round(((achVal || 0) / (goalVal || 1)) * 100));
 
                       return (

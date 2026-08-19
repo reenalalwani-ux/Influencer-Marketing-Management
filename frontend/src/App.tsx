@@ -166,6 +166,7 @@ export const App: React.FC = () => {
           {activeView === 'targets' && (
             <InfluencerManagementView
               userRole={user.role}
+              currentUser={user}
               initialTab="targets"
               onTargetUpdated={() => setTargetRefreshCount(prev => prev + 1)}
             />
@@ -176,6 +177,7 @@ export const App: React.FC = () => {
           {activeView === 'influencers' && (
             <InfluencerManagementView
               userRole={user.role}
+              currentUser={user}
               initialTab="paid"
               onTargetUpdated={() => setTargetRefreshCount(prev => prev + 1)}
             />
