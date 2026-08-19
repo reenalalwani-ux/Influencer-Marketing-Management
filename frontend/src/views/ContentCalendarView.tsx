@@ -970,7 +970,7 @@ export const ContentCalendarView: React.FC<ContentCalendarViewProps> = ({ curren
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-slate-800 font-extrabold uppercase mb-1">Assigned POC (Employee)</label>
+                <label className="block text-slate-800 font-extrabold uppercase mb-1">Assigned POC (Member)</label>
                 <select
                   value={assignedDesignerId}
                   onChange={(e) => {

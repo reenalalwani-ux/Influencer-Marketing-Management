@@ -703,7 +703,7 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
           </div>
 
           <div>
-            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Assign Employee *</label>
+            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Assign Member *</label>
             <select
               required
               value={employeeId}
@@ -712,7 +712,7 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
               className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 focus:outline-none font-bold text-xs disabled:bg-slate-100 disabled:cursor-not-allowed"
             >
               {currentUser?.role?.toLowerCase() !== 'employee' && (
-                <option value="">-- Select Employee --</option>
+                <option value="">-- Select Member --</option>
               )}
               {(currentUser?.role?.toLowerCase() === 'employee'
                 ? employees.filter(emp =>
@@ -859,7 +859,7 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
                   <span className="font-extrabold text-slate-900">{(viewingTask.brandId as any)?.brandName || 'Brand'}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block font-bold uppercase text-[10px]">Assigned Employee</span>
+                  <span className="text-slate-400 block font-bold uppercase text-[10px]">Assigned Member</span>
                   <span className="font-extrabold text-slate-900">{(viewingTask.employeeId as any)?.name || 'Unassigned'}</span>
                 </div>
                 <div>

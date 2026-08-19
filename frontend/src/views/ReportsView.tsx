@@ -99,12 +99,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ userRole, currentUser 
       return Object.keys(reportData[0]);
     }
     if (activeTab === 'employee') {
-      return ['Employee ID', 'Name', 'Department', 'Designation', 'Assigned Brands', 'Total Tasks', 'Completed', 'Pending', 'Delayed', 'Completion Rate'];
+      return ['Member ID', 'Name', 'Department', 'Designation', 'Assigned Brands', 'Total Tasks', 'Completed', 'Pending', 'Delayed', 'Completion Rate'];
     }
     if (activeTab === 'brand') {
-      return ['Brand ID', 'Brand Name', 'Industry', 'Assigned Employees', 'Total Tasks', 'Completed', 'Pending', 'Delayed'];
+      return ['Brand ID', 'Brand Name', 'Industry', 'Assigned Members', 'Total Tasks', 'Completed', 'Pending', 'Delayed'];
     }
-    return ['Task ID', 'Scheduled Date', 'Scheduled Time', 'Employee', 'Brand', 'Platform', 'Content Type', 'Task Title', 'Status', 'Published URL'];
+    return ['Task ID', 'Scheduled Date', 'Scheduled Time', 'Member', 'Brand', 'Platform', 'Content Type', 'Task Title', 'Status', 'Published URL'];
   };
 
   const headers = getHeadersForTab();
@@ -122,7 +122,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ userRole, currentUser 
               <h2 className="text-2xl font-black text-slate-900 tracking-tight">Reports & Export</h2>
               {isEmployeeRole && (
                 <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-black uppercase">
-                  Employee View
+                  Member View
                 </span>
               )}
             </div>
@@ -208,7 +208,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ userRole, currentUser 
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          Employee Summary Report
+          Member Summary Report
         </button>
 
         <button

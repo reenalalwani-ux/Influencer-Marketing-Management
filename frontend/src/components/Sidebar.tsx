@@ -65,7 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
       label: 'Team & Performance',
       icon: Users,
       subItems: [
-        ...(!isEmployee ? [{ id: 'employees', label: 'Employees Directory', icon: Users }] : []),
+        ...(!isEmployee ? [{ id: 'employees', label: 'Members Directory', icon: Users }] : []),
         { id: 'performance', label: 'Performance', icon: BarChart3 },
       ]
     },

@@ -180,7 +180,7 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
   const columns: DataTableColumn<GroupedAssignment>[] = [
     {
       key: 'employee',
-      label: 'Employee',
+      label: 'Member',
       sortable: true,
       render: (_, row) => (
         <div className="flex items-center space-x-2.5">
@@ -340,7 +340,7 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
       >
         <form onSubmit={handleSaveAssignments} className="space-y-4 text-sm font-bold">
           <div>
-            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Select Employee *</label>
+            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Select Member *</label>
             <select
               required
               disabled={!!editingEmployeeId}
@@ -348,7 +348,7 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
               onChange={(e) => setSelectedEmployeeId(e.target.value)}
               className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 focus:outline-none font-bold text-xs disabled:opacity-60"
             >
-              <option value="">-- Select Employee --</option>
+              <option value="">-- Select Member --</option>
               {employees.map((emp) => (
                 <option key={emp._id} value={emp._id}>{emp.name} ({emp.designation})</option>
               ))}

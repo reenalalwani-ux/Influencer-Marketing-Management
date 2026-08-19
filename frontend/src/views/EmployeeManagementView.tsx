@@ -141,7 +141,7 @@ export const EmployeeManagementView: React.FC = () => {
   const columns: DataTableColumn<Employee>[] = [
     {
       key: 'name',
-      label: 'Employee',
+      label: 'Member',
       sortable: true,
       render: (_, row) => (
         <div className="flex items-center gap-2.5">
@@ -245,7 +245,7 @@ export const EmployeeManagementView: React.FC = () => {
             <Users size={22} />
           </div>
           <div>
-            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Employees Directory</h2>
+            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Members Directory</h2>
             <p className="text-xs font-semibold text-slate-500 mt-0.5">Manage internal company staff, designations, and roles.</p>
           </div>
         </div>
@@ -254,7 +254,7 @@ export const EmployeeManagementView: React.FC = () => {
           className="px-4 py-2.5 btn-gradient-primary rounded-xl font-bold text-sm flex items-center space-x-2 self-start sm:self-auto shadow-md cursor-pointer"
         >
           <Plus size={18} />
-          <span>Add Employee</span>
+          <span>Add Member</span>
         </button>
       </div>
 
@@ -273,14 +273,14 @@ export const EmployeeManagementView: React.FC = () => {
 
       {/* Data Table */}
       {loading ? (
-        <InlineLoader message="Loading employee list..." />
+        <InlineLoader message="Loading member list..." />
       ) : (
         <div className="space-y-3">
           <DataTable
             columns={columns}
             data={paginatedEmployees}
             rowKey="_id"
-            emptyMessage="No employees found matching your search."
+            emptyMessage="No members found matching your search."
           />
           <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
             <Pagination
@@ -298,7 +298,7 @@ export const EmployeeManagementView: React.FC = () => {
       <Modal
         isOpen={!!viewingEmployee}
         onClose={() => setViewingEmployee(null)}
-        title="Employee Information Details"
+        title="Member Information Details"
       >
         {viewingEmployee && (
           <div className="space-y-4 text-xs">
@@ -358,7 +358,7 @@ export const EmployeeManagementView: React.FC = () => {
       <Modal
         isOpen={!!editingEmployee}
         onClose={() => setEditingEmployee(null)}
-        title="Edit Employee Account & Profile"
+        title="Edit Member Account & Profile"
       >
         <form onSubmit={handleUpdateEmployee} className="space-y-3.5 text-sm">
           <div>
@@ -470,7 +470,7 @@ export const EmployeeManagementView: React.FC = () => {
       <Modal
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
-        title="Add New Employee"
+        title="Add New Member"
       >
         <form onSubmit={handleCreateEmployee} className="space-y-3.5 text-sm">
           <div>
@@ -573,7 +573,7 @@ export const EmployeeManagementView: React.FC = () => {
                   <span>Creating...</span>
                 </>
               ) : (
-                <span>Create Employee</span>
+                <span>Create Member</span>
               )}
             </button>
           </div>

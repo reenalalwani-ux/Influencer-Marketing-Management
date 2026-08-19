@@ -173,7 +173,7 @@ export const DailyPostingView: React.FC<DailyPostingViewProps> = ({ currentUser,
             onChange={(e) => setSelectedEmployee(e.target.value)}
             className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-slate-800 font-semibold focus:outline-none focus:border-purple-500"
           >
-            <option value="">All Employees</option>
+            <option value="">All Members</option>
             {employees.map((e) => (
               <option key={e._id} value={e._id}>{e.name}</option>
             ))}

@@ -69,7 +69,7 @@ export const EmployeePerformanceView: React.FC = () => {
   const columns: DataTableColumn<EmployeePerformanceData>[] = [
     {
       key: 'employeeName',
-      label: 'Employee',
+      label: 'Member',
       sortable: true,
       render: (_, row) => (
         <div className="flex items-center gap-2.5">

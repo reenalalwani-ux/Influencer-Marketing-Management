@@ -8,13 +8,13 @@ import { InlineLoader } from '../components/PageLoader';
 // Available permission catalog grouped by module
 const PERMISSION_GROUPS: { moduleName: string; icon: string; permissions: { code: string; label: string }[] }[] = [
   {
-    moduleName: 'Employee Management',
+    moduleName: 'Member Management',
     icon: '👥',
     permissions: [
-      { code: 'employee.view', label: 'View Employee Directory & Details' },
-      { code: 'employee.create', label: 'Create New Employee Profiles' },
-      { code: 'employee.update', label: 'Edit Employee Roles & Info' },
-      { code: 'employee.delete', label: 'Deactivate / Delete Employee Accounts' }
+      { code: 'employee.view', label: 'View Member Directory & Details' },
+      { code: 'employee.create', label: 'Create New Member Profiles' },
+      { code: 'employee.update', label: 'Edit Member Roles & Info' },
+      { code: 'employee.delete', label: 'Deactivate / Delete Member Accounts' }
     ]
   },
   {
@@ -25,7 +25,7 @@ const PERMISSION_GROUPS: { moduleName: string; icon: string; permissions: { code
       { code: 'brand.create', label: 'Add New Brands' },
       { code: 'brand.update', label: 'Edit Brand Details & Contacts' },
       { code: 'brand.delete', label: 'Delete Brands' },
-      { code: 'brand.assign', label: 'Assign Employees to Brands' }
+      { code: 'brand.assign', label: 'Assign Members to Brands' }
     ]
   },
   {
@@ -364,7 +364,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ userRole, currentUse
               <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                 <div>
                   <h3 className="text-base font-extrabold text-slate-900">User Role Assignment Matrix</h3>
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">Delegate system access roles (Super Admin, Manager, Team Lead, Employee) to employees</p>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">Delegate system access roles (Super Admin, Manager, Team Lead, Employee) to members</p>
                 </div>
               </div>
 
@@ -372,7 +372,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ userRole, currentUse
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-600 font-extrabold uppercase border-b border-slate-200">
                     <tr>
-                      <th className="px-6 py-3.5">Employee</th>
+                      <th className="px-6 py-3.5">Member</th>
                       <th className="px-6 py-3.5">Department</th>
                       <th className="px-6 py-3.5">Designation</th>
                       <th className="px-6 py-3.5">Current Role</th>
