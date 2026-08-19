@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Settings as SettingsIcon, Shield, Sliders, Plus, Edit2, Users, CheckCircle2, UserCheck, Lock, Sparkles, Check, AlertCircle } from 'lucide-react';
+import { Settings as SettingsIcon, Shield, Sliders, Plus, Edit2, Users, CheckCircle2, UserCheck, Lock, Sparkles, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
 import { SystemRole, Employee } from '../types';
 import { Modal } from '../components/Modal';
@@ -553,9 +553,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ userRole, currentUse
               <button
                 type="submit"
                 disabled={saving}
-                className="px-5 py-2 btn-gradient-primary text-white rounded-xl font-bold transition text-xs shadow-md disabled:opacity-50"
+                className="px-5 py-2 btn-gradient-primary text-white rounded-xl font-bold transition text-xs shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
               >
-                {saving ? 'Saving to DB...' : 'Save Role Permissions'}
+                {saving ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <span>Save Role Permissions</span>
+                )}
               </button>
             </div>
           </form>
@@ -629,9 +636,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ userRole, currentUse
             <button
               type="submit"
               disabled={saving}
-              className="px-5 py-2 btn-gradient-primary text-white rounded-xl font-bold transition text-xs shadow-md disabled:opacity-50"
+              className="px-5 py-2 btn-gradient-primary text-white rounded-xl font-bold transition text-xs shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
             >
-              {saving ? 'Creating Role...' : 'Create Role in DB'}
+              {saving ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Creating Role...</span>
+                </>
+              ) : (
+                <span>Create Role in DB</span>
+              )}
             </button>
           </div>
         </form>

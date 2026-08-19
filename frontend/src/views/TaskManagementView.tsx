@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CheckSquare, Plus, Send, ExternalLink, Calendar, Clock, Filter, Tag, ChevronDown, ChevronRight, Layers, FolderPlus, User as UserIcon, Eye, Edit2, Trash2 } from 'lucide-react';
+import { CheckSquare, Plus, Send, ExternalLink, Calendar, Clock, Filter, Tag, ChevronDown, ChevronRight, Layers, FolderPlus, User as UserIcon, Eye, Edit2, Trash2, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
 import { TaskItem, Employee, Brand, User } from '../types';
 import { Modal } from '../components/Modal';
@@ -24,6 +24,8 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
 
   // Creation & Editing State
   const [showAddModal, setShowAddModal] = useState(false);
+  const [savingTask, setSavingTask] = useState(false);
+  const [verifyingTask, setVerifyingTask] = useState(false);
   const [creationType, setCreationType] = useState<'main' | 'sub'>('sub');
   const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
   const [viewingTask, setViewingTask] = useState<TaskItem | null>(null);
@@ -186,6 +188,7 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
 
   const handleSaveTask = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSavingTask(true);
     try {
       const sched = new Date(scheduledDate);
       const deadline = new Date(sched.getTime() + Number(deadlineHours) * 3600 * 1000);
@@ -223,6 +226,8 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
       }
     } catch (err: any) {
       alert(err.message || 'Failed to save task');
+    } finally {
+      setSavingTask(false);
     }
   };
 
@@ -232,6 +237,7 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
       alert('Please specify a rejection reason.');
       return;
     }
+    setVerifyingTask(true);
     try {
       const res = await api.post(`/verification/${selectedVerifyTask._id}/verify`, {
         decision,
@@ -246,6 +252,8 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
       }
     } catch (err: any) {
       alert(err.message || 'Failed to complete verification');
+    } finally {
+      setVerifyingTask(false);
     }
   };
 
@@ -806,9 +814,17 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
             </button>
             <button
               type="submit"
-              className="px-4 py-2 btn-gradient-primary text-white rounded-xl font-bold transition text-xs shadow-md"
+              disabled={savingTask}
+              className="px-4 py-2 btn-gradient-primary text-white rounded-xl font-bold transition text-xs shadow-md flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {editingTask ? "Update Task" : (creationType === 'main' ? "Create Main Task" : "Create Sub-Task")}
+              {savingTask ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>{editingTask ? "Updating..." : "Creating..."}</span>
+                </>
+              ) : (
+                <span>{editingTask ? "Update Task" : (creationType === 'main' ? "Create Main Task" : "Create Sub-Task")}</span>
+              )}
             </button>
           </div>
         </form>
@@ -935,17 +951,26 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
             <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
+                disabled={verifyingTask}
                 onClick={() => handleVerifyDecision('Rejected')}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-xs transition text-xs"
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-xs transition text-xs flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                ✕ Reject Task
+                {verifyingTask ? <Loader2 size={14} className="animate-spin" /> : <span>✕ Reject Task</span>}
               </button>
               <button
                 type="button"
+                disabled={verifyingTask}
                 onClick={() => handleVerifyDecision('Verified')}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition text-xs"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition text-xs flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                ✓ Approve & Complete Task
+                {verifyingTask ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Verifying...</span>
+                  </>
+                ) : (
+                  <span>✓ Approve & Complete Task</span>
+                )}
               </button>
             </div>
           </div>

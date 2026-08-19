@@ -1,5 +1,5 @@
 import React, { useState, useEffect, FormEvent } from 'react';
-import { UserCheck, Plus, Trash2, Edit2, Briefcase, User as UserIcon, CheckSquare, Square, Search, X, Eye } from 'lucide-react';
+import { UserCheck, Plus, Trash2, Edit2, Briefcase, User as UserIcon, CheckSquare, Square, Search, X, Eye, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
 import { Employee, Brand, EmployeeBrandAssignment, User } from '../types';
 import { Modal } from '../components/Modal';
@@ -30,6 +30,7 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [savingAssignments, setSavingAssignments] = useState(false);
   const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
   const [viewingGroup, setViewingGroup] = useState<GroupedAssignment | null>(null);
 
@@ -126,6 +127,7 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
       return;
     }
 
+    setSavingAssignments(true);
     try {
       const res = await api.post('/employee-brands/sync-employee', {
         employeeId: selectedEmployeeId,
@@ -141,6 +143,8 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
       }
     } catch (err: any) {
       alert(err.message || 'Failed to save brand assignments');
+    } finally {
+      setSavingAssignments(false);
     }
   };
 
@@ -482,9 +486,17 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
             </button>
             <button
               type="submit"
-              className="px-4 py-2 btn-gradient-primary text-white rounded-xl font-bold transition text-xs shadow-md"
+              disabled={savingAssignments}
+              className="px-4 py-2 btn-gradient-primary text-white rounded-xl font-bold transition text-xs shadow-md flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {editingEmployeeId ? "Save Portfolio Changes" : "Create Assignment"}
+              {savingAssignments ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <span>{editingEmployeeId ? "Save Portfolio Changes" : "Create Assignment"}</span>
+              )}
             </button>
           </div>
         </form>

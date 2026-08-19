@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar as CalendarIcon, Sparkles, Plus, Search, Filter, Link2, Video, CheckCircle2, Clock, Trash2, Edit2, ExternalLink, ChevronDown, User, FileSpreadsheet, Eye, Grid, List, Share2, Copy, Check, MessageSquare, Mail, Send } from 'lucide-react';
+import { Calendar as CalendarIcon, Sparkles, Plus, Search, Filter, Link2, Video, CheckCircle2, Clock, Trash2, Edit2, ExternalLink, ChevronDown, User, FileSpreadsheet, Eye, Grid, List, Share2, Copy, Check, MessageSquare, Mail, Send, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
 import { ContentCalendarItem, Brand, Employee } from '../types';
 import { Modal } from '../components/Modal';
@@ -131,6 +131,7 @@ export const ContentCalendarView: React.FC<ContentCalendarViewProps> = ({ curren
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
+  const [submittingPlan, setSubmittingPlan] = useState(false);
   const [editingItem, setEditingItem] = useState<ContentCalendarItem | null>(null);
 
   // Share Modal State
@@ -393,6 +394,7 @@ export const ContentCalendarView: React.FC<ContentCalendarViewProps> = ({ curren
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmittingPlan(true);
     try {
       const bObj = brands.find(b => b._id === selectedBrandId);
       const finalBName = bObj ? bObj.brandName : (brandName || selectedBrandFilter);
@@ -423,10 +425,13 @@ export const ContentCalendarView: React.FC<ContentCalendarViewProps> = ({ curren
 
       if (res.success) {
         setShowModal(false);
+        setEditingItem(null);
         fetchCalendarEntries();
       }
     } catch (err: any) {
       alert(err.message || 'Failed to save entry');
+    } finally {
+      setSubmittingPlan(false);
     }
   };
 
@@ -1019,9 +1024,17 @@ export const ContentCalendarView: React.FC<ContentCalendarViewProps> = ({ curren
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white rounded-xl font-bold transition text-xs shadow-md"
+              disabled={submittingPlan}
+              className="px-5 py-2 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white rounded-xl font-bold transition text-xs shadow-md flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {editingItem ? 'Update Entry' : 'Save Entry'}
+              {submittingPlan ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>{editingItem ? 'Saving...' : 'Creating...'}</span>
+                </>
+              ) : (
+                <span>{editingItem ? 'Update Entry' : 'Save Entry'}</span>
+              )}
             </button>
           </div>
         </form>

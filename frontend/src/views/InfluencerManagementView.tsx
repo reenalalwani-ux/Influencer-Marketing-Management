@@ -4,7 +4,7 @@ import {
   ArrowUpRight, ArrowDownRight, ExternalLink, Video, Link2, ChevronDown, 
   Receipt, Eye, ShoppingBag, ChevronUp, ChevronsUpDown, Target, TrendingUp,
   Award, Clock, AlertCircle, CheckCircle2, ShieldCheck, Layers, RefreshCw, Users,
-  Calendar, ChevronLeft, ChevronRight, CalendarDays
+  Calendar, ChevronLeft, ChevronRight, CalendarDays, Loader2
 } from 'lucide-react';
 import { api } from '../services/api';
 import { InfluencerTransaction, Brand, PaymentLogItem, TargetItem, TeamTargetBreakdown, MemberTargetItem } from '../types';
@@ -225,6 +225,8 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     status: 'Active'
   });
   const [savingTarget, setSavingTarget] = useState(false);
+  const [submittingInfluencer, setSubmittingInfluencer] = useState(false);
+  const [savingPayLog, setSavingPayLog] = useState(false);
 
   // Form Fields (Influencer Record)
   const [influencerManager, setInfluencerManager] = useState('');
@@ -543,6 +545,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
 
   const handleSubmitInfluencer = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmittingInfluencer(true);
     try {
       const brandObj = brands.find(b => b._id === selectedBrandId);
       const bName = brandObj ? brandObj.brandName : (customBrandName || 'Bunaiwala');
@@ -593,6 +596,8 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
       }
     } catch (err: any) {
       alert(err.message || 'Failed to save influencer record');
+    } finally {
+      setSubmittingInfluencer(false);
     }
   };
 
@@ -626,6 +631,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
 
   const handlePaymentLogSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSavingPayLog(true);
     try {
       const res = await api.post('/influencers/payment-logs', {
         influencerName: payLogInfluencerName,
@@ -644,6 +650,8 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
       }
     } catch (err: any) {
       alert(err.message || 'Failed to log payment entry');
+    } finally {
+      setSavingPayLog(false);
     }
   };
 
@@ -2238,9 +2246,17 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
             </button>
             <button
               type="submit"
-              className="px-5 py-2 btn-gradient-primary text-white rounded-xl font-extrabold shadow-md"
+              disabled={submittingInfluencer}
+              className="px-5 py-2 btn-gradient-primary text-white rounded-xl font-extrabold shadow-md flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {editingItem ? 'Save Changes' : 'Create Record'}
+              {submittingInfluencer ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>{editingItem ? 'Saving...' : 'Creating...'}</span>
+                </>
+              ) : (
+                <span>{editingItem ? 'Save Changes' : 'Create Record'}</span>
+              )}
             </button>
           </div>
         </form>
@@ -2407,9 +2423,16 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
             <button
               type="submit"
               disabled={savingTarget}
-              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-bold shadow-md"
+              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-bold shadow-md flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {savingTarget ? 'Saving...' : 'Save Target Goal'}
+              {savingTarget ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <span>Save Target Goal</span>
+              )}
             </button>
           </div>
         </form>
@@ -2534,9 +2557,17 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
             </button>
             <button
               type="submit"
-              className="px-5 py-2 btn-gradient-primary text-white rounded-xl font-black shadow-md"
+              disabled={savingPayLog}
+              className="px-5 py-2 btn-gradient-primary text-white rounded-xl font-black shadow-md flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Save Log Entry
+              {savingPayLog ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Saving Log...</span>
+                </>
+              ) : (
+                <span>Save Log Entry</span>
+              )}
             </button>
           </div>
         </form>

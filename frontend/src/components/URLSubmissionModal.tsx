@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link2, Send, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Link2, Send, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
 import { TaskItem } from '../types';
 import { Modal } from './Modal';
@@ -88,10 +88,19 @@ export const URLSubmissionModal: React.FC<URLSubmissionModalProps> = ({ task, on
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2.5 btn-gradient-primary text-white rounded-xl font-bold text-xs transition shadow-md flex items-center space-x-2 disabled:opacity-50"
+              className="px-5 py-2.5 btn-gradient-primary text-white rounded-xl font-bold text-xs transition shadow-md flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Send size={14} />
-              <span>{submitting ? 'Submitting...' : 'Submit URL'}</span>
+              {submitting ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Submitting...</span>
+                </>
+              ) : (
+                <>
+                  <Send size={14} />
+                  <span>Submit URL</span>
+                </>
+              )}
             </button>
           </div>
         </form>

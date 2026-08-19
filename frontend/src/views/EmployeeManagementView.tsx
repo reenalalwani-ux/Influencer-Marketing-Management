@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Users, Plus, Search, Mail, Eye, Edit2, Trash2, CheckCircle2, Phone, Briefcase, Calendar, Shield } from 'lucide-react';
+import { Users, Plus, Search, Mail, Eye, Edit2, Trash2, CheckCircle2, Phone, Briefcase, Calendar, Shield, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
 import { Employee } from '../types';
 import { Modal } from '../components/Modal';
@@ -16,6 +16,7 @@ export const EmployeeManagementView: React.FC = () => {
 
   // Modal States
   const [showAddModal, setShowAddModal] = useState(false);
+  const [savingEmp, setSavingEmp] = useState(false);
   const [viewingEmployee, setViewingEmployee] = useState<Employee | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
 
@@ -51,6 +52,7 @@ export const EmployeeManagementView: React.FC = () => {
       return;
     }
 
+    setSavingEmp(true);
     try {
       const res = await api.post('/employees', {
         name, email: email.toLowerCase().trim(), phone, department, designation, role, password
@@ -62,6 +64,8 @@ export const EmployeeManagementView: React.FC = () => {
       }
     } catch (err: any) {
       alert(err.message || 'Failed to create employee');
+    } finally {
+      setSavingEmp(false);
     }
   };
 
@@ -80,6 +84,7 @@ export const EmployeeManagementView: React.FC = () => {
     e.preventDefault();
     if (!editingEmployee) return;
 
+    setSavingEmp(true);
     try {
       const res = await api.put(`/employees/${editingEmployee._id}`, {
         name, phone, department, designation, role, status
@@ -90,6 +95,8 @@ export const EmployeeManagementView: React.FC = () => {
       }
     } catch (err: any) {
       alert(err.message || 'Failed to update employee');
+    } finally {
+      setSavingEmp(false);
     }
   };
 
@@ -443,9 +450,17 @@ export const EmployeeManagementView: React.FC = () => {
             </button>
             <button
               type="submit"
-              className="px-5 py-2 btn-gradient-primary text-white rounded-xl font-bold transition text-xs shadow-md cursor-pointer"
+              disabled={savingEmp}
+              className="px-5 py-2 btn-gradient-primary text-white rounded-xl font-bold transition text-xs shadow-md cursor-pointer flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Save Changes
+              {savingEmp ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <span>Save Changes</span>
+              )}
             </button>
           </div>
         </form>
@@ -549,9 +564,17 @@ export const EmployeeManagementView: React.FC = () => {
             </button>
             <button
               type="submit"
-              className="px-5 py-2 btn-gradient-primary text-white rounded-xl font-bold transition text-xs shadow-md cursor-pointer"
+              disabled={savingEmp}
+              className="px-5 py-2 btn-gradient-primary text-white rounded-xl font-bold transition text-xs shadow-md cursor-pointer flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Create Employee
+              {savingEmp ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Creating...</span>
+                </>
+              ) : (
+                <span>Create Employee</span>
+              )}
             </button>
           </div>
         </form>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Briefcase, Plus, Globe, Mail, Phone, ExternalLink, Search, Users, Eye, Edit2, Trash2 } from 'lucide-react';
+import { Briefcase, Plus, Globe, Mail, Phone, ExternalLink, Search, Users, Eye, Edit2, Trash2, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
 import { Brand } from '../types';
 import { Modal } from '../components/Modal';
@@ -13,6 +13,7 @@ export const BrandManagementView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [brandTypeFilter, setBrandTypeFilter] = useState<'All' | 'New' | 'Running'>('All');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [savingBrand, setSavingBrand] = useState(false);
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -86,6 +87,7 @@ export const BrandManagementView: React.FC = () => {
 
   const handleSaveBrand = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSavingBrand(true);
     try {
       const payload = {
         brandName, industry, contactPerson, email, phone, website,
@@ -109,6 +111,8 @@ export const BrandManagementView: React.FC = () => {
       }
     } catch (err: any) {
       alert(err.message || 'Failed to save brand');
+    } finally {
+      setSavingBrand(false);
     }
   };
 
@@ -619,9 +623,17 @@ export const BrandManagementView: React.FC = () => {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 btn-gradient-primary text-white rounded-xl font-bold transition text-xs shadow-md"
+              disabled={savingBrand}
+              className="px-4 py-2 btn-gradient-primary text-white rounded-xl font-bold transition text-xs shadow-md flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {editingBrand ? "Save Changes" : "Create Brand"}
+              {savingBrand ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>{editingBrand ? "Saving..." : "Creating..."}</span>
+                </>
+              ) : (
+                <span>{editingBrand ? "Save Changes" : "Create Brand"}</span>
+              )}
             </button>
           </div>
         </form>
