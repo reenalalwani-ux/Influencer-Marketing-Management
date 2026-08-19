@@ -207,14 +207,14 @@ router.post('/', authenticateToken, checkPermission('influencer.create'), async 
       orderId: orderId || '',
       orderDate: orderDate ? new Date(orderDate) : undefined,
       platform: platform || 'Instagram',
-      status: status || 'Completed',
+      status: status || (req.user?.role === 'Employee' ? 'Under Review' : 'Completed'),
       contentLink: contentLink || '',
       adsCode: adsCode || '',
       viewsCount: Number(viewsCount) || 0,
       ordersCount: actualOrders,
       ordersGenerated: actualOrders,
       isOrderBonusQualified,
-      isApproved: isApproved !== undefined ? !!isApproved : true,
+      isApproved: isApproved !== undefined ? !!isApproved : ((status || (req.user?.role === 'Employee' ? 'Under Review' : 'Completed')) !== 'Under Review' && (status || (req.user?.role === 'Employee' ? 'Under Review' : 'Completed')) !== 'Pending'),
       notes: notes || '',
       remark: remark || '',
       createdBy: req.user?._id
@@ -315,7 +315,14 @@ router.put('/:id', authenticateToken, checkPermission('influencer.update'), asyn
     if (orderId !== undefined) record.orderId = orderId;
     if (orderDate) record.orderDate = new Date(orderDate);
     if (platform) record.platform = platform;
-    if (status) record.status = status;
+    if (status) {
+      record.status = status;
+      if (status === 'Completed' || status === 'Approved' || status === 'Settled') {
+        record.isApproved = true;
+      } else if (status === 'Under Review' || status === 'Pending') {
+        record.isApproved = false;
+      }
+    }
     if (contentLink !== undefined) record.contentLink = contentLink;
     if (adsCode !== undefined) record.adsCode = adsCode;
     if (viewsCount !== undefined) record.viewsCount = Number(viewsCount) || 0;

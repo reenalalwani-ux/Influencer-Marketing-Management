@@ -30,51 +30,36 @@ const getCurrentMonthTimeframe = () => {
 // Custom Pill Select for Status
 const StatusPillDropdown: React.FC<{
   currentStatus: string;
+  userRole?: string;
   onSelect: (newStatus: string) => void;
-}> = ({ currentStatus, onSelect }) => {
+}> = ({ currentStatus, userRole, onSelect }) => {
+  const isManagerOrAdmin = userRole === 'Super Admin' || userRole === 'Admin' || userRole === 'Marketing Manager' || userRole === 'Team Leader';
+
   return (
     <div className="relative inline-flex items-center">
       <select
-        value={currentStatus || 'Completed'}
+        value={currentStatus || 'Under Review'}
         onChange={(e) => onSelect(e.target.value)}
         className={`appearance-none pl-3 pr-7 py-1 rounded-xl text-[11px] font-extrabold focus:outline-none cursor-pointer border shadow-2xs transition ${
-          currentStatus === 'Completed'
+          currentStatus === 'Completed' || currentStatus === 'Approved'
             ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
-            : currentStatus === 'Approved'
-              ? 'bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200'
+            : currentStatus === 'Under Review'
+              ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200'
               : currentStatus === 'Settled'
                 ? 'bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-200'
-                : 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200'
+                : 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200'
         }`}
       >
-        <option value="Completed" className="bg-white text-slate-900 font-bold py-1">🟢 Completed</option>
-        <option value="Approved" className="bg-white text-slate-900 font-bold py-1">🔵 Approved</option>
-        <option value="Pending" className="bg-white text-slate-900 font-bold py-1">🟡 Pending</option>
+        <option value="Under Review" className="bg-white text-slate-900 font-bold py-1">🟡 Under Review</option>
+        {isManagerOrAdmin ? (
+          <option value="Completed" className="bg-white text-slate-900 font-bold py-1">🟢 Completed (Approve)</option>
+        ) : (
+          currentStatus === 'Completed' && (
+            <option value="Completed" className="bg-white text-slate-900 font-bold py-1">🟢 Completed</option>
+          )
+        )}
+        <option value="Pending" className="bg-white text-slate-900 font-bold py-1">🟠 Pending</option>
         <option value="Settled" className="bg-white text-slate-900 font-bold py-1">🟣 Settled</option>
-      </select>
-      <ChevronDown size={13} className="absolute right-2.5 pointer-events-none opacity-80" />
-    </div>
-  );
-};
-
-// Custom Pill Select for Approval
-const ApprovalPillDropdown: React.FC<{
-  isApproved: boolean;
-  onSelect: (newApproved: boolean) => void;
-}> = ({ isApproved, onSelect }) => {
-  return (
-    <div className="relative inline-flex items-center">
-      <select
-        value={isApproved ? 'Yes' : 'No'}
-        onChange={(e) => onSelect(e.target.value === 'Yes')}
-        className={`appearance-none pl-3 pr-7 py-1 rounded-xl text-[11px] font-extrabold focus:outline-none cursor-pointer border shadow-2xs transition ${
-          isApproved
-            ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
-            : 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200'
-        }`}
-      >
-        <option value="Yes" className="bg-white text-slate-900 font-bold py-1">✅ Yes (Approved)</option>
-        <option value="No" className="bg-white text-slate-900 font-bold py-1">⏳ Pending / No</option>
       </select>
       <ChevronDown size={13} className="absolute right-2.5 pointer-events-none opacity-80" />
     </div>
@@ -252,7 +237,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
   const [orderId, setOrderId] = useState('');
   const [orderDate, setOrderDate] = useState('');
   const [platform, setPlatform] = useState('Instagram');
-  const [status, setStatus] = useState<'Pending' | 'Completed' | 'Settled' | 'Approved'>('Completed');
+  const [status, setStatus] = useState<'Pending' | 'Under Review' | 'Completed' | 'Settled' | 'Approved'>('Under Review');
   const [contentLink, setContentLink] = useState('');
   const [adsCode, setAdsCode] = useState('');
   const [viewsCount, setViewsCount] = useState<number | ''>(0);
@@ -498,7 +483,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     setOrderId('');
     setOrderDate('');
     setPlatform('Instagram');
-    setStatus('Completed');
+    setStatus(isEmployee ? 'Under Review' : 'Completed');
     setContentLink('');
     setAdsCode('');
     setViewsCount('');
@@ -735,8 +720,12 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
   const activePaidTarget = targets.find(t => t.isActive && (t.targetType === 'Paid' || !t.targetType)) || targets.find(t => (t.targetType === 'Paid' || !t.targetType));
   const activeBarterTarget = targets.find(t => t.isActive && t.targetType === 'Barter') || targets.find(t => t.targetType === 'Barter');
 
-  const paidAchieved = activePaidTarget ? activePaidTarget.achievedAmount : (teamBreakdown?.teamAchievedMargin || netAd2shipMargin);
-  const paidGoal = activePaidTarget ? activePaidTarget.targetAmount : (teamBreakdown?.teamTargetAmount || 720000);
+  const paidAchieved = isEmployee
+    ? (myMember?.netMargin !== undefined ? myMember.netMargin : (activePaidTarget ? activePaidTarget.achievedAmount : netAd2shipMargin))
+    : (activePaidTarget ? activePaidTarget.achievedAmount : (teamBreakdown?.teamAchievedMargin || netAd2shipMargin));
+  const paidGoal = isEmployee
+    ? 120000
+    : (activePaidTarget ? activePaidTarget.targetAmount : (teamBreakdown?.teamTargetAmount || 720000));
   const paidPct = paidGoal > 0 ? Math.min(100, Math.round((paidAchieved / paidGoal) * 100)) : 0;
 
   const barterAchieved = isEmployee
@@ -942,12 +931,12 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
 
               <div className="flex items-center gap-4 self-stretch md:self-auto justify-between md:justify-end bg-white/80 backdrop-blur-xs p-3.5 rounded-2xl border border-purple-100 shadow-2xs">
                 <div className="text-right">
-                  <span className="text-[10px] uppercase font-bold text-slate-500 block">My Quota Performance</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block">My Paid Colab Performance</span>
                   <span className="text-2xl font-black text-emerald-600">
                     {myMember?.targetAchievedPercent || 0}% Met
                   </span>
                   <span className="text-[11px] font-extrabold text-purple-700 block">
-                    {myMember?.targetAchievedPercent || 0}% Quota Achieved
+                    {myMember?.targetAchievedPercent || 0}% Paid Colab Achieved
                   </span>
                 </div>
 
@@ -991,7 +980,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                     ₹{new Intl.NumberFormat().format(teamBreakdown?.teamAchievedMargin || 0)}
                   </span>
                   <span className="text-[11px] font-extrabold text-purple-700 block">
-                    {teamBreakdown?.teamCompletionPercent || 0}% Team Quota Met
+                    {teamBreakdown?.teamCompletionPercent || 0}% Team Paid Colab Met
                   </span>
                 </div>
 
@@ -1126,7 +1115,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                       <div className="flex justify-between text-[11px] font-bold">
                         <span className="text-slate-600">
                           {isEmployee ? (
-                            <>Quota Progress: <strong className="text-slate-900">{m.targetAchievedPercent}% Met</strong></>
+                            <>Paid Colab Progress: <strong className="text-slate-900">{m.targetAchievedPercent}% Met</strong></>
                           ) : (
                             <>Net Margin: <strong className="text-slate-900">₹{new Intl.NumberFormat().format(m.netMargin)}</strong></>
                           )}
@@ -1401,10 +1390,10 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                       const isBarter = t.targetType === 'Barter';
                       const goalVal = isBarter 
                         ? (isEmployee ? barterGoal : (t.targetCount || t.targetAmount))
-                        : t.targetAmount;
+                        : (isEmployee ? 120000 : t.targetAmount);
                       const achVal = isBarter 
                         ? (isEmployee ? barterAchieved : (t.achievedCount || t.achievedAmount || 0))
-                        : t.achievedAmount;
+                        : (isEmployee ? (myMember?.netMargin !== undefined ? myMember.netMargin : (t.achievedAmount || 0)) : (t.achievedAmount || 0));
                       const pct = Math.min(100, Math.round(((achVal || 0) / (goalVal || 1)) * 100));
 
                       return (
@@ -1664,7 +1653,6 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                     )}
 
                     <SortHeader field="status" label="Status" align="center" />
-                    <SortHeader field="isApproved" label="Approved" align="center" />
                     <th className="p-3 border-b border-slate-700 text-center">Actions</th>
                   </tr>
                 </thead>
@@ -1789,14 +1777,8 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                           <td className="p-3 border-r border-slate-100 text-center">
                             <StatusPillDropdown
                               currentStatus={item.status}
+                              userRole={userRole}
                               onSelect={(newStat) => handleStatusChange(item._id, newStat)}
-                            />
-                          </td>
-
-                          <td className="p-3 border-r border-slate-100 text-center">
-                            <ApprovalPillDropdown
-                              isApproved={item.isApproved !== false}
-                              onSelect={(newAppr) => handleApprovalChange(item._id, newAppr)}
                             />
                           </td>
 
@@ -2052,6 +2034,26 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                 onChange={(e) => setTransactionDate(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
               />
+            </div>
+
+            <div>
+              <label className="block text-slate-700 mb-1">Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as any)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none font-bold"
+              >
+                <option value="Under Review">🟡 Under Review</option>
+                {isManagerOrAdmin ? (
+                  <option value="Completed">🟢 Completed (Approve)</option>
+                ) : (
+                  status === 'Completed' && (
+                    <option value="Completed">🟢 Completed</option>
+                  )
+                )}
+                <option value="Pending">🟠 Pending</option>
+                <option value="Settled">🟣 Settled</option>
+              </select>
             </div>
           </div>
 
@@ -2652,7 +2654,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                 {/* Quota Progress Meter */}
                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
                   <div className="flex justify-between items-center text-xs font-black">
-                    <span className="text-slate-700">Monthly Net Margin Quota Progress</span>
+                    <span className="text-slate-700">Monthly Net Margin Paid Colab Progress</span>
                     <span className="text-purple-700">
                       ₹{new Intl.NumberFormat().format(selectedMemberForDetail.netMargin)} / ₹{new Intl.NumberFormat().format(selectedMemberForDetail.individualTarget)} ({selectedMemberForDetail.targetAchievedPercent}%)
                     </span>

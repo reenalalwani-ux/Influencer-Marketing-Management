@@ -84,7 +84,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
     'posting.view', 'posting.update',
     'performance.view',
     'target.view',
-    'influencer.view', 'influencer.create'
+    'influencer.view', 'influencer.create', 'influencer.update'
   ]
 };
 

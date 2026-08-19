@@ -180,7 +180,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
             <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-xs">
               <span className="text-emerald-700 font-extrabold bg-emerald-50 px-2 py-0.5 rounded-md">
                 {data?.activeTarget
-                  ? `${Math.round(((data.activeTarget.achievedAmount || 1) / (data.activeTarget.targetAmount || 1)) * 100)}% Progress`
+                  ? `${Math.min(100, Math.round(((data.activeTarget.achievedAmount || 0) / (user?.role === 'Employee' ? 120000 : (data.activeTarget.targetAmount || 720000))) * 100))}% Paid Colab Progress`
                   : 'Goal Active'}
               </span>
               <span className="text-slate-400 font-semibold">Monthly Goal</span>
@@ -270,7 +270,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
             </div>
             <p className="text-xs text-purple-600 font-bold mt-1 truncate">
               {data?.activeTarget
-                ? `${Math.round(((data.activeTarget.achievedAmount || 0) / (data.activeTarget.targetAmount || 1)) * 100)}% Achieved`
+                ? `${Math.min(100, Math.round(((data.activeTarget.achievedAmount || 0) / (user?.role === 'Employee' ? 120000 : (data.activeTarget.targetAmount || 720000))) * 100))}% Paid Colab Progress`
                 : 'Click to set target'}
             </p>
           </div>

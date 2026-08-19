@@ -336,7 +336,7 @@ export interface IInfluencer extends Document {
   orderId?: string;
   orderDate?: Date;
   platform: string;
-  status: 'Pending' | 'Completed' | 'Settled' | 'Approved';
+  status: 'Pending' | 'Under Review' | 'Completed' | 'Settled' | 'Approved';
   contentLink?: string;
   adsCode?: string;
   viewsCount?: number;
@@ -385,7 +385,7 @@ const InfluencerSchema = new Schema<IInfluencer>({
   orderId: { type: String, default: '' },
   orderDate: { type: Date },
   platform: { type: String, default: 'Instagram' },
-  status: { type: String, enum: ['Pending', 'Completed', 'Settled', 'Approved'], default: 'Completed' },
+  status: { type: String, enum: ['Pending', 'Under Review', 'Completed', 'Settled', 'Approved'], default: 'Under Review' },
   contentLink: { type: String, default: '' },
   adsCode: { type: String, default: '' },
   viewsCount: { type: Number, default: 0 },

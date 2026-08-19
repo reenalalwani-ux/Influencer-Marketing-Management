@@ -32,15 +32,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
   // Grouped Menu Definitions
   const menuGroups: MenuGroup[] = [
     {
-      id: 'targets-collab',
-      label: 'Targets & Revenue',
-      icon: Target,
-      subItems: [
-        { id: 'targets', label: 'Target Module', icon: Target },
-        { id: 'influencers', label: 'Influencer Module', icon: Sparkles },
-      ]
-    },
-    {
       id: 'brand-management',
       label: 'Brand',
       icon: Briefcase,
@@ -130,6 +121,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
           <div className="flex items-center space-x-2.5 min-w-0">
             <LayoutDashboard size={18} className={`shrink-0 ${activeView === 'dashboard' ? 'text-white' : 'text-slate-400'}`} />
             <span className="whitespace-nowrap truncate">Dashboard</span>
+          </div>
+        </button>
+
+        {/* Single Standalone Item: Targets & Revenue */}
+        <button
+          onClick={() => {
+            setActiveView('targets');
+            window.scrollTo(0, 0);
+          }}
+          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 ${
+            activeView === 'targets' || activeView === 'influencers'
+              ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-500 text-white shadow-md shadow-purple-500/25'
+              : 'text-slate-700 hover:text-purple-700 hover:bg-purple-50/60 border border-transparent'
+          }`}
+        >
+          <div className="flex items-center space-x-2.5 min-w-0">
+            <Target size={18} className={`shrink-0 ${activeView === 'targets' || activeView === 'influencers' ? 'text-white' : 'text-slate-400'}`} />
+            <span className="whitespace-nowrap truncate">Targets & Revenue</span>
           </div>
         </button>
 

@@ -59,10 +59,12 @@ export const TargetTopBanner: React.FC<TargetTopBannerProps> = ({ user, onNaviga
 
   if (loading || !target) return null;
 
-  const percentage = Math.min(100, Math.round(((target.achievedAmount || 0) / (target.targetAmount || 1)) * 100));
-  const remaining = Math.max(0, target.targetAmount - target.achievedAmount);
-  const formattedTarget = new Intl.NumberFormat().format(target.targetAmount);
-  const formattedAchieved = new Intl.NumberFormat().format(target.achievedAmount);
+  const isEmployee = user?.role === 'Employee';
+  const effectiveTargetAmount = isEmployee ? 120000 : (target.targetAmount || 720000);
+  const percentage = Math.min(100, Math.round(((target.achievedAmount || 0) / effectiveTargetAmount) * 100));
+  const remaining = Math.max(0, effectiveTargetAmount - (target.achievedAmount || 0));
+  const formattedTarget = new Intl.NumberFormat().format(effectiveTargetAmount);
+  const formattedAchieved = new Intl.NumberFormat().format(target.achievedAmount || 0);
   const formattedRemaining = new Intl.NumberFormat().format(remaining);
 
   return (
@@ -95,7 +97,7 @@ export const TargetTopBanner: React.FC<TargetTopBannerProps> = ({ user, onNaviga
               {isManagerOrAdmin ? (
                 <>Net Margin Target: <span className="font-bold text-emerald-400">{target.currency}{formattedTarget}</span> | Achieved: <span className="font-bold text-purple-300">{target.currency}{formattedAchieved}</span> ({percentage}%)</>
               ) : (
-                <>Monthly Target Quota | Performance: <span className="font-bold text-purple-300">{percentage}% Quota Met</span></>
+                <>Monthly Target | Performance: <span className="font-bold text-purple-300">{percentage}% Paid Colab Met</span></>
               )}
             </p>
           </div>
@@ -108,7 +110,7 @@ export const TargetTopBanner: React.FC<TargetTopBannerProps> = ({ user, onNaviga
               <TrendingUp size={12} /> {percentage}% Completed
             </span>
             <span className="text-slate-400">
-              {remaining === 0 ? '🎯 Target Reached!' : isManagerOrAdmin ? `${target.currency}${formattedRemaining} Remaining` : `${100 - percentage}% Quota Remaining`}
+              {remaining === 0 ? '🎯 Target Reached!' : isManagerOrAdmin ? `${target.currency}${formattedRemaining} Remaining` : `${100 - percentage}% Remaining`}
             </span>
           </div>
           <div className="w-full bg-slate-800/80 rounded-full h-2.5 overflow-hidden border border-slate-700 p-0.5">

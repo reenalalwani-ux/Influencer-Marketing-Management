@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { User, Employee, Brand, Task, EmployeeBrand, AuditLog, Target } from '../models/allModels';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
+import { recalculateTargetProgress } from './targetRoutes';
 
 const router = Router();
 
@@ -36,12 +37,15 @@ router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response) 
           employeeId: emp._id,
           scheduledDate: { $gt: endOfDay, $lte: nextWeek }
         }).populate('brandId', 'brandName logo').limit(10).sort({ scheduledDate: 1 }).lean(),
-        Target.findOne({ isActive: true, status: 'Active' }).sort({ updatedAt: -1 }).lean()
+        Target.findOne({ isActive: true, status: 'Active' }).sort({ updatedAt: -1 })
       ]);
 
       let activeTarget = activeTargetFound;
       if (!activeTarget) {
-        activeTarget = await Target.findOne({ status: 'Active' }).sort({ createdAt: -1 }).lean();
+        activeTarget = await Target.findOne({ status: 'Active' }).sort({ createdAt: -1 });
+      }
+      if (activeTarget) {
+        await recalculateTargetProgress(activeTarget);
       }
 
       let todaysTasks = todaysTasksInitial;
@@ -87,12 +91,15 @@ router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response) 
         scheduledDate: { $gt: endOfDay }
       }).populate('employeeId', 'name').populate('brandId', 'brandName logo').sort({ scheduledDate: 1 }).limit(5).lean(),
       AuditLog.find().sort({ timestamp: -1 }).limit(8).lean(),
-      Target.findOne({ isActive: true, status: 'Active' }).sort({ updatedAt: -1 }).lean()
+      Target.findOne({ isActive: true, status: 'Active' }).sort({ updatedAt: -1 })
     ]);
 
     let activeTarget = activeTargetFound;
     if (!activeTarget) {
-      activeTarget = await Target.findOne({ status: 'Active' }).sort({ createdAt: -1 }).lean();
+      activeTarget = await Target.findOne({ status: 'Active' }).sort({ createdAt: -1 });
+    }
+    if (activeTarget) {
+      await recalculateTargetProgress(activeTarget);
     }
 
     let todaysTasks = todaysTasksInitial;

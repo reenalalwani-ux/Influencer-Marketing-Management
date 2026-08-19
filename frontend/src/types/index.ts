@@ -282,7 +282,7 @@ export interface InfluencerTransaction {
   orderId?: string;
   orderDate?: string;
   platform: string;
-  status: 'Pending' | 'Completed' | 'Settled' | 'Approved';
+  status: 'Pending' | 'Under Review' | 'Completed' | 'Settled' | 'Approved';
   contentLink?: string;
   adsCode?: string;
   viewsCount?: number;
