@@ -55,8 +55,21 @@ router.post('/', authenticateToken, checkPermission('employee.create'), async (r
     }
 
     // Auto-generate employeeId
-    const count = await Employee.countDocuments();
-    const employeeId = `EMP-${1000 + count + 1}`;
+    const existingEmps = await Employee.find({ employeeId: /^EMP-\d+$/ }, { employeeId: 1 });
+    let maxEmpNum = 1000;
+    existingEmps.forEach(e => {
+      const match = e.employeeId?.match(/^EMP-(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxEmpNum) maxEmpNum = num;
+      }
+    });
+    let nextEmpNum = maxEmpNum + 1;
+    let employeeId = `EMP-${nextEmpNum}`;
+    while (await Employee.exists({ employeeId })) {
+      nextEmpNum++;
+      employeeId = `EMP-${nextEmpNum}`;
+    }
 
     // Create User login account
     const hashedPassword = await bcrypt.hash(password || 'Employee@123', 10);

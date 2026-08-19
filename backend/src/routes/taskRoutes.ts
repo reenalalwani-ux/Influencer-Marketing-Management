@@ -105,8 +105,22 @@ router.post('/', authenticateToken, checkPermission('task.create'), async (req: 
   }
 
   try {
-    const count = await Task.countDocuments();
-    const taskId = isMainTask ? `MAIN-${10000 + count + 1}` : `TSK-${10000 + count + 1}`;
+    const prefix = isMainTask ? 'MAIN' : 'TSK';
+    const existingTasks = await Task.find({ taskId: new RegExp(`^${prefix}-\\d+$`) }, { taskId: 1 });
+    let maxTaskNum = 10000;
+    existingTasks.forEach(t => {
+      const match = t.taskId?.match(new RegExp(`^${prefix}-(\\d+)$`));
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxTaskNum) maxTaskNum = num;
+      }
+    });
+    let nextTaskNum = maxTaskNum + 1;
+    let taskId = `${prefix}-${nextTaskNum}`;
+    while (await Task.exists({ taskId })) {
+      nextTaskNum++;
+      taskId = `${prefix}-${nextTaskNum}`;
+    }
 
     const task = await Task.create({
       taskId,

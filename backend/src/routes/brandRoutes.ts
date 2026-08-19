@@ -93,8 +93,22 @@ router.post('/', authenticateToken, checkPermission('brand.create'), async (req:
   }
 
   try {
-    const count = await Brand.countDocuments();
-    const brandId = `BRD-${100 + count + 1}`;
+    const existingBrands = await Brand.find({ brandId: /^BRD-\d+$/ }, { brandId: 1 });
+    let maxNum = 100;
+    existingBrands.forEach(b => {
+      const match = b.brandId?.match(/^BRD-(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    });
+
+    let nextNum = maxNum + 1;
+    let brandId = `BRD-${nextNum}`;
+    while (await Brand.exists({ brandId })) {
+      nextNum++;
+      brandId = `BRD-${nextNum}`;
+    }
 
     const barterCount = targetBarterCollabs !== undefined ? Number(targetBarterCollabs) : (brandType === 'New' ? 8 : 7);
     const paidCount = targetPaidCollabs !== undefined ? Number(targetPaidCollabs) : (brandType === 'New' ? 2 : 3);
@@ -128,8 +142,13 @@ router.post('/', authenticateToken, checkPermission('brand.create'), async (req:
     });
 
     return res.status(200).json({ success: true, message: 'Brand created successfully', data: brand });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: 'Failed to create brand', error });
+  } catch (error: any) {
+    console.error('Failed to create brand:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: error?.message || 'Failed to create brand', 
+      error: error?.errmsg || error 
+    });
   }
 });
 

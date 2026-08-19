@@ -169,8 +169,21 @@ router.post('/signup', async (req: AuthRequest, res: Response) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const assignedRole = role || 'Employee';
-    const empCount = await Employee.countDocuments();
-    const generatedEmpId = `EMP-${100 + empCount + 1}`;
+    const existingEmps = await Employee.find({ employeeId: /^EMP-\d+$/ }, { employeeId: 1 });
+    let maxEmpNum = 1000;
+    existingEmps.forEach(e => {
+      const match = e.employeeId?.match(/^EMP-(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxEmpNum) maxEmpNum = num;
+      }
+    });
+    let nextEmpNum = maxEmpNum + 1;
+    let generatedEmpId = `EMP-${nextEmpNum}`;
+    while (await Employee.exists({ employeeId: generatedEmpId })) {
+      nextEmpNum++;
+      generatedEmpId = `EMP-${nextEmpNum}`;
+    }
 
     const newUser = await User.create({
       name,

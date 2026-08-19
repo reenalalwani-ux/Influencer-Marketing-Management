@@ -233,10 +233,24 @@ router.post('/matrix/toggle', authenticateToken, checkPermission('posting.update
 
     if (isPosted) {
       if (!task) {
-        const count = await Task.countDocuments();
+        const existingTasks = await Task.find({ taskId: /^TSK-MTRX-\d+$/ }, { taskId: 1 });
+        let maxTaskNum = 10000;
+        existingTasks.forEach(t => {
+          const match = t.taskId?.match(/^TSK-MTRX-(\d+)$/);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (num > maxTaskNum) maxTaskNum = num;
+          }
+        });
+        let nextTaskNum = maxTaskNum + 1;
+        let taskId = `TSK-MTRX-${nextTaskNum}`;
+        while (await Task.exists({ taskId })) {
+          nextTaskNum++;
+          taskId = `TSK-MTRX-${nextTaskNum}`;
+        }
         const brand = await Brand.findById(brandId);
         task = await Task.create({
-          taskId: `TSK-MTRX-${count + 10001}`,
+          taskId,
           employeeId,
           brandId,
           platform: 'Instagram',
