@@ -70,7 +70,8 @@ export const recalculateTargetProgress = async (target: any, customDateFilter?: 
   }
 
   if (target.targetType === 'Barter') {
-    if (target.autoSync !== false) {
+    // Only set default targetAmount/targetCount if completely unassigned
+    if (!target.targetAmount && !target.targetCount) {
       const activeMembers = await getActiveInfluencerMembers();
       const activeMemberIds = activeMembers.map(m => m._id.toString());
       
@@ -88,36 +89,44 @@ export const recalculateTargetProgress = async (target: any, customDateFilter?: 
 
       target.targetAmount = totalBarterQuota || 120;
       target.targetCount = totalBarterQuota || 120;
-      target.description = `Auto-calculated monthly barter volume across ${assignedBrands.length} assigned brands (${totalBarterQuota} Collabs).`;
+      if (!target.description) {
+        target.description = `Auto-calculated monthly barter volume across ${assignedBrands.length} assigned brands (${totalBarterQuota} Collabs).`;
+      }
     }
 
-    const barterCount = await Influencer.countDocuments({
-      category: 'Barter',
-      status: { $in: ['Completed', 'Approved', 'Settled', 'completed', 'approved', 'settled'] },
-      ...filter
-    });
-    target.achievedCount = barterCount;
-    target.achievedAmount = barterCount;
-  } else {
-    // Paid Target: Auto-fill targetAmount based on active team members (N * ₹1,20,000)
     if (target.autoSync !== false) {
+      const barterCount = await Influencer.countDocuments({
+        category: 'Barter',
+        status: { $in: ['Completed', 'Approved', 'Settled', 'completed', 'approved', 'settled'] },
+        ...filter
+      });
+      target.achievedCount = barterCount;
+      target.achievedAmount = barterCount;
+    }
+  } else {
+    // Paid Target: Only set default targetAmount if completely unassigned
+    if (!target.targetAmount) {
       const activeMembers = await getActiveInfluencerMembers();
       const memberCount = Math.max(1, activeMembers.length);
       target.targetAmount = memberCount * 120000;
-      target.description = `Monthly AD2ship team profit margin target (₹1.2L per executive across ${memberCount} team members).`;
+      if (!target.description) {
+        target.description = `Monthly AD2ship team profit margin target (₹1.2L per executive across ${memberCount} team members).`;
+      }
     }
 
-    // Sum ad2shipMargin from Paid collabs
-    const paidRecords = await Influencer.find({
-      category: 'Paid',
-      status: { $in: ['Completed', 'Approved', 'Settled', 'completed', 'approved', 'settled'] },
-      ...filter
-    });
-    const totalMargin = paidRecords.reduce((acc, curr) => {
-      const m = curr.ad2shipMargin || ((curr.brandOnboardingAmt || curr.inAmount || 0) - (curr.influencerOnboardingAmt || curr.outAmount || 0));
-      return acc + m;
-    }, 0);
-    target.achievedAmount = totalMargin;
+    if (target.autoSync !== false) {
+      // Sum ad2shipMargin from Paid collabs
+      const paidRecords = await Influencer.find({
+        category: 'Paid',
+        status: { $in: ['Completed', 'Approved', 'Settled', 'completed', 'approved', 'settled'] },
+        ...filter
+      });
+      const totalMargin = paidRecords.reduce((acc, curr) => {
+        const m = curr.ad2shipMargin || ((curr.brandOnboardingAmt || curr.inAmount || 0) - (curr.influencerOnboardingAmt || curr.outAmount || 0));
+        return acc + m;
+      }, 0);
+      target.achievedAmount = totalMargin;
+    }
   }
 
   await target.save();
@@ -133,7 +142,8 @@ router.get('/team-breakdown', authenticateToken, checkPermission('target.view'),
     const members = await getActiveInfluencerMembers();
     const teamSize = members.length;
     const perMemberTarget = 120000;
-    const teamTargetAmount = teamSize * perMemberTarget;
+    const activePaidTarget = await Target.findOne({ isActive: true, status: 'Active', targetType: 'Paid' }).sort({ updatedAt: -1 });
+    const teamTargetAmount = activePaidTarget ? activePaidTarget.targetAmount : (teamSize * perMemberTarget);
 
     const allBrands = await Brand.find();
     const allAssignments = await EmployeeBrand.find({ status: 'Active' });

@@ -439,6 +439,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
       if (res.success) {
         setShowTargetModal(false);
         fetchTargets();
+        fetchTeamBreakdown();
         if (onTargetUpdated) onTargetUpdated();
       }
     } catch (err: any) {
@@ -968,10 +969,10 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                 </div>
                 <h3 className="text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2.5">
                   <Target className="text-purple-600" size={24} />
-                  Team Monthly Margin Target: <span className="text-emerald-700">₹{new Intl.NumberFormat().format(teamBreakdown?.teamTargetAmount || 720000)}</span>
+                  Team Monthly Margin Target: <span className="text-emerald-700">₹{new Intl.NumberFormat().format(activePaidTarget?.targetAmount || teamBreakdown?.teamTargetAmount || 720000)}</span>
                 </h3>
                 <p className="text-xs text-slate-600 font-medium">
-                  Auto-calculated quota: <strong className="text-slate-900 font-black">₹1,20,000 Net Margin per member</strong> × {teamBreakdown?.teamSize || 6} executives.
+                  {activePaidTarget ? activePaidTarget.title : `Auto-calculated quota: ₹1,20,000 Net Margin per member × ${teamBreakdown?.teamSize || 6} executives.`}
                 </p>
               </div>
 
@@ -989,13 +990,13 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                 <div className="h-10 w-px bg-slate-200 hidden sm:block" />
 
                 <span className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase border shadow-2xs ${
-                  (teamBreakdown?.teamAchievedMargin || 0) >= (teamBreakdown?.teamTargetAmount || 720000)
+                  (teamBreakdown?.teamAchievedMargin || 0) >= (activePaidTarget?.targetAmount || teamBreakdown?.teamTargetAmount || 720000)
                     ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                     : (teamBreakdown?.teamAchievedMargin || 0) >= ((teamBreakdown?.teamSize || 6) * 80000)
                       ? 'bg-blue-100 text-blue-800 border-blue-300'
                       : 'bg-amber-100 text-amber-800 border-amber-300'
                 }`}>
-                  {(teamBreakdown?.teamAchievedMargin || 0) >= (teamBreakdown?.teamTargetAmount || 720000) ? '🏆 10% Slab' : (teamBreakdown?.teamAchievedMargin || 0) >= ((teamBreakdown?.teamSize || 6) * 80000) ? '🥈 5% Slab (80k+)' : '⚡ 0% Slab'}
+                  {(teamBreakdown?.teamAchievedMargin || 0) >= (activePaidTarget?.targetAmount || teamBreakdown?.teamTargetAmount || 720000) ? '🏆 10% Slab' : (teamBreakdown?.teamAchievedMargin || 0) >= ((teamBreakdown?.teamSize || 6) * 80000) ? '🥈 5% Slab (80k+)' : '⚡ 0% Slab'}
                 </span>
               </div>
             </div>

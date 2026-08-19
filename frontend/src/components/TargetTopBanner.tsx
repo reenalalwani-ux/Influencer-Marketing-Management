@@ -80,14 +80,14 @@ export const TargetTopBanner: React.FC<TargetTopBannerProps> = ({ user, onNaviga
                 {target.period}
               </span>
               <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
-                target.achievedAmount >= 720000 || percentage >= 100
+                percentage >= 100 || (target.targetAmount && target.achievedAmount >= target.targetAmount)
                   ? 'bg-emerald-500/30 text-emerald-300 border-emerald-400/50'
-                  : target.achievedAmount >= 480000 || percentage >= 67
+                  : percentage >= 67 || (target.targetAmount && target.achievedAmount >= target.targetAmount * 0.67)
                     ? 'bg-blue-500/30 text-blue-300 border-blue-400/50'
                     : 'bg-amber-500/30 text-amber-300 border-amber-400/50'
               }`}>
                 {isManagerOrAdmin 
-                  ? (target.achievedAmount >= 720000 || percentage >= 100 ? '🏆 10% Slab Unlocked' : target.achievedAmount >= 480000 || percentage >= 67 ? '🥈 5% Slab Unlocked' : '⚡ 0% (<₹80k/exec)')
+                  ? (percentage >= 100 || (target.targetAmount && target.achievedAmount >= target.targetAmount) ? '🏆 10% Slab Unlocked' : percentage >= 67 || (target.targetAmount && target.achievedAmount >= target.targetAmount * 0.67) ? '🥈 5% Slab Unlocked' : '⚡ 0% (<₹80k/exec)')
                   : (percentage >= 100 ? '🏆 10% Slab Unlocked' : percentage >= 67 ? '🥈 5% Slab Unlocked' : '⚡ 0% Slab')}
               </span>
             </div>
