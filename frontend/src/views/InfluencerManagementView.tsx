@@ -4,7 +4,7 @@ import {
   ArrowUpRight, ArrowDownRight, ExternalLink, Video, Link2, ChevronDown, 
   Receipt, Eye, ShoppingBag, ChevronUp, ChevronsUpDown, Target, TrendingUp,
   Award, Clock, AlertCircle, CheckCircle2, ShieldCheck, Layers, RefreshCw, Users,
-  Calendar, ChevronLeft, ChevronRight, CalendarDays, Loader2
+  Calendar, ChevronLeft, ChevronRight, CalendarDays, Loader2, Lock
 } from 'lucide-react';
 import { api } from '../services/api';
 import { InfluencerTransaction, Brand, PaymentLogItem, TargetItem, TeamTargetBreakdown, MemberTargetItem } from '../types';
@@ -62,6 +62,122 @@ const StatusPillDropdown: React.FC<{
         <option value="Settled" className="bg-white text-slate-900 font-bold py-1">🟣 Settled</option>
       </select>
       <ChevronDown size={13} className="absolute right-2.5 pointer-events-none opacity-80" />
+    </div>
+  );
+};
+
+// Searchable Combobox for Brand Selection
+const SearchableBrandSelect: React.FC<{
+  brands: Brand[];
+  selectedBrandId: string;
+  customBrandName: string;
+  onSelectBrand: (brandId: string, brandName: string) => void;
+}> = ({ brands, selectedBrandId, customBrandName, onSelectBrand }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const wrapperRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (customBrandName) {
+      setSearchQuery(customBrandName);
+    } else {
+      const selected = brands.find(b => b._id === selectedBrandId);
+      setSearchQuery(selected ? selected.brandName : '');
+    }
+  }, [selectedBrandId, customBrandName, brands]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredBrands = brands.filter(b =>
+    b.brandName.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <label className="block text-slate-700 mb-1">Brand Name *</label>
+      <div className="relative">
+        <input
+          type="text"
+          required
+          placeholder="Search brand (e.g. Vaasva, EBBANI)..."
+          value={searchQuery}
+          onFocus={() => setIsOpen(true)}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            onSelectBrand('', e.target.value);
+            setIsOpen(true);
+          }}
+          className="w-full pl-3 pr-8 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-bold"
+        />
+        {searchQuery ? (
+          <button
+            type="button"
+            onClick={() => {
+              setSearchQuery('');
+              onSelectBrand('', '');
+              setIsOpen(true);
+            }}
+            className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 font-bold text-xs"
+          >
+            ✕
+          </button>
+        ) : (
+          <ChevronDown size={14} className="absolute right-2.5 top-3 text-slate-400 pointer-events-none" />
+        )}
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-full max-h-56 overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-xl py-1 text-xs divide-y divide-slate-100">
+          {filteredBrands.length === 0 ? (
+            <div className="px-3.5 py-2.5 text-slate-400 font-semibold italic text-center">
+              No matching brands found. Custom brand "{searchQuery}" will be used.
+            </div>
+          ) : (
+            filteredBrands.map((b) => {
+              const isSelected = b._id === selectedBrandId || b.brandName.toLowerCase() === searchQuery.toLowerCase();
+              return (
+                <div
+                  key={b._id}
+                  onClick={() => {
+                    onSelectBrand(b._id, b.brandName);
+                    setSearchQuery(b.brandName);
+                    setIsOpen(false);
+                  }}
+                  className={`px-3.5 py-2 cursor-pointer flex items-center justify-between transition ${
+                    isSelected ? 'bg-purple-50 text-purple-900 font-black' : 'hover:bg-slate-50 text-slate-800 font-semibold'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2 truncate">
+                    {b.logo ? (
+                      <img src={b.logo} alt={b.brandName} className="w-5 h-5 rounded-full object-cover shrink-0" />
+                    ) : (
+                      <div className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[10px] font-black shrink-0">
+                        {b.brandName.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <span className="truncate">{b.brandName}</span>
+                  </div>
+                  {b.brandType && (
+                    <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded border ${
+                      b.brandType === 'New' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    }`}>
+                      {b.brandType}
+                    </span>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -243,7 +359,8 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
   const [viewsCount, setViewsCount] = useState<number | ''>(0);
   const [ordersCount, setOrdersCount] = useState<number | ''>(0);
   const [isApproved, setIsApproved] = useState(true);
-  const [transactionDate, setTransactionDate] = useState(new Date().toISOString().split('T')[0]);
+  const [transactionDate, setTransactionDate] = useState('');
+  const [connectedDate, setConnectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
   const [remark, setRemark] = useState('');
 
@@ -296,7 +413,6 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
       const month = currentDate.getMonth() + 1;
 
       let url = `/influencers?timeframe=${timeframe}&year=${year}&month=${month}`;
-      if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
 
       const res = await api.get(url);
       if (res.success) {
@@ -462,7 +578,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
   };
 
   // Influencer Record Handlers
-  const openAddModal = (defaultCategory: 'Paid' | 'Barter' = 'Paid') => {
+  const openAddModal = (defaultCategory: 'Paid' | 'Barter' = 'Barter') => {
     setEditingItem(null);
     setInfluencerManager('');
     setInfluencerName('');
@@ -489,7 +605,8 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     setViewsCount('');
     setOrdersCount('');
     setIsApproved(true);
-    setTransactionDate(new Date().toISOString().split('T')[0]);
+    setTransactionDate('');
+    setConnectedDate(new Date().toISOString().split('T')[0]);
     setNotes('');
     setRemark('');
     setShowModal(true);
@@ -522,7 +639,8 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     setViewsCount(item.viewsCount || 0);
     setOrdersCount(item.ordersCount || 0);
     setIsApproved(item.isApproved !== undefined ? item.isApproved : true);
-    setTransactionDate(item.transactionDate ? item.transactionDate.split('T')[0] : new Date().toISOString().split('T')[0]);
+    setTransactionDate(item.transactionDate ? item.transactionDate.split('T')[0] : '');
+    setConnectedDate(item.connectedDate ? item.connectedDate.split('T')[0] : (item.transactionDate ? item.transactionDate.split('T')[0] : new Date().toISOString().split('T')[0]));
     setNotes(item.notes || '');
     setRemark(item.remark || '');
     setShowModal(true);
@@ -562,6 +680,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
         ordersCount: Number(ordersCount) || 0,
         isApproved,
         transactionDate,
+        connectedDate,
         notes,
         remark
       };
@@ -671,10 +790,23 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     }
   };
 
-  // Filtered & Sorted Influencers
+  // Filtered & Sorted Influencers (Searches only within the active tab view)
   const filteredInfluencers = influencers.filter(i => {
     if (viewMode === 'Paid Collaborations' && i.category !== 'Paid') return false;
     if (viewMode === 'Barter Collaborations' && i.category !== 'Barter') return false;
+
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      const matchInf = i.influencerName?.toLowerCase().includes(term);
+      const matchBrand = i.brandName?.toLowerCase().includes(term);
+      const matchMgr = i.influencerManager?.toLowerCase().includes(term);
+      const matchPhone = i.phone?.toLowerCase().includes(term);
+      const matchPlatform = i.platform?.toLowerCase().includes(term);
+      const matchVideo = i.videoType?.toLowerCase().includes(term);
+      if (!matchInf && !matchBrand && !matchMgr && !matchPhone && !matchPlatform && !matchVideo) {
+        return false;
+      }
+    }
     return true;
   }).sort((a, b) => {
     let valA = (a as any)[sortKey];
@@ -684,8 +816,8 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
       valA = a.sNo || 0;
       valB = b.sNo || 0;
     } else if (sortKey === 'transactionDate') {
-      valA = new Date(a.transactionDate).getTime();
-      valB = new Date(b.transactionDate).getTime();
+      valA = a.transactionDate ? new Date(a.transactionDate).getTime() : (a.connectedDate ? new Date(a.connectedDate).getTime() : 0);
+      valB = b.transactionDate ? new Date(b.transactionDate).getTime() : (b.connectedDate ? new Date(b.connectedDate).getTime() : 0);
     }
 
     if (valA < valB) return sortDir === 'asc' ? -1 : 1;
@@ -700,17 +832,19 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     return st === 'completed' || st === 'approved' || st === 'settled';
   };
 
-  // Calculate Metrics from Current View (Only count completed/approved/settled records toward achieved)
+  // Calculate Metrics from Current View (Include all paid collaborations for metric card totals)
+  const allPaidCollabs = influencers.filter(i => i.category === 'Paid');
+  const allBarterCollabs = influencers.filter(i => i.category === 'Barter');
   const paidCollabs = influencers.filter(i => i.category === 'Paid' && isAchievedStatus(i.status));
   const barterCollabs = influencers.filter(i => i.category === 'Barter' && isAchievedStatus(i.status));
 
-  const totalBrandBilling = paidCollabs.reduce((acc, curr) => acc + (curr.brandOnboardingAmt || curr.inAmount || 0), 0);
-  const totalInfluencerCost = paidCollabs.reduce((acc, curr) => acc + (curr.influencerOnboardingAmt || curr.outAmount || 0), 0);
+  const totalBrandBilling = allPaidCollabs.reduce((acc, curr) => acc + (curr.brandOnboardingAmt || curr.inAmount || 0), 0);
+  const totalInfluencerCost = allPaidCollabs.reduce((acc, curr) => acc + (curr.influencerOnboardingAmt || curr.outAmount || 0), 0);
   const netAd2shipMargin = totalBrandBilling - totalInfluencerCost;
   const marginPercentage = totalBrandBilling > 0 ? Math.round((netAd2shipMargin / totalBrandBilling) * 100) : 0;
 
-  const totalBrandReceived = paidCollabs.reduce((acc, curr) => acc + (curr.brandReceivedAmt || curr.inAmount || 0), 0);
-  const totalInfluencerPaid = paidCollabs.reduce((acc, curr) => acc + (curr.influencerPaidAmt || curr.outAmount || 0), 0);
+  const totalBrandReceived = allPaidCollabs.reduce((acc, curr) => acc + (curr.brandReceivedAmt || curr.inAmount || 0), 0);
+  const totalInfluencerPaid = allPaidCollabs.reduce((acc, curr) => acc + (curr.influencerPaidAmt || curr.outAmount || 0), 0);
   const cashflowBalance = totalBrandReceived - totalInfluencerPaid;
 
   const totalBarterViews = barterCollabs.reduce((acc, curr) => acc + (curr.viewsCount || 0), 0);
@@ -791,7 +925,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
           )}
 
           <button
-            onClick={() => openAddModal('Paid')}
+            onClick={() => openAddModal(viewMode === 'Paid Collaborations' ? 'Paid' : 'Barter')}
             className="px-4 py-2.5 btn-gradient-primary text-white rounded-xl font-bold text-xs flex items-center space-x-2 shadow-md transition"
           >
             <Plus size={16} />
@@ -833,7 +967,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
             <span className={`px-2 py-0.5 text-[10px] rounded-full font-black ${
               viewMode === 'Paid Collaborations' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-800'
             }`}>
-              {paidCollabs.length}
+              {allPaidCollabs.length}
             </span>
           </button>
 
@@ -850,7 +984,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
             <span className={`px-2 py-0.5 text-[10px] rounded-full font-black ${
               viewMode === 'Barter Collaborations' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-800'
             }`}>
-              {barterCollabs.length}
+              {allBarterCollabs.length}
             </span>
           </button>
 
@@ -1545,12 +1679,12 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className={`grid grid-cols-1 sm:grid-cols-2 ${isManagerOrAdmin ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-4`}>
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
                 <div>
                   <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">Brand Onboarding (IN)</p>
                   <h4 className="text-2xl font-black text-slate-900 mt-1">
-                    {isManagerOrAdmin ? `₹${new Intl.NumberFormat().format(totalBrandBilling)}` : <span className="inline-flex items-center px-3 py-1 rounded-xl bg-purple-100 text-purple-800 text-sm font-black shadow-2xs">PAID</span>}
+                    ₹{new Intl.NumberFormat().format(totalBrandBilling)}
                   </h4>
                   <p className="text-[11px] text-slate-400 font-semibold mt-0.5">Client Agreed Revenue</p>
                 </div>
@@ -1563,7 +1697,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                 <div>
                   <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">Creator Cost (OUT)</p>
                   <h4 className="text-2xl font-black text-slate-900 mt-1">
-                    {isManagerOrAdmin ? `₹${new Intl.NumberFormat().format(totalInfluencerCost)}` : <span className="inline-flex items-center px-3 py-1 rounded-xl bg-purple-100 text-purple-800 text-sm font-black shadow-2xs">PAID</span>}
+                    ₹{new Intl.NumberFormat().format(totalInfluencerCost)}
                   </h4>
                   <p className="text-[11px] text-slate-400 font-semibold mt-0.5">Real Influencer Payout</p>
                 </div>
@@ -1572,24 +1706,26 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-5 rounded-2xl text-white shadow-md flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-extrabold uppercase tracking-wider text-emerald-100">AD2ship Profit Margin</p>
-                  <h4 className="text-2xl font-black text-white mt-1">
-                    {isManagerOrAdmin ? `₹${new Intl.NumberFormat().format(netAd2shipMargin)}` : <span className="inline-flex items-center px-3 py-1 rounded-xl bg-white/20 text-white text-sm font-black shadow-2xs backdrop-blur-xs">PAID</span>}
-                  </h4>
-                  <p className="text-[11px] text-emerald-100 font-bold mt-0.5">{isManagerOrAdmin ? `Margin: ${marginPercentage}% Profit` : 'Paid Collaborations Active'}</p>
+              {isManagerOrAdmin && (
+                <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-5 rounded-2xl text-white shadow-md flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-extrabold uppercase tracking-wider text-emerald-100">AD2ship Profit Margin</p>
+                    <h4 className="text-2xl font-black text-white mt-1">
+                      ₹{new Intl.NumberFormat().format(netAd2shipMargin)}
+                    </h4>
+                    <p className="text-[11px] text-emerald-100 font-bold mt-0.5">Margin: {marginPercentage}% Profit</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold backdrop-blur-xs">
+                    <DollarSign size={24} />
+                  </div>
                 </div>
-                <div className="w-12 h-12 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold backdrop-blur-xs">
-                  <DollarSign size={24} />
-                </div>
-              </div>
+              )}
 
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
                 <div>
                   <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">Cashflow Balance</p>
                   <h4 className={`text-2xl font-black mt-1 ${cashflowBalance >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-                    {isManagerOrAdmin ? `₹${new Intl.NumberFormat().format(cashflowBalance)}` : <span className="inline-flex items-center px-3 py-1 rounded-xl bg-emerald-100 text-emerald-800 text-sm font-black shadow-2xs">PAID</span>}
+                    ₹{new Intl.NumberFormat().format(cashflowBalance)}
                   </h4>
                   <p className="text-[11px] text-slate-400 font-semibold mt-0.5">Received IN - Paid OUT</p>
                 </div>
@@ -1639,7 +1775,9 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                       <>
                         <SortHeader field="brandOnboardingAmt" label="Brand Price (IN)" align="right" />
                         <SortHeader field="influencerOnboardingAmt" label="Creator Price (OUT)" align="right" />
-                        <SortHeader field="ad2shipMargin" label="AD2ship Margin" align="right" />
+                        {isManagerOrAdmin && (
+                          <SortHeader field="ad2shipMargin" label="AD2ship Margin" align="right" />
+                        )}
                         <SortHeader field="ordersCount" label="Orders & Bonus" align="center" />
                       </>
                     )}
@@ -1684,7 +1822,13 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                           </td>
 
                           <td className="p-3 border-r border-slate-100 font-semibold whitespace-nowrap text-slate-600">
-                            {new Date(item.transactionDate).toLocaleDateString()}
+                            {item.transactionDate ? (
+                              new Date(item.transactionDate).toLocaleDateString()
+                            ) : item.connectedDate ? (
+                              <span className="text-purple-700 font-bold" title="Connection Date">{new Date(item.connectedDate).toLocaleDateString()}</span>
+                            ) : (
+                              '—'
+                            )}
                           </td>
 
                           <td className="p-3 border-r border-slate-100 font-semibold text-slate-700">
@@ -1712,28 +1856,18 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                           {(viewMode === 'Paid Collaborations' || viewMode === 'All Collaborations') && (
                             <>
                               <td className="p-3 border-r border-slate-100 text-right font-black text-slate-900">
-                                {isManagerOrAdmin ? (
-                                  `₹${new Intl.NumberFormat().format(item.brandOnboardingAmt || item.inAmount || 0)}`
-                                ) : (
-                                  <span className="px-2.5 py-0.5 rounded-lg bg-purple-100 text-purple-800 text-xs font-black border border-purple-200">PAID</span>
-                                )}
+                                ₹{new Intl.NumberFormat().format(item.brandOnboardingAmt || item.inAmount || 0)}
                               </td>
 
                               <td className="p-3 border-r border-slate-100 text-right font-black text-slate-700">
-                                {isManagerOrAdmin ? (
-                                  `₹${new Intl.NumberFormat().format(item.influencerOnboardingAmt || item.outAmount || 0)}`
-                                ) : (
-                                  <span className="px-2.5 py-0.5 rounded-lg bg-purple-100 text-purple-800 text-xs font-black border border-purple-200">PAID</span>
-                                )}
+                                ₹{new Intl.NumberFormat().format(item.influencerOnboardingAmt || item.outAmount || 0)}
                               </td>
 
-                              <td className="p-3 border-r border-slate-100 text-right font-black text-emerald-600 bg-emerald-50/30">
-                                {isManagerOrAdmin ? (
-                                  `₹${new Intl.NumberFormat().format(margin)}`
-                                ) : (
-                                  <span className="px-2.5 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 text-xs font-black border border-emerald-200">PAID</span>
-                                )}
-                              </td>
+                              {isManagerOrAdmin && (
+                                <td className="p-3 border-r border-slate-100 text-right font-black text-emerald-600 bg-emerald-50/30">
+                                  ₹{new Intl.NumberFormat().format(margin)}
+                                </td>
+                              )}
 
                               <td className="p-3 border-r border-slate-100 text-center">
                                 {isBonusQualified ? (
@@ -1942,11 +2076,11 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         title={editingItem ? 'Edit Collaboration Record' : 'New Influencer Collaboration'}
-        maxWidth="max-w-2xl"
+        maxWidth="max-w-3xl"
       >
         <form onSubmit={handleSubmitInfluencer} className="space-y-4 text-xs font-bold">
           {/* Category Selector */}
-          <div className="p-3 bg-purple-50 rounded-2xl border border-purple-100 flex items-center justify-between">
+          <div className="p-3 bg-purple-50/70 rounded-2xl border border-purple-100 flex items-center justify-between">
             <span className="text-slate-700 font-black">Collaboration Type:</span>
             <div className="flex space-x-2">
               <button
@@ -1984,26 +2118,18 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
               />
             </div>
 
-            <div>
-              <label className="block text-slate-700 mb-1">Brand Name *</label>
-              <select
-                value={selectedBrandId}
-                onChange={(e) => {
-                  setSelectedBrandId(e.target.value);
-                  const found = brands.find(b => b._id === e.target.value);
-                  if (found) setCustomBrandName(found.brandName);
-                }}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none font-bold"
-              >
-                <option value="">-- Select Brand --</option>
-                {brands.map(b => (
-                  <option key={b._id} value={b._id}>{b.brandName}</option>
-                ))}
-              </select>
-            </div>
+            <SearchableBrandSelect
+              brands={brands}
+              selectedBrandId={selectedBrandId}
+              customBrandName={customBrandName}
+              onSelectBrand={(bId, bName) => {
+                setSelectedBrandId(bId);
+                setCustomBrandName(bName);
+              }}
+            />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-slate-700 mb-1">Manager Name</label>
               <input
@@ -2025,23 +2151,36 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                 className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
               />
             </div>
+          </div>
 
+          {/* Timeline & Status Bar */}
+          <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-slate-700 mb-1">Transaction Date</label>
+              <label className="block text-slate-700 mb-1 font-extrabold">Connection Date *</label>
               <input
                 type="date"
-                value={transactionDate}
-                onChange={(e) => setTransactionDate(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
+                value={connectedDate}
+                onChange={(e) => setConnectedDate(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none font-semibold text-purple-900 bg-white"
               />
             </div>
 
             <div>
-              <label className="block text-slate-700 mb-1">Status</label>
+              <label className="block text-slate-700 mb-1 font-extrabold">Transaction Date</label>
+              <input
+                type="date"
+                value={transactionDate}
+                onChange={(e) => setTransactionDate(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none font-semibold bg-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-700 mb-1 font-extrabold">Deal Status</label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as any)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none font-bold"
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none font-bold bg-white"
               >
                 <option value="Under Review">🟡 Under Review</option>
                 {isManagerOrAdmin ? (
@@ -2058,13 +2197,15 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
           </div>
 
           {/* FINANCIAL BREAKDOWN SECTION (PAID COLLABS) */}
-          {category === 'Paid' && isManagerOrAdmin && (
+          {category === 'Paid' && (
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
               <h4 className="font-black text-slate-900 flex items-center justify-between">
-                <span>Financial Breakdown (AD2ship Margin Engine)</span>
-                <span className="text-[11px] text-purple-700 font-extrabold bg-purple-100 px-2 py-0.5 rounded-md">
-                  Auto-Calculated Margin
-                </span>
+                <span>Financial Details</span>
+                {isManagerOrAdmin && (
+                  <span className="text-[11px] text-purple-700 font-extrabold bg-purple-100 px-2 py-0.5 rounded-md">
+                    Auto-Calculated Margin
+                  </span>
+                )}
               </h4>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2119,27 +2260,22 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                 </div>
               </div>
 
-              {/* Real-time AD2ship Margin Preview */}
-              <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-3 rounded-xl text-white flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-emerald-100">Calculated AD2ship Profit Margin</span>
-                  <p className="text-base font-black">
-                    ₹{new Intl.NumberFormat().format(Number(brandOnboardingAmt || 0) - Number(influencerOnboardingAmt || 0))}
-                  </p>
+              {/* Real-time AD2ship Margin Preview (Manager/Admin Only) */}
+              {isManagerOrAdmin && (
+                <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-3 rounded-xl text-white flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-emerald-100">Calculated AD2ship Profit Margin</span>
+                    <p className="text-base font-black">
+                      ₹{new Intl.NumberFormat().format(Number(brandOnboardingAmt || 0) - Number(influencerOnboardingAmt || 0))}
+                    </p>
+                  </div>
+                  <span className="text-xs font-black bg-white/20 px-3 py-1 rounded-lg">
+                    {Number(brandOnboardingAmt || 0) > 0 
+                      ? `${Math.round(((Number(brandOnboardingAmt || 0) - Number(influencerOnboardingAmt || 0)) / Number(brandOnboardingAmt || 1)) * 100)}% Profit`
+                      : '0%'}
+                  </span>
                 </div>
-                <span className="text-xs font-black bg-white/20 px-3 py-1 rounded-lg">
-                  {Number(brandOnboardingAmt || 0) > 0 
-                    ? `${Math.round(((Number(brandOnboardingAmt || 0) - Number(influencerOnboardingAmt || 0)) / Number(brandOnboardingAmt || 1)) * 100)}% Profit`
-                    : '0%'}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {category === 'Paid' && !isManagerOrAdmin && (
-            <div className="p-4 bg-purple-50/70 rounded-2xl border border-purple-200 flex items-center justify-between text-purple-900 font-extrabold text-xs">
-              <span>🔒 Paid Collaboration Record</span>
-              <span className="px-2.5 py-1 rounded-lg bg-purple-200/80 text-purple-900 text-[11px] font-black uppercase">Financial Confidentiality Active</span>
+              )}
             </div>
           )}
 

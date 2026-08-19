@@ -21,6 +21,23 @@ export const buildDateFilter = (timeframe?: string, year?: string | number, mont
   const currentYear = Number(year) || now.getFullYear();
   const currentMonth = month !== undefined ? Number(month) - 1 : now.getMonth();
 
+  const getDateQuery = (start: Date, end: Date) => ({
+    $or: [
+      { transactionDate: { $gte: start, $lte: end } },
+      {
+        $and: [
+          { $or: [{ transactionDate: { $exists: false } }, { transactionDate: null }] },
+          {
+            $or: [
+              { connectedDate: { $gte: start, $lte: end } },
+              { createdAt: { $gte: start, $lte: end } }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
   if (timeframe && typeof timeframe === 'string' && timeframe.includes('_')) {
     const parts = timeframe.split('_');
     const monthNames: Record<string, number> = {
@@ -32,20 +49,20 @@ export const buildDateFilter = (timeframe?: string, year?: string | number, mont
     if (mIdx !== undefined) {
       const startOfMonth = new Date(yr, mIdx, 1, 0, 0, 0);
       const endOfMonth = new Date(yr, mIdx + 1, 0, 23, 59, 59);
-      filter.transactionDate = { $gte: startOfMonth, $lte: endOfMonth };
+      filter.$and = [getDateQuery(startOfMonth, endOfMonth)];
     }
   } else if (timeframe === 'today') {
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
     const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-    filter.transactionDate = { $gte: startOfDay, $lte: endOfDay };
+    filter.$and = [getDateQuery(startOfDay, endOfDay)];
   } else if (timeframe === 'monthly' || timeframe === 'Month') {
     const startOfMonth = new Date(currentYear, currentMonth, 1, 0, 0, 0);
     const endOfMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
-    filter.transactionDate = { $gte: startOfMonth, $lte: endOfMonth };
+    filter.$and = [getDateQuery(startOfMonth, endOfMonth)];
   } else if (timeframe === 'yearly' || timeframe === 'Year') {
     const startOfYear = new Date(currentYear, 0, 1, 0, 0, 0);
     const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59);
-    filter.transactionDate = { $gte: startOfYear, $lte: endOfYear };
+    filter.$and = [getDateQuery(startOfYear, endOfYear)];
   }
   return filter;
 };
@@ -57,6 +74,8 @@ export const recalculateTargetProgress = async (target: any, customDateFilter?: 
   let filter: any = {};
   if (customDateFilter && customDateFilter.transactionDate) {
     filter.transactionDate = customDateFilter.transactionDate;
+  } else if (customDateFilter && customDateFilter.$and) {
+    filter.$and = customDateFilter.$and;
   } else {
     const now = new Date();
     let startDate = target.startDate;
@@ -66,7 +85,20 @@ export const recalculateTargetProgress = async (target: any, customDateFilter?: 
       startDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
       endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
     }
-    filter.transactionDate = { $gte: startDate, $lte: endDate };
+    filter.$or = [
+      { transactionDate: { $gte: startDate, $lte: endDate } },
+      {
+        $and: [
+          { $or: [{ transactionDate: { $exists: false } }, { transactionDate: null }] },
+          {
+            $or: [
+              { connectedDate: { $gte: startDate, $lte: endDate } },
+              { createdAt: { $gte: startDate, $lte: endDate } }
+            ]
+          }
+        ]
+      }
+    ];
   }
 
   if (target.targetType === 'Barter') {

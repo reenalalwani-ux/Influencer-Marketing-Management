@@ -1,3 +1,4 @@
+// Server Entry Point - Permissions Synced
 import dotenv from 'dotenv';
 dotenv.config();
 

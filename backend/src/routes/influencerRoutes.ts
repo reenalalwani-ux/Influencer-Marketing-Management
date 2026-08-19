@@ -71,10 +71,27 @@ router.get('/', authenticateToken, checkPermission('influencer.view'), async (re
       filter.category = category;
     }
 
-    // 2. Timeframe Filter (Today, Monthly, Yearly)
+    // 2. Timeframe Filter (Today, Monthly, Yearly) — Matches transactionDate OR connectedDate/createdAt if transactionDate is blank
     const now = new Date();
     const currentYear = Number(year) || now.getFullYear();
     const currentMonth = month !== undefined ? Number(month) - 1 : now.getMonth();
+
+    const getDateQuery = (start: Date, end: Date) => ({
+      $or: [
+        { transactionDate: { $gte: start, $lte: end } },
+        {
+          $and: [
+            { $or: [{ transactionDate: { $exists: false } }, { transactionDate: null }] },
+            {
+              $or: [
+                { connectedDate: { $gte: start, $lte: end } },
+                { createdAt: { $gte: start, $lte: end } }
+              ]
+            }
+          ]
+        }
+      ]
+    });
 
     if (timeframe && (timeframe as string).includes('_')) {
       const parts = (timeframe as string).split('_');
@@ -87,20 +104,24 @@ router.get('/', authenticateToken, checkPermission('influencer.view'), async (re
       if (mIdx !== undefined) {
         const startOfMonth = new Date(yr, mIdx, 1, 0, 0, 0);
         const endOfMonth = new Date(yr, mIdx + 1, 0, 23, 59, 59);
-        filter.transactionDate = { $gte: startOfMonth, $lte: endOfMonth };
+        filter.$and = filter.$and || [];
+        filter.$and.push(getDateQuery(startOfMonth, endOfMonth));
       }
     } else if (timeframe === 'today') {
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
       const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-      filter.transactionDate = { $gte: startOfDay, $lte: endOfDay };
+      filter.$and = filter.$and || [];
+      filter.$and.push(getDateQuery(startOfDay, endOfDay));
     } else if (timeframe === 'monthly' || timeframe === 'Month') {
       const startOfMonth = new Date(currentYear, currentMonth, 1, 0, 0, 0);
       const endOfMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
-      filter.transactionDate = { $gte: startOfMonth, $lte: endOfMonth };
+      filter.$and = filter.$and || [];
+      filter.$and.push(getDateQuery(startOfMonth, endOfMonth));
     } else if (timeframe === 'yearly' || timeframe === 'Year') {
       const startOfYear = new Date(currentYear, 0, 1, 0, 0, 0);
       const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59);
-      filter.transactionDate = { $gte: startOfYear, $lte: endOfYear };
+      filter.$and = filter.$and || [];
+      filter.$and.push(getDateQuery(startOfYear, endOfYear));
     }
 
     // 3. Search Filter
@@ -145,7 +166,7 @@ router.post('/', authenticateToken, checkPermission('influencer.create'), async 
       influencerName, influencerManager, brandId, brandName, phone, profileLink, category,
       brandOnboardingAmt, brandReceivedAmt, influencerOnboardingAmt, influencerPaidAmt, finalPaymentReceived,
       inAmount, outAmount, productLink, videoType, videoDescription, refVideoLink, orderId, orderDate,
-      platform, status, contentLink, adsCode, viewsCount, ordersCount, ordersGenerated, isApproved, notes, remark, transactionDate
+      platform, status, contentLink, adsCode, viewsCount, ordersCount, ordersGenerated, isApproved, notes, remark, transactionDate, connectedDate
     } = req.body;
 
     if (!influencerName) {
@@ -179,7 +200,8 @@ router.post('/', authenticateToken, checkPermission('influencer.create'), async 
 
     const newRecord = await Influencer.create({
       sNo: count + 1,
-      transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
+      transactionDate: transactionDate ? new Date(transactionDate) : undefined,
+      connectedDate: connectedDate ? new Date(connectedDate) : new Date(),
       influencerManager: influencerManager || req.user?.name || '',
       brandId: brandId || undefined,
       brandName: finalBrandName || 'General',
@@ -278,7 +300,7 @@ router.put('/:id', authenticateToken, checkPermission('influencer.update'), asyn
       influencerName, influencerManager, brandId, brandName, phone, profileLink, category,
       brandOnboardingAmt, brandReceivedAmt, influencerOnboardingAmt, influencerPaidAmt, finalPaymentReceived,
       inAmount, outAmount, productLink, videoType, videoDescription, refVideoLink, orderId, orderDate,
-      platform, status, contentLink, adsCode, viewsCount, ordersCount, ordersGenerated, isApproved, notes, remark, transactionDate
+      platform, status, contentLink, adsCode, viewsCount, ordersCount, ordersGenerated, isApproved, notes, remark, transactionDate, connectedDate
     } = req.body;
 
     const record = await Influencer.findById(req.params.id);
@@ -335,7 +357,8 @@ router.put('/:id', authenticateToken, checkPermission('influencer.update'), asyn
     if (isApproved !== undefined) record.isApproved = !!isApproved;
     if (notes !== undefined) record.notes = notes;
     if (remark !== undefined) record.remark = remark;
-    if (transactionDate) record.transactionDate = new Date(transactionDate);
+    if (transactionDate !== undefined) record.transactionDate = transactionDate ? new Date(transactionDate) : (undefined as any);
+    if (connectedDate !== undefined) record.connectedDate = connectedDate ? new Date(connectedDate) : (undefined as any);
 
     await record.save();
 

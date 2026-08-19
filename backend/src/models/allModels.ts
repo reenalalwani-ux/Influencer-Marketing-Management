@@ -306,7 +306,8 @@ const TargetSchema = new Schema<ITarget>({
 // 14. Influencer Schema
 export interface IInfluencer extends Document {
   sNo?: number;
-  transactionDate: Date;
+  transactionDate?: Date;
+  connectedDate?: Date;
   influencerManager?: string;
   brandId?: mongoose.Types.ObjectId;
   brandName: string;
@@ -353,7 +354,8 @@ export interface IInfluencer extends Document {
 
 const InfluencerSchema = new Schema<IInfluencer>({
   sNo: { type: Number },
-  transactionDate: { type: Date, default: Date.now },
+  transactionDate: { type: Date },
+  connectedDate: { type: Date },
   influencerManager: { type: String, default: '' },
   brandManagerTeam: { type: String, default: '' },
   assignedExecutive: { type: String, default: '' },

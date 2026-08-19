@@ -252,7 +252,8 @@ export interface TargetItem {
 export interface InfluencerTransaction {
   _id: string;
   sNo?: number;
-  transactionDate: string;
+  transactionDate?: string;
+  connectedDate?: string;
   influencerManager?: string;
   brandId?: Brand | any;
   brandName: string;
