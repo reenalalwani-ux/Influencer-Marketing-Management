@@ -1,4 +1,4 @@
-// Server Entry Point - Permissions Synced
+// Server Entry Point - Dynamic Collabs Calculation Synced
 import dotenv from 'dotenv';
 dotenv.config();
 

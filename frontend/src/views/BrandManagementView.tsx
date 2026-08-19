@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Briefcase, Plus, Globe, Mail, Phone, ExternalLink, Search, Users, Eye, Edit2, Trash2, Loader2 } from 'lucide-react';
+import { Briefcase, Plus, Globe, Mail, Phone, ExternalLink, Search, Users, Eye, Edit2, Trash2, Loader2, ChevronDown } from 'lucide-react';
 import { api } from '../services/api';
 import { Brand } from '../types';
 import { Modal } from '../components/Modal';
@@ -7,11 +7,17 @@ import { Pagination } from '../components/Pagination';
 import { InlineLoader } from '../components/PageLoader';
 import { DataTable, DataTableColumn } from '../components/DataTable';
 
-export const BrandManagementView: React.FC = () => {
+interface BrandManagementViewProps {
+  userRole?: string;
+}
+
+export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRole }) => {
+  const isEmployee = userRole === 'Employee';
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [brandTypeFilter, setBrandTypeFilter] = useState<'All' | 'New' | 'Running'>('All');
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [savingBrand, setSavingBrand] = useState(false);
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
@@ -239,7 +245,7 @@ export const BrandManagementView: React.FC = () => {
             <Mail size={11} className="text-purple-600 shrink-0" />
             <span>{row.email}</span>
           </div>
-          {row.phone && (
+          {!isEmployee && row.phone && (
             <div className="flex items-center gap-1 text-slate-500">
               <Phone size={11} className="text-slate-400 shrink-0" />
               <span>{row.phone}</span>
@@ -313,18 +319,20 @@ export const BrandManagementView: React.FC = () => {
             <Briefcase size={22} />
           </div>
           <div>
-            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Brand Portfolio</h2>
+            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">{isEmployee ? 'Brand' : 'Brand Portfolio'}</h2>
             <p className="text-xs font-semibold text-slate-500 mt-0.5">Maintain portfolio of brands handled by the company.</p>
           </div>
         </div>
 
-        <button
-          onClick={openAddBrandModal}
-          className="px-4 py-2.5 btn-gradient-primary text-white rounded-xl font-bold text-sm flex items-center space-x-2 self-start sm:self-auto shadow-md"
-        >
-          <Plus size={18} />
-          <span>Add Brand</span>
-        </button>
+        {!isEmployee && (
+          <button
+            onClick={openAddBrandModal}
+            className="px-4 py-2.5 btn-gradient-primary text-white rounded-xl font-bold text-sm flex items-center space-x-2 self-start sm:self-auto shadow-md"
+          >
+            <Plus size={18} />
+            <span>Add Brand</span>
+          </button>
+        )}
       </div>
 
       {/* Search & Brand Type Filter */}
@@ -340,19 +348,72 @@ export const BrandManagementView: React.FC = () => {
           />
         </div>
 
-        <div className="flex items-center space-x-2 self-end sm:self-auto shrink-0">
-          <label className="text-[11px] font-bold text-slate-500">Status:</label>
-          <select
-            value={brandTypeFilter}
-            onChange={(e) => setBrandTypeFilter(e.target.value as any)}
-            className="bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-purple-500"
-          >
-            <option value="All">All Brands ({brands.length})</option>
-            <option value="Running">Running Brands (7B : 3P)</option>
-            <option value="New">New Brands (8B : 2P)</option>
-          </select>
+        <div className="flex items-center space-x-2.5 self-end sm:self-auto shrink-0 relative">
+          <label className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Status:</label>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
+              className="px-3.5 py-2 rounded-xl bg-purple-50/80 hover:bg-purple-100/80 border border-purple-200 text-purple-900 text-xs font-black flex items-center gap-2 cursor-pointer transition shadow-2xs"
+            >
+              <span>
+                {brandTypeFilter === 'All' && `🌐 All Brands (${brands.length})`}
+                {brandTypeFilter === 'Running' && `⚡ Running Brands`}
+                {brandTypeFilter === 'New' && `✨ New Brands`}
+              </span>
+              <ChevronDown size={14} className={`text-purple-600 transition-transform ${statusDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {statusDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-20" onClick={() => setStatusDropdownOpen(false)} />
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-200/90 p-1.5 z-30 space-y-1 animate-in fade-in zoom-in-95">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBrandTypeFilter('All');
+                      setStatusDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition cursor-pointer ${
+                      brandTypeFilter === 'All' ? 'bg-purple-50 text-purple-700 font-extrabold' : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>🌐 All Brands</span>
+                    <span className="text-[10px] bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full font-extrabold">{brands.length}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBrandTypeFilter('Running');
+                      setStatusDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer ${
+                      brandTypeFilter === 'Running' ? 'bg-blue-50 text-blue-700 font-extrabold' : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>⚡ Running Brands</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBrandTypeFilter('New');
+                      setStatusDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer ${
+                      brandTypeFilter === 'New' ? 'bg-emerald-50 text-emerald-700 font-extrabold' : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>✨ New Brands</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
           {filteredBrands.length > 0 && (
-            <span className="text-xs text-slate-400 font-semibold whitespace-nowrap ml-2">
+            <span className="text-xs font-extrabold text-slate-400 whitespace-nowrap bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200">
               {filteredBrands.length} records
             </span>
           )}
@@ -590,10 +651,9 @@ export const BrandManagementView: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Phone *</label>
+              <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Phone</label>
               <input
                 type="text"
-                required
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+91 98765 00000"

@@ -76,6 +76,13 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
+  // Guard for Employee role accessing prohibited views (e.g., settings or system reports)
+  useEffect(() => {
+    if (user && user.role === 'Employee' && (activeView === 'settings' || activeView === 'reports')) {
+      handleNavigate('dashboard');
+    }
+  }, [user, activeView]);
+
   // If URL has a public share token, render public share view immediately (no login required)
   if (shareToken) {
     return <PublicCalendarShareView token={shareToken} />;
@@ -179,7 +186,7 @@ export const App: React.FC = () => {
           )}
 
           {activeView === 'employees' && <EmployeeManagementView />}
-          {activeView === 'brands' && <BrandManagementView />}
+          {activeView === 'brands' && <BrandManagementView userRole={user.role} />}
           {activeView === 'influencers' && (
             <InfluencerManagementView
               userRole={user.role}
@@ -189,7 +196,11 @@ export const App: React.FC = () => {
             />
           )}
           {activeView === 'employee-brands' && (
-            <EmployeeBrandAssignmentView userRole={user.role} currentUser={user} />
+            user.role === 'Employee' ? (
+              <BrandManagementView userRole={user.role} />
+            ) : (
+              <EmployeeBrandAssignmentView userRole={user.role} currentUser={user} />
+            )
           )}
           {activeView === 'tasks' && (
             <TaskManagementView
@@ -212,7 +223,7 @@ export const App: React.FC = () => {
               onOpenSubmitUrlModal={(task) => setSubmitUrlTask(task)}
             />
           )}
-          {activeView === 'performance' && <EmployeePerformanceView />}
+          {activeView === 'performance' && <EmployeePerformanceView currentUser={user} />}
           {activeView === 'reports' && <ReportsView userRole={user.role} currentUser={user} />}
           {activeView === 'audit-logs' && <AuditLogView />}
           {activeView === 'settings' && <SettingsView userRole={user.role} currentUser={user} />}

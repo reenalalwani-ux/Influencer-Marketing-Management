@@ -8,7 +8,21 @@ const router = Router();
 // GET /api/v1/reports/employee-summary
 router.get('/employee-summary', authenticateToken, checkPermission('report.view'), async (req: AuthRequest, res: Response) => {
   try {
-    const employees = await Employee.find().sort({ name: 1 });
+    const isEmployeeRole = req.user?.role?.toLowerCase() === 'employee';
+    let empQuery: any = {};
+    if (isEmployeeRole) {
+      const currentEmp = await Employee.findOne({
+        $or: [
+          { email: req.user?.email },
+          { name: req.user?.name }
+        ]
+      });
+      if (currentEmp) {
+        empQuery._id = currentEmp._id;
+      }
+    }
+
+    const employees = await Employee.find(empQuery).sort({ name: 1 });
 
     const report = await Promise.all(
       employees.map(async (emp) => {
@@ -50,7 +64,25 @@ router.get('/employee-summary', authenticateToken, checkPermission('report.view'
 // GET /api/v1/reports/brand-summary
 router.get('/brand-summary', authenticateToken, checkPermission('report.view'), async (req: AuthRequest, res: Response) => {
   try {
-    const brands = await Brand.find().sort({ brandName: 1 });
+    const isEmployeeRole = req.user?.role?.toLowerCase() === 'employee';
+    let brandQuery: any = {};
+    if (isEmployeeRole) {
+      const currentEmp = await Employee.findOne({
+        $or: [
+          { email: req.user?.email },
+          { name: req.user?.name }
+        ]
+      });
+      if (currentEmp) {
+        const assignments = await EmployeeBrand.find({ employeeId: currentEmp._id, status: 'Active' });
+        const assignedBrandIds = assignments.map(a => a.brandId);
+        brandQuery._id = { $in: assignedBrandIds };
+      } else {
+        brandQuery._id = { $in: [] };
+      }
+    }
+
+    const brands = await Brand.find(brandQuery).sort({ brandName: 1 });
 
     const report = await Promise.all(
       brands.map(async (b) => {
@@ -97,7 +129,28 @@ router.get('/daily-posting', authenticateToken, checkPermission('report.view'), 
   endOfDay.setHours(23, 59, 59, 999);
 
   try {
-    const tasks = await Task.find({ scheduledDate: { $gte: startOfDay, $lte: endOfDay } })
+    const isEmployeeRole = req.user?.role?.toLowerCase() === 'employee';
+    let taskFilter: any = { scheduledDate: { $gte: startOfDay, $lte: endOfDay } };
+    if (isEmployeeRole) {
+      const currentEmp = await Employee.findOne({
+        $or: [
+          { email: req.user?.email },
+          { name: req.user?.name }
+        ]
+      });
+      if (currentEmp) {
+        const assignments = await EmployeeBrand.find({ employeeId: currentEmp._id, status: 'Active' });
+        const assignedBrandIds = assignments.map(a => a.brandId);
+        taskFilter.$or = [
+          { employeeId: currentEmp._id },
+          { brandId: { $in: assignedBrandIds } }
+        ];
+      } else {
+        taskFilter.employeeId = null;
+      }
+    }
+
+    const tasks = await Task.find(taskFilter)
       .populate('employeeId', 'name employeeId')
       .populate('brandId', 'brandName')
       .sort({ scheduledTime: 1 });

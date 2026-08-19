@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { BarChart3, Search, LayoutGrid, Table as TableIcon } from 'lucide-react';
+import { BarChart3, Search, LayoutGrid, Table as TableIcon, Download, FileSpreadsheet, Layers, Calendar, Loader2, Eye, ArrowLeft } from 'lucide-react';
 import { api } from '../services/api';
-import { EmployeePerformanceData } from '../types';
+import { EmployeePerformanceData, User } from '../types';
 import { Pagination } from '../components/Pagination';
 import { PageLoader } from '../components/PageLoader';
 import { DataTable, DataTableColumn } from '../components/DataTable';
 import { MonthDatePicker } from '../components/MonthDatePicker';
+import { Modal } from '../components/Modal';
+
+interface EmployeePerformanceViewProps {
+  currentUser?: User | null;
+}
 
 const getCurrentMonthTimeframe = () => {
   const now = new Date();
@@ -13,7 +18,7 @@ const getCurrentMonthTimeframe = () => {
   return `${monthNames[now.getMonth()]}_${now.getFullYear()}`;
 };
 
-export const EmployeePerformanceView: React.FC = () => {
+export const EmployeePerformanceView: React.FC<EmployeePerformanceViewProps> = ({ currentUser }) => {
   const [performanceData, setPerformanceData] = useState<EmployeePerformanceData[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
@@ -23,6 +28,13 @@ export const EmployeePerformanceView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = viewMode === 'table' ? 10 : 4;
+
+  // Export & In-Panel Report State
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportingReportType, setExportingReportType] = useState<string | null>(null);
+  const [activePanelReportTab, setActivePanelReportTab] = useState<'analytics' | 'member-summary' | 'brand-summary' | 'daily-posting'>('analytics');
+  const [panelReportData, setPanelReportData] = useState<any[]>([]);
+  const [panelReportLoading, setPanelReportLoading] = useState(false);
 
   const fetchPerformance = async () => {
     setLoading(true);
@@ -66,6 +78,111 @@ export const EmployeePerformanceView: React.FC = () => {
     setCurrentPage(1);
   };
 
+  // CSV Exporter for Performance & Incentives
+  const handleExportPerformanceCSV = () => {
+    if (filteredData.length === 0) {
+      alert('No performance data available to export');
+      return;
+    }
+    const headers = ['Member Name', 'Employee ID', 'Designation', 'Paid Target', 'Paid Revenue', 'Slab %', 'Target Incentive', 'Order Bonus Count', 'Order Bonus Amount', 'Total Take Home', 'Barter Collabs', 'Paid Collabs', 'Brands Managed', 'Completion Rate'];
+    const rows = filteredData.map(row => [
+      `"${row.employee?.name || ''}"`,
+      `"${row.employee?.employeeId || ''}"`,
+      `"${row.employee?.designation || ''}"`,
+      `"${(row.incentiveSummary as any)?.paidTarget || 0}"`,
+      `"${(row.incentiveSummary as any)?.paidRevenueAchieved || 0}"`,
+      `"${(row.incentiveSummary as any)?.tierPercentage || 0}%"`,
+      `"${row.incentiveSummary?.targetIncentiveAmount || 0}"`,
+      `"${row.incentiveSummary?.qualifyingBonusDealsCount || 0}"`,
+      `"${row.incentiveSummary?.orderBonusAmount || 0}"`,
+      `"${row.incentiveSummary?.totalTakeHomeIncentive || 0}"`,
+      `"${row.incentiveSummary?.barterCount || 0}"`,
+      `"${row.incentiveSummary?.paidCount || 0}"`,
+      `"${row.metrics?.brandsManaged || 0}"`,
+      `"${row.metrics?.completionRate || 0}%"`
+    ].join(','));
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows].join('\n');
+    const link = document.createElement('a');
+    link.href = encodeURI(csvContent);
+    link.download = `performance_incentive_report_${timeframe}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // CSV Exporter for General API endpoints
+  const handleExportApiReport = async (endpoint: string, fileName: string, reportType: string) => {
+    setExportingReportType(reportType);
+    try {
+      const res = await api.get(endpoint);
+      if (res.success && res.data && res.data.length > 0) {
+        let data = res.data;
+        if (currentUser?.role === 'Employee' && currentUser?.name) {
+          const empNameLower = currentUser.name.toLowerCase();
+          if (endpoint.includes('employee-summary')) {
+            data = data.filter((item: any) => item.name?.toLowerCase().includes(empNameLower) || item.employeeId === currentUser.id);
+          } else if (endpoint.includes('daily-posting')) {
+            data = data.filter((item: any) => item.employee?.toLowerCase().includes(empNameLower));
+          }
+        }
+        if (data.length === 0) {
+          alert('No report entries found for your account');
+          return;
+        }
+        const headers = Object.keys(data[0]).join(',');
+        const rows = data.map((row: any) =>
+          Object.values(row).map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')
+        );
+        const csvContent = 'data:text/csv;charset=utf-8,' + [headers, ...rows].join('\n');
+        const link = document.createElement('a');
+        link.href = encodeURI(csvContent);
+        link.download = `${fileName}_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        alert('No data found for this report export');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to export report');
+    } finally {
+      setExportingReportType(null);
+    }
+  };
+
+  // View Report on Panel (redirect view without download)
+  const handleViewReportOnPanel = async (tab: 'member-summary' | 'brand-summary' | 'daily-posting') => {
+    setShowExportModal(false);
+    setActivePanelReportTab(tab);
+    setPanelReportLoading(true);
+    try {
+      let endpoint = '/reports/employee-summary';
+      if (tab === 'brand-summary') endpoint = '/reports/brand-summary';
+      if (tab === 'daily-posting') endpoint = '/reports/daily-posting';
+
+      const res = await api.get(endpoint);
+      if (res.success) {
+        let data = res.data || [];
+        if (currentUser?.role === 'Employee' && currentUser?.name) {
+          const empNameLower = currentUser.name.toLowerCase();
+          if (tab === 'member-summary') {
+            data = data.filter((item: any) => item.name?.toLowerCase().includes(empNameLower) || item.employeeId === currentUser.id);
+          } else if (tab === 'daily-posting') {
+            data = data.filter((item: any) => item.employee?.toLowerCase().includes(empNameLower));
+          }
+        }
+        setPanelReportData(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setPanelReportLoading(false);
+    }
+  };
+
+  const isEmployee = currentUser?.role === 'Employee';
+
   const columns: DataTableColumn<EmployeePerformanceData>[] = [
     {
       key: 'employeeName',
@@ -85,7 +202,7 @@ export const EmployeePerformanceView: React.FC = () => {
         </div>
       ),
     },
-    {
+    ...(!isEmployee ? [{
       key: 'netMargin',
       label: 'Ad2ship Net Margin',
       sortable: true,
@@ -102,7 +219,7 @@ export const EmployeePerformanceView: React.FC = () => {
           </div>
         );
       }
-    },
+    }] as DataTableColumn<EmployeePerformanceData>[] : []),
     {
       key: 'targetTier',
       label: 'Incentive Slab',
@@ -241,6 +358,15 @@ export const EmployeePerformanceView: React.FC = () => {
             </button>
           </div>
 
+          {/* Export & Reports Action Button */}
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="px-3.5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition"
+          >
+            <Download size={15} />
+            <span>Export Reports</span>
+          </button>
+
           {/* Search Input */}
           <div className="relative w-full sm:w-56">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -301,12 +427,14 @@ export const EmployeePerformanceView: React.FC = () => {
 
                     {/* Net Margin & Slabs Box (Clean Light Theme) */}
                     <div className="p-3.5 bg-gradient-to-br from-slate-50 via-purple-50/40 to-emerald-50/40 border border-slate-200/90 rounded-2xl space-y-2.5 shadow-2xs">
-                      <div className="flex justify-between items-center text-xs font-bold">
-                        <span className="text-slate-600">Net Ad2ship Margin:</span>
-                        <span className="text-base font-black text-slate-900">
-                          ₹{new Intl.NumberFormat().format(margin)}
-                        </span>
-                      </div>
+                      {!isEmployee && (
+                        <div className="flex justify-between items-center text-xs font-bold">
+                          <span className="text-slate-600">Net Ad2ship Margin:</span>
+                          <span className="text-base font-black text-slate-900">
+                            ₹{new Intl.NumberFormat().format(margin)}
+                          </span>
+                        </div>
+                      )}
 
                       <div className="space-y-1">
                         <div className="flex justify-between text-[11px] font-bold text-slate-500">
@@ -383,6 +511,233 @@ export const EmployeePerformanceView: React.FC = () => {
               onPageChange={setCurrentPage}
             />
           </div>
+        </div>
+      )}
+
+      {/* Modal: Export & Reports */}
+      <Modal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        title="Export & Download Performance Reports"
+        maxWidth="max-w-3xl"
+      >
+        <div className="space-y-5 text-xs font-semibold text-slate-700 p-1">
+          {/* Top Featured Hero Banner: Performance & Incentives */}
+          <div className="p-5 rounded-3xl bg-gradient-to-r from-purple-50 via-indigo-50 to-pink-50 border border-purple-200/90 text-slate-900 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative overflow-hidden">
+            <div className="space-y-1.5 z-10">
+              <div className="flex items-center gap-2">
+                <span className="bg-purple-100 text-purple-700 border border-purple-200 px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider">
+                  ★ Primary Report
+                </span>
+                <span className="bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider">
+                  {timeframe}
+                </span>
+              </div>
+              <h4 className="font-extrabold text-base text-slate-900 tracking-tight">Performance & Incentive Analytics CSV</h4>
+              <p className="text-xs text-slate-600 font-medium leading-relaxed max-w-lg">
+                Complete incentive breakdown including target revenue, tier slab percentage, 100+ order bonus, and total take-home incentive.
+              </p>
+            </div>
+
+            <button
+              onClick={handleExportPerformanceCSV}
+              className="px-5 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-2xl font-black text-xs flex items-center gap-2 shadow-md hover:shadow-lg cursor-pointer transition-all duration-200 shrink-0 self-stretch md:self-auto justify-center z-10"
+            >
+              <Download size={16} className="shrink-0" />
+              <span>Download CSV</span>
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between px-1">
+              <h5 className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Module Reports & Live Panel Viewers</h5>
+              <span className="text-[11px] font-bold text-purple-600 bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-200">Account Scoped</span>
+            </div>
+
+            {/* List Rows */}
+            <div className="space-y-2.5">
+              {/* Row 1: Member Summary */}
+              <div className="p-4 bg-slate-50/70 hover:bg-slate-50 rounded-2xl border border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 transition-all">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-10 h-10 rounded-2xl bg-indigo-100/90 text-indigo-700 flex items-center justify-center font-extrabold shrink-0 shadow-2xs">
+                    <FileSpreadsheet size={20} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-extrabold text-slate-900 text-sm">Member Task Summary</h4>
+                      <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">Tasks & Completion Rate</span>
+                    </div>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">Summary of total tasks, completed, pending, delayed, and completion percentage.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                  <button
+                    disabled={exportingReportType === 'member'}
+                    onClick={() => handleExportApiReport('/reports/employee-summary', 'member_task_summary_report', 'member')}
+                    className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-extrabold text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer transition disabled:opacity-50"
+                  >
+                    {exportingReportType === 'member' ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                    <span>Download CSV</span>
+                  </button>
+                  <button
+                    onClick={() => handleViewReportOnPanel('member-summary')}
+                    className="px-3.5 py-2.5 bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl font-extrabold text-xs flex items-center gap-1.5 cursor-pointer transition shadow-2xs"
+                  >
+                    <Eye size={15} />
+                    <span>View on Panel</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Row 2: Brand Summary */}
+              <div className="p-4 bg-slate-50/70 hover:bg-slate-50 rounded-2xl border border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 transition-all">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-10 h-10 rounded-2xl bg-purple-100/90 text-purple-700 flex items-center justify-center font-extrabold shrink-0 shadow-2xs">
+                    <BarChart3 size={20} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-extrabold text-slate-900 text-sm">Brand Performance Summary</h4>
+                      <span className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-md">Assigned Brands</span>
+                    </div>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">Campaign totals, active brand deals, and execution status for assigned portfolio.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                  <button
+                    disabled={exportingReportType === 'brand'}
+                    onClick={() => handleExportApiReport('/reports/brand-summary', 'brand_performance_summary_report', 'brand')}
+                    className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-extrabold text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer transition disabled:opacity-50"
+                  >
+                    {exportingReportType === 'brand' ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                    <span>Download CSV</span>
+                  </button>
+                  <button
+                    onClick={() => handleViewReportOnPanel('brand-summary')}
+                    className="px-3.5 py-2.5 bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 rounded-xl font-extrabold text-xs flex items-center gap-1.5 cursor-pointer transition shadow-2xs"
+                  >
+                    <Eye size={15} />
+                    <span>View on Panel</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Row 3: Daily Postings Log */}
+              <div className="p-4 bg-slate-50/70 hover:bg-slate-50 rounded-2xl border border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 transition-all">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-10 h-10 rounded-2xl bg-pink-100/90 text-pink-700 flex items-center justify-center font-extrabold shrink-0 shadow-2xs">
+                    <Calendar size={20} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-extrabold text-slate-900 text-sm">Daily Postings Audit Log</h4>
+                      <span className="text-[10px] font-bold text-pink-600 bg-pink-50 px-2 py-0.5 rounded-md">Posting Verification</span>
+                    </div>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">Day-wise posting schedule, platform URLs, and verification audit trail.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                  <button
+                    disabled={exportingReportType === 'daily'}
+                    onClick={() => handleExportApiReport('/reports/daily-posting', 'daily_posting_audit_report', 'daily')}
+                    className="px-4 py-2.5 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-extrabold text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer transition disabled:opacity-50"
+                  >
+                    {exportingReportType === 'daily' ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                    <span>Download CSV</span>
+                  </button>
+                  <button
+                    onClick={() => handleViewReportOnPanel('daily-posting')}
+                    className="px-3.5 py-2.5 bg-white hover:bg-pink-50 text-pink-700 border border-pink-200 rounded-xl font-extrabold text-xs flex items-center gap-1.5 cursor-pointer transition shadow-2xs"
+                  >
+                    <Eye size={15} />
+                    <span>View on Panel</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Interactive In-Panel Report Viewer */}
+      {activePanelReportTab !== 'analytics' && (
+        <div className="bg-white p-6 rounded-3xl border border-purple-200 shadow-md space-y-4 animate-fade-in">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setActivePanelReportTab('analytics')}
+                className="p-2 rounded-xl bg-slate-100 hover:bg-purple-100 text-slate-700 hover:text-purple-800 transition font-bold text-xs flex items-center gap-1 cursor-pointer"
+              >
+                <ArrowLeft size={16} />
+                <span>Back to Performance Analytics</span>
+              </button>
+              <div>
+                <h3 className="text-lg font-extrabold text-slate-900 capitalize">
+                  {activePanelReportTab.replace('-', ' ')} (Panel Report View)
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">Viewing real-time report records for your account without CSV download.</p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2 bg-slate-100 p-1 rounded-xl">
+              <button
+                onClick={() => handleViewReportOnPanel('member-summary')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition cursor-pointer ${
+                  activePanelReportTab === 'member-summary' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Member Summary
+              </button>
+              <button
+                onClick={() => handleViewReportOnPanel('brand-summary')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition cursor-pointer ${
+                  activePanelReportTab === 'brand-summary' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Brand Summary
+              </button>
+              <button
+                onClick={() => handleViewReportOnPanel('daily-posting')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition cursor-pointer ${
+                  activePanelReportTab === 'daily-posting' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Daily Postings
+              </button>
+            </div>
+          </div>
+
+          {panelReportLoading ? (
+            <PageLoader message="Loading report data on panel..." />
+          ) : panelReportData.length === 0 ? (
+            <div className="text-center py-10 text-slate-500 font-bold text-sm bg-slate-50 rounded-2xl border border-slate-200">
+              No report records found for your account in this section.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-100/80 text-slate-700 font-extrabold uppercase tracking-wider text-[11px] border-b border-slate-200">
+                  <tr>
+                    {Object.keys(panelReportData[0]).map((key) => (
+                      <th key={key} className="px-4 py-3 whitespace-nowrap">{key.replace(/([A-Z])/g, ' $1')}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-semibold text-slate-800">
+                  {panelReportData.map((row, idx) => (
+                    <tr key={idx} className="hover:bg-purple-50/40 transition">
+                      {Object.values(row).map((val: any, vIdx) => (
+                        <td key={vIdx} className="px-4 py-3 whitespace-nowrap">{String(val)}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

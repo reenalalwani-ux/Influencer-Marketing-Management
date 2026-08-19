@@ -45,20 +45,44 @@ router.get('/', authenticateToken, checkPermission('performance.view'), async (r
           .map((a: any) => a.brandId?._id)
           .filter(Boolean);
 
-        // Fetch Influencer Deals for this employee's assigned brands or executive name with Date Filtering
+        // Fetch Influencer Deals specifically for this particular employee
+        const flexNameRegex = new RegExp(emp.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+
         const dealFilter: any = {
           $or: [
-            { brandName: { $in: assignedBrandNames } },
-            { brandId: { $in: assignedBrandIds } },
-            { influencerManager: new RegExp(emp.name, 'i') },
-            { assignedExecutive: new RegExp(emp.name, 'i') }
+            { influencerManager: flexNameRegex },
+            { assignedExecutive: flexNameRegex },
+            { createdBy: empId }
           ]
         };
+
         if (dateFilter.transactionDate) {
           dealFilter.transactionDate = dateFilter.transactionDate;
         }
 
-        const deals = await Influencer.find(dealFilter);
+        let deals = await Influencer.find(dealFilter);
+
+        // If employee has assigned brands, also include deals on assigned brands where manager is unassigned
+        if (assignedBrandIds.length > 0 || assignedBrandNames.length > 0) {
+          const brandDealFilter: any = {
+            $or: [
+              { brandId: { $in: assignedBrandIds } },
+              { brandName: { $in: assignedBrandNames } }
+            ],
+            $and: [
+              { $or: [{ influencerManager: { $exists: false } }, { influencerManager: '' }, { influencerManager: null }] },
+              { $or: [{ assignedExecutive: { $exists: false } }, { assignedExecutive: '' }, { assignedExecutive: null }] }
+            ]
+          };
+          if (dateFilter.transactionDate) {
+            brandDealFilter.transactionDate = dateFilter.transactionDate;
+          }
+          const unassignedBrandDeals = await Influencer.find(brandDealFilter);
+
+          const dealMap = new Map();
+          [...deals, ...unassignedBrandDeals].forEach(d => dealMap.set(d._id.toString(), d));
+          deals = Array.from(dealMap.values());
+        }
 
         const barterDeals = deals.filter(d => d.category === 'Barter');
         const paidDeals = deals.filter(d => d.category === 'Paid');

@@ -31,7 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
 
   // Grouped Menu Definitions
   const menuGroups: MenuGroup[] = [
-    {
+    ...(!isEmployee ? [{
       id: 'brand-management',
       label: 'Brand',
       icon: Briefcase,
@@ -39,7 +39,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
         { id: 'brands', label: 'Brand Portfolio', icon: Briefcase },
         { id: 'employee-brands', label: 'Brand Assignments', icon: UserCheck },
       ]
-    },
+    }] : []),
     {
       id: 'content-tasks',
       label: 'Tasks & Postings',
@@ -51,25 +51,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
         { id: 'content-calendar', label: 'Content Calendar', icon: FileSpreadsheet },
       ]
     },
-    {
+    ...(!isEmployee ? [{
       id: 'team-performance',
       label: 'Team & Performance',
       icon: Users,
       subItems: [
-        ...(!isEmployee ? [{ id: 'employees', label: 'Members Directory', icon: Users }] : []),
+        { id: 'employees', label: 'Members Directory', icon: Users },
         { id: 'performance', label: 'Performance', icon: BarChart3 },
       ]
-    },
-    {
+    }] : []),
+    ...(!isEmployee ? [{
       id: 'system-reports',
       label: 'Reports & Settings',
       icon: Settings,
       subItems: [
         { id: 'reports', label: 'Reports & Export', icon: FileSpreadsheet },
-        ...(!isEmployee ? [{ id: 'audit-logs', label: 'Audit Logs', icon: ShieldAlert }] : []),
+        { id: 'audit-logs', label: 'Audit Logs', icon: ShieldAlert },
         { id: 'settings', label: 'Settings', icon: Settings },
       ]
-    }
+    }] : [])
   ];
 
   // Track expanded groups
@@ -141,6 +141,48 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
             <span className="whitespace-nowrap truncate">Targets & Revenue</span>
           </div>
         </button>
+
+        {/* Single Standalone Item for Employee: Brand */}
+        {isEmployee && (
+          <button
+            onClick={() => {
+              setActiveView('brands');
+              window.scrollTo(0, 0);
+            }}
+            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 ${
+              activeView === 'brands'
+                ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-500 text-white shadow-md shadow-purple-500/25'
+                : 'text-slate-700 hover:text-purple-700 hover:bg-purple-50/60 border border-transparent'
+            }`}
+          >
+            <div className="flex items-center space-x-2.5 min-w-0">
+              <Briefcase size={18} className={`shrink-0 ${activeView === 'brands' ? 'text-white' : 'text-slate-400'}`} />
+              <span className="whitespace-nowrap truncate">Brand</span>
+            </div>
+          </button>
+        )}
+
+        {/* Single Standalone Item for Employee: Performance */}
+        {isEmployee && (
+          <button
+            onClick={() => {
+              setActiveView('performance');
+              window.scrollTo(0, 0);
+            }}
+            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 ${
+              activeView === 'performance'
+                ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-500 text-white shadow-md shadow-purple-500/25'
+                : 'text-slate-700 hover:text-purple-700 hover:bg-purple-50/60 border border-transparent'
+            }`}
+          >
+            <div className="flex items-center space-x-2.5 min-w-0">
+              <BarChart3 size={18} className={`shrink-0 ${activeView === 'performance' ? 'text-white' : 'text-slate-400'}`} />
+              <span className="whitespace-nowrap truncate">Performance</span>
+            </div>
+          </button>
+        )}
+
+
 
         {/* Grouped Accordion Parent Modules */}
         {menuGroups.map((group) => {
