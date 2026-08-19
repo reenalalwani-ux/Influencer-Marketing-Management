@@ -82,16 +82,20 @@ export const App: React.FC = () => {
   }
 
   const checkAuth = async () => {
+    // 6-second fallback timeout so application never hangs on slow cold starts
+    const timeoutId = setTimeout(() => {
+      setLoading(false);
+    }, 6000);
+
     try {
-      // Cookie is sent automatically — no token needed from localStorage
       const res = await api.get('/auth/me');
       if (res.success) {
         setUser(res.user);
       }
     } catch (err) {
-      // Token invalid or expired — stay on login screen
-      console.error(err);
+      console.error('Session check:', err);
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   };
@@ -118,9 +122,37 @@ export const App: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400">
-        <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mr-3" />
-        Loading application...
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 text-slate-900 relative overflow-hidden font-sans">
+        {/* Ambient Light Glows */}
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-200/50 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-1/4 left-1/3 w-80 h-80 bg-indigo-200/40 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Branded Light Loading Splash Card */}
+        <div className="relative z-10 flex flex-col items-center space-y-5 text-center max-w-sm p-8 bg-white/90 backdrop-blur-md rounded-3xl border border-slate-200/80 shadow-xl animate-fade-in">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 p-1 shadow-lg shadow-purple-500/20">
+            <div className="w-full h-full bg-white rounded-[12px] flex items-center justify-center text-purple-700 font-black text-2xl tracking-tighter">
+              AD
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <h1 className="text-xl font-black text-slate-900 tracking-tight">
+              AD2ship Operations
+            </h1>
+            <p className="text-xs font-bold text-slate-500">
+              Influencer Marketing & Enterprise Management
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 bg-purple-50 px-4 py-2 rounded-full border border-purple-200/80">
+            <div className="w-4 h-4 rounded-full border-2 border-purple-600 border-t-transparent animate-spin" />
+            <span className="text-xs font-extrabold text-purple-900">Authenticating session...</span>
+          </div>
+
+          <p className="text-[11px] text-slate-400 font-medium max-w-xs">
+            Verifying login credentials & initializing live services.
+          </p>
+        </div>
       </div>
     );
   }
