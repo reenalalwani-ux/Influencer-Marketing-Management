@@ -15,7 +15,7 @@ export const clearDemoData = async () => {
 
     // Delete users except Super Admin and Managers
     const deletedUsers = await User.deleteMany({
-      role: { $nin: ['Super Admin', 'Admin', 'Marketing Manager', 'Team Leader'] },
+      role: { $nin: ['Super Admin', 'Admin', 'Marketing Manager', 'Assistant Manager', 'Assistant Marketing Manager', 'Team Leader'] },
       email: { $ne: 'admin@influencer.com' }
     });
 

@@ -51,7 +51,8 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
   const [rejectionReason, setRejectionReason] = useState('');
   const [comments, setComments] = useState('');
 
-  const isManagerOrAdmin = currentUser?.role === 'Super Admin' || currentUser?.role === 'Admin' || currentUser?.role === 'Marketing Manager' || currentUser?.role === 'Team Leader';
+  const isAssistant = currentUser?.role === 'Assistant Manager' || currentUser?.role === 'Assistant Marketing Manager' || (!!currentUser?.role && currentUser.role.toLowerCase().includes('assistant'));
+  const isManagerOrAdmin = currentUser?.role === 'Super Admin' || currentUser?.role === 'Admin' || currentUser?.role === 'Marketing Manager' || currentUser?.role === 'Manager' || isAssistant || currentUser?.role === 'Team Leader';
 
   const fetchData = async () => {
     try {

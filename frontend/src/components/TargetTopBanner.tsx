@@ -16,7 +16,9 @@ export const TargetTopBanner: React.FC<TargetTopBannerProps> = ({ user, onNaviga
   const [newAchieved, setNewAchieved] = useState<number>(0);
   const [saving, setSaving] = useState(false);
 
-  const isManagerOrAdmin = user?.role === 'Super Admin' || user?.role === 'Admin' || user?.role === 'Marketing Manager' || user?.role === 'Team Leader';
+  const isAssistantManager = user?.role === 'Assistant Manager' || user?.role === 'Assistant Marketing Manager' || (!!user?.role && user.role.toLowerCase().includes('assistant'));
+  const isManagerOrAdmin = user?.role === 'Super Admin' || user?.role === 'Admin' || user?.role === 'Marketing Manager' || user?.role === 'Manager' || isAssistantManager || user?.role === 'Team Leader';
+  const isTargetManager = (user?.role === 'Super Admin' || user?.role === 'Admin' || user?.role === 'Marketing Manager' || user?.role === 'Manager') && !isAssistantManager;
 
   const fetchActiveTarget = async () => {
     try {
@@ -59,7 +61,7 @@ export const TargetTopBanner: React.FC<TargetTopBannerProps> = ({ user, onNaviga
 
   if (loading || !target) return null;
 
-  const isEmployee = user?.role === 'Employee';
+  const isEmployee = user?.role === 'Employee' || isAssistantManager;
   const effectiveTargetAmount = isEmployee ? 120000 : (target.targetAmount || 720000);
   const percentage = Math.min(100, Math.round(((target.achievedAmount || 0) / effectiveTargetAmount) * 100));
   const remaining = Math.max(0, effectiveTargetAmount - (target.achievedAmount || 0));
@@ -88,13 +90,13 @@ export const TargetTopBanner: React.FC<TargetTopBannerProps> = ({ user, onNaviga
                     ? 'bg-blue-500/30 text-blue-300 border-blue-400/50'
                     : 'bg-amber-500/30 text-amber-300 border-amber-400/50'
               }`}>
-                {isManagerOrAdmin 
+                {isTargetManager 
                   ? (percentage >= 100 || (target.targetAmount && target.achievedAmount >= target.targetAmount) ? '🏆 10% Slab Unlocked' : percentage >= 67 || (target.targetAmount && target.achievedAmount >= target.targetAmount * 0.67) ? '🥈 5% Slab Unlocked' : '⚡ 0% (<₹80k/exec)')
                   : (percentage >= 100 ? '🏆 10% Slab Unlocked' : percentage >= 67 ? '🥈 5% Slab Unlocked' : '⚡ 0% Slab')}
               </span>
             </div>
             <p className="text-[11px] text-slate-300 font-medium">
-              {isManagerOrAdmin ? (
+              {isTargetManager ? (
                 <>Net Margin Target: <span className="font-bold text-emerald-400">{target.currency}{formattedTarget}</span> | Achieved: <span className="font-bold text-purple-300">{target.currency}{formattedAchieved}</span> ({percentage}%)</>
               ) : (
                 <>Monthly Target | Performance: <span className="font-bold text-purple-300">{percentage}% Paid Colab Met</span></>
@@ -110,7 +112,7 @@ export const TargetTopBanner: React.FC<TargetTopBannerProps> = ({ user, onNaviga
               <TrendingUp size={12} /> {percentage}% Completed
             </span>
             <span className="text-slate-400">
-              {remaining === 0 ? '🎯 Target Reached!' : isManagerOrAdmin ? `${target.currency}${formattedRemaining} Remaining` : `${100 - percentage}% Remaining`}
+              {remaining === 0 ? '🎯 Target Reached!' : isTargetManager ? `${target.currency}${formattedRemaining} Remaining` : `${100 - percentage}% Remaining`}
             </span>
           </div>
           <div className="w-full bg-slate-800/80 rounded-full h-2.5 overflow-hidden border border-slate-700 p-0.5">
@@ -131,7 +133,7 @@ export const TargetTopBanner: React.FC<TargetTopBannerProps> = ({ user, onNaviga
 
         {/* Right: Actions */}
         <div className="flex items-center space-x-2 shrink-0">
-          {isManagerOrAdmin && (
+          {isTargetManager && (
             <button
               onClick={() => setShowQuickEdit(true)}
               className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold text-white transition flex items-center space-x-1.5 border border-white/10"

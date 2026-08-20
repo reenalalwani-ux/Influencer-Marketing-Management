@@ -381,6 +381,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-purple-500 font-medium"
                 >
                   <option value="Employee">Employee</option>
+                  <option value="Assistant Manager">Assistant Manager</option>
                   <option value="Marketing Manager">Manager</option>
                 </select>
               </div>

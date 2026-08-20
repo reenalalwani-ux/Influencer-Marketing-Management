@@ -423,6 +423,8 @@ export const EmployeeManagementView: React.FC = () => {
               >
                 <option value="Employee">Employee</option>
                 <option value="Team Leader">Team Leader</option>
+                <option value="Assistant Manager">Assistant Manager</option>
+                <option value="Assistant Marketing Manager">Assistant Marketing Manager</option>
                 <option value="Marketing Manager">Marketing Manager</option>
                 <option value="Admin">Admin</option>
               </select>
@@ -539,6 +541,8 @@ export const EmployeeManagementView: React.FC = () => {
               >
                 <option value="Employee">Employee</option>
                 <option value="Team Leader">Team Leader</option>
+                <option value="Assistant Manager">Assistant Manager</option>
+                <option value="Assistant Marketing Manager">Assistant Marketing Manager</option>
                 <option value="Marketing Manager">Marketing Manager</option>
                 <option value="Admin">Admin</option>
               </select>

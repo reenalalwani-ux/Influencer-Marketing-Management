@@ -33,7 +33,8 @@ const StatusPillDropdown: React.FC<{
   userRole?: string;
   onSelect: (newStatus: string) => void;
 }> = ({ currentStatus, userRole, onSelect }) => {
-  const isManagerOrAdmin = userRole === 'Super Admin' || userRole === 'Admin' || userRole === 'Marketing Manager' || userRole === 'Team Leader';
+  const isAssistant = userRole === 'Assistant Manager' || userRole === 'Assistant Marketing Manager' || (!!userRole && userRole.toLowerCase().includes('assistant'));
+  const isManagerOrAdmin = userRole === 'Super Admin' || userRole === 'Admin' || userRole === 'Marketing Manager' || userRole === 'Manager' || isAssistant || userRole === 'Team Leader';
 
   return (
     <div className="relative inline-flex items-center">
@@ -269,7 +270,10 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     }
   };
 
-  const isManagerOrAdmin = userRole === 'Super Admin' || userRole === 'Admin' || userRole === 'Marketing Manager' || userRole === 'Team Leader';
+  const isAssistantManager = userRole === 'Assistant Manager' || userRole === 'Assistant Marketing Manager' || (!!userRole && userRole.toLowerCase().includes('assistant'));
+  const isManagerOrAdmin = userRole === 'Super Admin' || userRole === 'Admin' || userRole === 'Marketing Manager' || userRole === 'Manager' || isAssistantManager || userRole === 'Team Leader';
+  const isTargetManager = (userRole === 'Super Admin' || userRole === 'Admin' || userRole === 'Marketing Manager' || userRole === 'Manager') && !isAssistantManager;
+  const isTargetEmployee = userRole === 'Employee' || isAssistantManager;
   const isEmployee = userRole === 'Employee';
 
   const myMember = (teamBreakdown?.members || []).find(m => {
@@ -914,7 +918,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-auto">
-          {isManagerOrAdmin && (
+          {isTargetManager && (
             <button
               onClick={() => handleOpenCreateTargetModal('Paid')}
               className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-xl font-bold text-xs flex items-center space-x-2 transition"
@@ -1043,7 +1047,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
       {viewMode === 'Targets & Goals' && (
         <div className="space-y-6">
           {/* Top Overview Banner (Personal for Employee, Team for Admin/Manager) */}
-          {isEmployee ? (
+          {isTargetEmployee ? (
             <div className="p-6 bg-gradient-to-r from-purple-50/90 via-indigo-50/80 to-emerald-50/90 text-slate-900 rounded-3xl border border-purple-200/90 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
@@ -1248,13 +1252,13 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                     <div className="space-y-1">
                       <div className="flex justify-between text-[11px] font-bold">
                         <span className="text-slate-600">
-                          {isEmployee ? (
-                            <>Paid Colab Progress: <strong className="text-slate-900">{m.targetAchievedPercent}% Met</strong></>
-                          ) : (
+                          {isTargetManager ? (
                             <>Net Margin: <strong className="text-slate-900">₹{new Intl.NumberFormat().format(m.netMargin)}</strong></>
+                          ) : (
+                            <>Paid Colab Progress: <strong className="text-slate-900">{m.targetAchievedPercent}% Met</strong></>
                           )}
                         </span>
-                        <span className="text-purple-600">{m.targetAchievedPercent}% {isEmployee ? 'of Goal' : 'of ₹1.2L'}</span>
+                        <span className="text-purple-600">{m.targetAchievedPercent}% {isTargetManager ? 'of ₹1.2L' : 'of Goal'}</span>
                       </div>
                       <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
                         <div
@@ -1339,13 +1343,13 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                 <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                   <p className="text-[10px] font-bold text-slate-500 uppercase">Target Margin</p>
                   <p className="text-lg font-black text-slate-900 mt-0.5">
-                    {isManagerOrAdmin ? `₹${new Intl.NumberFormat().format(paidGoal)}` : <span className="px-2.5 py-0.5 rounded-lg bg-purple-100 text-purple-800 text-xs font-black">PAID</span>}
+                    {isTargetManager ? `₹${new Intl.NumberFormat().format(paidGoal)}` : <span className="px-2.5 py-0.5 rounded-lg bg-purple-100 text-purple-800 text-xs font-black">PAID</span>}
                   </p>
                 </div>
                 <div className="bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-100">
                   <p className="text-[10px] font-bold text-emerald-700 uppercase">Achieved Margin</p>
                   <p className="text-lg font-black text-emerald-600 mt-0.5">
-                    {isManagerOrAdmin ? `₹${new Intl.NumberFormat().format(paidAchieved)}` : <span className="px-2.5 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 text-xs font-black">PAID</span>}
+                    {isTargetManager ? `₹${new Intl.NumberFormat().format(paidAchieved)}` : <span className="px-2.5 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 text-xs font-black">PAID</span>}
                   </p>
                 </div>
               </div>
@@ -1357,7 +1361,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                     <TrendingUp size={12} className="text-emerald-600" /> {paidPct}% Progress
                   </span>
                   <span className="text-slate-400">
-                    {isManagerOrAdmin ? `Remaining: ₹${new Intl.NumberFormat().format(Math.max(0, paidGoal - paidAchieved))}` : <span className="text-[10px] font-bold text-purple-600">PAID COLLABORATIONS</span>}
+                    {isTargetManager ? `Remaining: ₹${new Intl.NumberFormat().format(Math.max(0, paidGoal - paidAchieved))}` : <span className="text-[10px] font-bold text-purple-600">PAID COLLABORATIONS</span>}
                   </span>
                 </div>
                 <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
@@ -1368,7 +1372,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                 </div>
               </div>
 
-              {isManagerOrAdmin && (
+              {isTargetManager && (
                 <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-xs">
                   <span className="text-slate-400 text-[11px]">Auto-Sync: <strong className="text-emerald-600">{activePaidTarget?.autoSync !== false ? 'Active' : 'Off'}</strong></span>
                   {activePaidTarget ? (
@@ -1444,7 +1448,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                 </div>
               </div>
 
-              {isManagerOrAdmin && (
+              {isTargetManager && (
                 <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-xs">
                   <span className="text-slate-400 text-[11px]">Auto-Sync: <strong className="text-purple-600">{activeBarterTarget?.autoSync !== false ? 'Active' : 'Off'}</strong></span>
                   {activeBarterTarget ? (
@@ -1480,7 +1484,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                 </p>
               </div>
 
-              {isManagerOrAdmin && (
+              {isTargetManager && (
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={() => handleOpenCreateTargetModal('Paid')}
@@ -1523,11 +1527,11 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                     targets.map((t) => {
                       const isBarter = t.targetType === 'Barter';
                       const goalVal = isBarter 
-                        ? (isEmployee ? barterGoal : (t.targetCount || t.targetAmount))
-                        : (isEmployee ? 120000 : t.targetAmount);
+                        ? (isTargetEmployee ? barterGoal : (t.targetCount || t.targetAmount))
+                        : (isTargetEmployee ? 120000 : t.targetAmount);
                       const achVal = isBarter 
-                        ? (isEmployee ? barterAchieved : (t.achievedCount || t.achievedAmount || 0))
-                        : (isEmployee ? (myMember?.netMargin !== undefined ? myMember.netMargin : (t.achievedAmount || 0)) : (t.achievedAmount || 0));
+                        ? (isTargetEmployee ? barterAchieved : (t.achievedCount || t.achievedAmount || 0))
+                        : (isTargetEmployee ? (myMember?.netMargin !== undefined ? myMember.netMargin : (t.achievedAmount || 0)) : (t.achievedAmount || 0));
                       const pct = Math.min(100, Math.round(((achVal || 0) / (goalVal || 1)) * 100));
 
                       return (
@@ -1549,11 +1553,11 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                           </td>
 
                           <td className="p-3 border-r border-slate-100 text-right font-extrabold text-slate-900">
-                            {isBarter ? `${goalVal} Collabs` : isManagerOrAdmin ? `₹${new Intl.NumberFormat().format(goalVal)}` : <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[10px] font-black">PAID</span>}
+                            {isBarter ? `${goalVal} Collabs` : isTargetManager ? `₹${new Intl.NumberFormat().format(goalVal)}` : <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[10px] font-black">PAID</span>}
                           </td>
 
                           <td className="p-3 border-r border-slate-100 text-right font-extrabold text-emerald-600">
-                            {isBarter ? `${achVal} Collabs` : isManagerOrAdmin ? `₹${new Intl.NumberFormat().format(achVal)}` : <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-black">PAID</span>}
+                            {isBarter ? `${achVal} Collabs` : isTargetManager ? `₹${new Intl.NumberFormat().format(achVal)}` : <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-black">PAID</span>}
                           </td>
 
                           <td className="p-3 border-r border-slate-100 min-w-[140px]">
@@ -1581,7 +1585,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                           </td>
 
                           <td className="p-3 text-center whitespace-nowrap">
-                            {isManagerOrAdmin && (
+                            {isTargetManager && (
                               <div className="flex items-center justify-center gap-2">
                                 {!t.isActive ? (
                                   <button
@@ -1678,8 +1682,8 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                 </div>
               </div>
             </div>
-          ) : (
-            <div className={`grid grid-cols-1 sm:grid-cols-2 ${isManagerOrAdmin ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-4`}>
+          ) : isTargetManager ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
                 <div>
                   <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">Brand Onboarding (IN)</p>
@@ -1706,20 +1710,18 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                 </div>
               </div>
 
-              {isManagerOrAdmin && (
-                <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-5 rounded-2xl text-white shadow-md flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-extrabold uppercase tracking-wider text-emerald-100">AD2ship Profit Margin</p>
-                    <h4 className="text-2xl font-black text-white mt-1">
-                      ₹{new Intl.NumberFormat().format(netAd2shipMargin)}
-                    </h4>
-                    <p className="text-[11px] text-emerald-100 font-bold mt-0.5">Margin: {marginPercentage}% Profit</p>
-                  </div>
-                  <div className="w-12 h-12 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold backdrop-blur-xs">
-                    <DollarSign size={24} />
-                  </div>
+              <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-5 rounded-2xl text-white shadow-md flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-emerald-100">AD2ship Profit Margin</p>
+                  <h4 className="text-2xl font-black text-white mt-1">
+                    ₹{new Intl.NumberFormat().format(netAd2shipMargin)}
+                  </h4>
+                  <p className="text-[11px] text-emerald-100 font-bold mt-0.5">Margin: {marginPercentage}% Profit</p>
                 </div>
-              )}
+                <div className="w-12 h-12 rounded-xl bg-white/20 text-white flex items-center justify-center font-bold backdrop-blur-xs">
+                  <DollarSign size={24} />
+                </div>
+              </div>
 
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
                 <div>
@@ -1731,6 +1733,45 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                 </div>
                 <div className="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
                   <Receipt size={24} />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">Paid Collabs Completed</p>
+                  <h4 className="text-2xl font-black text-slate-900 mt-1">{paidCollabs.length}</h4>
+                  <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">Active Paid Collaborations</p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                  <DollarSign size={24} />
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">Total Orders Driven</p>
+                  <h4 className="text-2xl font-black text-slate-900 mt-1">
+                    {new Intl.NumberFormat().format(paidCollabs.reduce((acc, curr) => acc + (curr.ordersCount || curr.ordersGenerated || 0), 0))}
+                  </h4>
+                  <p className="text-[11px] text-indigo-600 font-semibold mt-0.5">Paid Video Conversion Orders</p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                  <TrendingUp size={24} />
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">100+ Order Bonus Videos</p>
+                  <h4 className="text-2xl font-black text-slate-900 mt-1">
+                    {paidCollabs.filter(curr => (curr.ordersCount || curr.ordersGenerated || 0) >= 100).length}
+                  </h4>
+                  <p className="text-[11px] text-amber-600 font-semibold mt-0.5">High Performance Videos</p>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                  <Sparkles size={24} />
                 </div>
               </div>
             </div>
@@ -1775,7 +1816,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                       <>
                         <SortHeader field="brandOnboardingAmt" label="Brand Price (IN)" align="right" />
                         <SortHeader field="influencerOnboardingAmt" label="Creator Price (OUT)" align="right" />
-                        {isManagerOrAdmin && (
+                        {isTargetManager && (
                           <SortHeader field="ad2shipMargin" label="AD2ship Margin" align="right" />
                         )}
                         <SortHeader field="ordersCount" label="Orders & Bonus" align="center" />
@@ -1863,7 +1904,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                                 ₹{new Intl.NumberFormat().format(item.influencerOnboardingAmt || item.outAmount || 0)}
                               </td>
 
-                              {isManagerOrAdmin && (
+                              {isTargetManager && (
                                 <td className="p-3 border-r border-slate-100 text-right font-black text-emerald-600 bg-emerald-50/30">
                                   ₹{new Intl.NumberFormat().format(margin)}
                                 </td>
@@ -1875,7 +1916,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
                                       🌟 {orders} orders
                                     </span>
-                                    {isManagerOrAdmin && (
+                                    {isTargetManager && (
                                       <div className="text-[10px] font-black text-emerald-700">
                                         +₹{new Intl.NumberFormat().format(Math.round(margin * 0.10))} Bonus
                                       </div>
@@ -2201,7 +2242,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
               <h4 className="font-black text-slate-900 flex items-center justify-between">
                 <span>Financial Details</span>
-                {isManagerOrAdmin && (
+                {isTargetManager && (
                   <span className="text-[11px] text-purple-700 font-extrabold bg-purple-100 px-2 py-0.5 rounded-md">
                     Auto-Calculated Margin
                   </span>
@@ -2261,7 +2302,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
               </div>
 
               {/* Real-time AD2ship Margin Preview (Manager/Admin Only) */}
-              {isManagerOrAdmin && (
+              {isTargetManager && (
                 <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-3 rounded-xl text-white flex items-center justify-between">
                   <div>
                     <span className="text-[10px] uppercase font-bold text-emerald-100">Calculated AD2ship Profit Margin</span>

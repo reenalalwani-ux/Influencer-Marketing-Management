@@ -84,7 +84,8 @@ interface SettingsViewProps {
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ userRole, currentUser }) => {
-  const isManagerOrAdmin = userRole === 'Super Admin' || userRole === 'Admin' || userRole === 'Marketing Manager' || userRole === 'Team Leader';
+  const isAssistant = userRole === 'Assistant Manager' || userRole === 'Assistant Marketing Manager' || (!!userRole && userRole.toLowerCase().includes('assistant'));
+  const isManagerOrAdmin = userRole === 'Super Admin' || userRole === 'Admin' || userRole === 'Marketing Manager' || userRole === 'Manager' || isAssistant || userRole === 'Team Leader';
   const [activeTab, setActiveTab] = useState<'roles' | 'config' | 'delegation'>(isManagerOrAdmin ? 'roles' : 'config');
   const [settings, setSettings] = useState<any>({});
   const [roles, setRoles] = useState<SystemRole[]>([]);

@@ -2,6 +2,8 @@ export const ROLES = {
   SUPER_ADMIN: 'Super Admin',
   ADMIN: 'Admin',
   MARKETING_MANAGER: 'Marketing Manager',
+  ASSISTANT_MANAGER: 'Assistant Manager',
+  ASSISTANT_MARKETING_MANAGER: 'Assistant Marketing Manager',
   TEAM_LEADER: 'Team Leader',
   EMPLOYEE: 'Employee',
 };
@@ -68,6 +70,26 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
     'target.view', 'target.create', 'target.update', 'target.delete',
     'influencer.view', 'influencer.create', 'influencer.update', 'influencer.delete'
   ],
+  [ROLES.ASSISTANT_MANAGER]: [
+    'employee.view', 'employee.create', 'employee.update', 'employee.delete',
+    'brand.view', 'brand.create', 'brand.update', 'brand.delete', 'brand.assign',
+    'task.view', 'task.create', 'task.update', 'task.delete', 'task.verify',
+    'posting.view', 'posting.create', 'posting.update',
+    'performance.view', 'report.view', 'report.export',
+    'settings.view', 'audit.view',
+    'target.view',
+    'influencer.view', 'influencer.create', 'influencer.update', 'influencer.delete'
+  ],
+  [ROLES.ASSISTANT_MARKETING_MANAGER]: [
+    'employee.view', 'employee.create', 'employee.update', 'employee.delete',
+    'brand.view', 'brand.create', 'brand.update', 'brand.delete', 'brand.assign',
+    'task.view', 'task.create', 'task.update', 'task.delete', 'task.verify',
+    'posting.view', 'posting.create', 'posting.update',
+    'performance.view', 'report.view', 'report.export',
+    'settings.view', 'audit.view',
+    'target.view',
+    'influencer.view', 'influencer.create', 'influencer.update', 'influencer.delete'
+  ],
   [ROLES.TEAM_LEADER]: [
     'employee.view', 'employee.create', 'employee.update',
     'brand.view', 'brand.create', 'brand.update', 'brand.assign',
@@ -93,4 +115,4 @@ export const CONTENT_TYPES = ['Reel', 'Post', 'Story', 'Short', 'Video', 'Carous
 export const TASK_STATUSES = ['Pending', 'In Progress', 'Submitted', 'Verified', 'Rejected', 'Delayed', 'Missed'];
 export const PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'];
 export const DEPARTMENTS = ['Influencer Marketing', 'Content Creation', 'Campaign Strategy', 'Quality Control', 'Management'];
-export const DESIGNATIONS = ['Marketing Manager', 'Senior Influencer Specialist', 'Influencer Executive', 'Content Strategist', 'Team Lead'];
+export const DESIGNATIONS = ['Marketing Manager', 'Assistant Manager', 'Assistant Marketing Manager', 'Senior Influencer Specialist', 'Influencer Executive', 'Content Strategist', 'Team Lead'];
