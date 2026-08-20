@@ -126,7 +126,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
             className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-extrabold text-xs transition border border-slate-200 flex items-center space-x-2 cursor-pointer"
           >
             <Layers size={16} />
-            <span>Influencer Ledger</span>
+            <span>Influencer Target</span>
           </button>
           <button
             onClick={() => onNavigate('calendar')}
