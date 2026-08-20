@@ -1,12 +1,13 @@
 import { Router, Response } from 'express';
 import { User, Employee, Brand, Task, EmployeeBrand, AuditLog, Target } from '../models/allModels';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
+import { cacheMiddleware } from '../middleware/cache';
 import { recalculateTargetProgress } from './targetRoutes';
 
 const router = Router();
 
 // GET /api/v1/dashboard/stats
-router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response) => {
+router.get('/stats', authenticateToken, cacheMiddleware(30), async (req: AuthRequest, res: Response) => {
   if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
   const role = req.user.role;

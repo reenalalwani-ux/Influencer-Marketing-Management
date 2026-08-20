@@ -3,6 +3,7 @@ import { Target, Influencer, Employee, EmployeeBrand, Brand } from '../models/al
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 import { logActivity } from '../middleware/auditLog';
+import { cacheMiddleware } from '../middleware/cache';
 
 const router = Router();
 
@@ -169,7 +170,7 @@ export const recalculateTargetProgress = async (target: any, customDateFilter?: 
 };
 
 // GET /api/v1/targets/team-breakdown - Live auto-filled breakdown for all active team members (Month-Filtered)
-router.get('/team-breakdown', authenticateToken, checkPermission('target.view'), async (req: AuthRequest, res: Response) => {
+router.get('/team-breakdown', authenticateToken, checkPermission('target.view'), cacheMiddleware(45), async (req: AuthRequest, res: Response) => {
   try {
     const { timeframe, year, month } = req.query;
     const dateFilter = buildDateFilter(timeframe as string, year as string, month as string);
@@ -363,7 +364,7 @@ router.get('/', authenticateToken, checkPermission('target.view'), async (req: A
 });
 
 // GET /api/v1/targets/active - Fetch current active target for top banner display
-router.get('/active', authenticateToken, checkPermission('target.view'), async (req: AuthRequest, res: Response) => {
+router.get('/active', authenticateToken, checkPermission('target.view'), cacheMiddleware(60), async (req: AuthRequest, res: Response) => {
   try {
     const { timeframe, year, month } = req.query;
     const dateFilter = buildDateFilter(timeframe as string, year as string, month as string);
