@@ -163,7 +163,15 @@ router.post('/sync-employee', authenticateToken, checkPermission('brand.assign')
   }
 
   try {
-    // Delete active assignments for brands not in brandIds
+    // Enforce 1 brand = 1 person: Delete active assignments of these brandIds from ANY other employees
+    if (brandIds.length > 0) {
+      await EmployeeBrand.deleteMany({
+        employeeId: { $ne: employeeId },
+        brandId: { $in: brandIds }
+      });
+    }
+
+    // Delete active assignments for brands not in brandIds for this employee
     await EmployeeBrand.deleteMany({
       employeeId,
       brandId: { $nin: brandIds }
@@ -197,6 +205,72 @@ router.post('/sync-employee', authenticateToken, checkPermission('brand.assign')
     return res.status(200).json({ success: true, message: 'Employee brand assignments updated successfully', data: updatedAssignments });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to sync employee brand assignments', error });
+  }
+});
+
+// POST /api/v1/employee-brands/transfer
+router.post('/transfer', authenticateToken, checkPermission('brand.assign'), async (req: AuthRequest, res: Response) => {
+  const { brandId, fromEmployeeId, toEmployeeId, responsibility, priority } = req.body;
+
+  if (!brandId || !toEmployeeId) {
+    return res.status(400).json({ success: false, message: 'Brand ID and destination Employee ID are required' });
+  }
+
+  if (fromEmployeeId && fromEmployeeId === toEmployeeId) {
+    return res.status(400).json({ success: false, message: 'Source and destination employees must be different' });
+  }
+
+  try {
+    // 1. Remove existing active assignments for this brand across the system
+    await EmployeeBrand.deleteMany({
+      brandId
+    });
+
+    // 2. Create new active assignment for destination employee
+    const newAssignment = await EmployeeBrand.create({
+      employeeId: toEmployeeId,
+      brandId,
+      assignedBy: req.user?._id,
+      responsibility: responsibility || 'Brand Operations & Content Posting',
+      priority: priority || 'High',
+      startDate: new Date(),
+      status: 'Active'
+    });
+
+    const populated = await EmployeeBrand.findById(newAssignment._id)
+      .populate('employeeId', 'name employeeId designation department email userId')
+      .populate('brandId', 'brandName brandId logo industry');
+
+    const empDoc = populated?.employeeId as any;
+    const brandDoc = populated?.brandId as any;
+
+    if (empDoc && empDoc.userId) {
+      await Notification.create({
+        userId: empDoc.userId,
+        title: 'Brand Transferred to You',
+        message: `Brand "${brandDoc?.brandName || 'Brand'}" has been transferred and assigned to you.`,
+        type: 'Assignment',
+        relatedId: (brandId as string)
+      });
+    }
+
+    await logActivity({
+      userId: req.user?._id,
+      userName: req.user?.name || 'System',
+      action: 'TRANSFER_EMPLOYEE_BRAND',
+      module: 'Employee-Brand Assignment',
+      entity: 'EmployeeBrand',
+      entityId: (newAssignment._id as any).toString(),
+      newValue: { brandId, fromEmployeeId, toEmployeeId }
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Brand "${brandDoc?.brandName || 'Brand'}" successfully transferred to ${empDoc?.name || 'new employee'}`,
+      data: populated
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to transfer brand assignment', error });
   }
 });
 

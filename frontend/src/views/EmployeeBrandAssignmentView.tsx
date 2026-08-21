@@ -1,5 +1,5 @@
 import React, { useState, useEffect, FormEvent } from 'react';
-import { UserCheck, Plus, Trash2, Edit2, Briefcase, User as UserIcon, CheckSquare, Square, Search, X, Eye, Loader2 } from 'lucide-react';
+import { UserCheck, Plus, Trash2, Edit2, Briefcase, User as UserIcon, CheckSquare, Square, Search, X, Eye, Loader2, ArrowRightLeft, ChevronDown } from 'lucide-react';
 import { api } from '../services/api';
 import { Employee, Brand, EmployeeBrandAssignment, User } from '../types';
 import { Modal } from '../components/Modal';
@@ -36,10 +36,24 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
 
   // Form states
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
+  const [showMemberDropdown, setShowMemberDropdown] = useState(false);
+  const [assignMemberSearch, setAssignMemberSearch] = useState('');
   const [selectedBrandIds, setSelectedBrandIds] = useState<string[]>([]);
   const [brandSearch, setBrandSearch] = useState('');
   const [responsibility, setResponsibility] = useState('Brand Operations & Content Posting');
   const [priority, setPriority] = useState<'Low' | 'Medium' | 'High' | 'Urgent'>('High');
+
+  // Transfer Brand states
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferringBrand, setTransferringBrand] = useState(false);
+  const [transferSelectedBrandId, setTransferSelectedBrandId] = useState('');
+  const [transferBrandSearch, setTransferBrandSearch] = useState('');
+  const [transferFromEmployeeId, setTransferFromEmployeeId] = useState('');
+  const [transferToEmployeeId, setTransferToEmployeeId] = useState('');
+  const [showToEmployeeDropdown, setShowToEmployeeDropdown] = useState(false);
+  const [toEmployeeSearch, setToEmployeeSearch] = useState('');
+  const [transferResponsibility, setTransferResponsibility] = useState('Brand Operations & Content Posting');
+  const [transferPriority, setTransferPriority] = useState<'Low' | 'Medium' | 'High' | 'Urgent'>('High');
 
   const fetchData = async () => {
     try {
@@ -103,6 +117,8 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
   const openCreateModal = () => {
     setEditingEmployeeId(null);
     setSelectedEmployeeId('');
+    setShowMemberDropdown(false);
+    setAssignMemberSearch('');
     setSelectedBrandIds([]);
     setBrandSearch('');
     setResponsibility('Brand Operations & Content Posting');
@@ -113,11 +129,109 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
   const openEditModal = (group: GroupedAssignment) => {
     setEditingEmployeeId(group.employeeId);
     setSelectedEmployeeId(group.employeeId);
+    setShowMemberDropdown(false);
+    setAssignMemberSearch('');
     setSelectedBrandIds(group.brands.map(b => b._id));
     setBrandSearch('');
     setResponsibility(group.responsibility);
     setPriority(group.priority as any);
     setShowAssignModal(true);
+  };
+
+  // List of all currently assigned brands with their owner
+  const allAssignedBrandsList: { brand: Brand; currentEmp: Employee | null }[] = [];
+  rawAssignments.forEach((item) => {
+    if (item.status === 'Active') {
+      const emp = item.employeeId as any;
+      const brd = item.brandId as any;
+      const empId = typeof emp === 'object' ? (emp?._id || emp?.id) : String(emp);
+      const bId = typeof brd === 'object' ? (brd?._id || brd?.id) : String(brd);
+
+      const brandObj = typeof brd === 'object' ? brd : brands.find(b => b._id === bId);
+      const empObj = typeof emp === 'object' ? emp : employees.find(e => e._id === empId);
+
+      if (brandObj && (brandObj._id || brandObj.brandName)) {
+        if (!allAssignedBrandsList.some(x => x.brand._id === (brandObj._id || bId))) {
+          allAssignedBrandsList.push({
+            brand: brandObj,
+            currentEmp: empObj || null
+          });
+        }
+      }
+    }
+  });
+  allAssignedBrandsList.sort((a, b) => (a.brand.brandName || '').localeCompare(b.brand.brandName || ''));
+
+  const openTransferModal = (brandId?: string, fromEmployeeId?: string) => {
+    if (brandId) {
+      setTransferSelectedBrandId(brandId);
+      if (fromEmployeeId) {
+        setTransferFromEmployeeId(fromEmployeeId);
+      } else {
+        const match = allAssignedBrandsList.find(x => x.brand._id === brandId);
+        setTransferFromEmployeeId(match?.currentEmp?._id || '');
+      }
+    } else if (fromEmployeeId) {
+      setTransferFromEmployeeId(fromEmployeeId);
+      const firstBrandOfEmp = allAssignedBrandsList.find(x => x.currentEmp?._id === fromEmployeeId);
+      setTransferSelectedBrandId(firstBrandOfEmp?.brand._id || '');
+    } else {
+      setTransferSelectedBrandId(allAssignedBrandsList[0]?.brand._id || '');
+      setTransferFromEmployeeId(allAssignedBrandsList[0]?.currentEmp?._id || '');
+    }
+
+    setTransferBrandSearch('');
+    setTransferToEmployeeId('');
+    setShowToEmployeeDropdown(false);
+    setToEmployeeSearch('');
+    setTransferResponsibility('Brand Operations & Content Posting');
+    setTransferPriority('High');
+    setShowTransferModal(true);
+  };
+
+  const handleTransferBrandSelect = (bId: string) => {
+    setTransferSelectedBrandId(bId);
+    const match = allAssignedBrandsList.find(x => x.brand._id === bId);
+    if (match && match.currentEmp) {
+      setTransferFromEmployeeId(match.currentEmp._id);
+    } else {
+      setTransferFromEmployeeId('');
+    }
+  };
+
+  const handleTransferBrand = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!transferSelectedBrandId || !transferToEmployeeId) {
+      alert('Please select both a brand and the target employee.');
+      return;
+    }
+    if (transferFromEmployeeId && transferFromEmployeeId === transferToEmployeeId) {
+      alert('Target employee must be different from the current employee.');
+      return;
+    }
+
+    setTransferringBrand(true);
+    try {
+      const res = await api.post('/employee-brands/transfer', {
+        brandId: transferSelectedBrandId,
+        fromEmployeeId: transferFromEmployeeId || undefined,
+        toEmployeeId: transferToEmployeeId,
+        responsibility: transferResponsibility,
+        priority: transferPriority
+      });
+
+      if (res.success) {
+        setShowTransferModal(false);
+        setTransferSelectedBrandId('');
+        setTransferFromEmployeeId('');
+        setTransferToEmployeeId('');
+        fetchData();
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to transfer brand');
+    } finally {
+      setTransferringBrand(false);
+    }
   };
 
   const handleSaveAssignments = async (e: FormEvent) => {
@@ -172,7 +286,21 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
     }
   };
 
-  const filteredBrandsForSelect = brands.filter(b =>
+  // Enforce 1 brand = 1 person: Track all brands currently assigned to ANY team member in DB
+  const allAssignedBrandIds = new Set<string>();
+
+  rawAssignments.forEach((item) => {
+    if (item.status === 'Active') {
+      const brd = item.brandId as any;
+      const bId = typeof brd === 'object' ? (brd?._id || brd?.id) : String(brd);
+      if (bId) allAssignedBrandIds.add(bId);
+    }
+  });
+
+  // Only show brands that are completely UNASSIGNED to anyone in the team
+  const unassignedBrandsForSelect = brands.filter((b) => !allAssignedBrandIds.has(b._id));
+
+  const filteredBrandsForSelect = unassignedBrandsForSelect.filter((b) =>
     b.brandName.toLowerCase().includes(brandSearch.toLowerCase()) ||
     b.industry.toLowerCase().includes(brandSearch.toLowerCase())
   );
@@ -203,10 +331,15 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
           {row.brands.map((b) => (
             <span
               key={b._id}
-              className="px-2.5 py-1 rounded-xl text-xs font-extrabold bg-purple-50 text-purple-800 border border-purple-200 flex items-center gap-1 shadow-2xs"
+              onClick={() => !isEmployeeRole && openTransferModal(b._id, row.employeeId)}
+              className={`px-2.5 py-1 rounded-xl text-xs font-extrabold bg-purple-50 text-purple-800 border border-purple-200 flex items-center gap-1.5 shadow-2xs ${!isEmployeeRole ? 'cursor-pointer hover:bg-purple-100 hover:border-purple-300 transition' : ''}`}
+              title={!isEmployeeRole ? `Click to Transfer "${b.brandName}" to another member` : undefined}
             >
               <Briefcase size={12} className="text-purple-600 shrink-0" />
               <span>{b.brandName}</span>
+              {!isEmployeeRole && (
+                <ArrowRightLeft size={11} className="text-purple-400 hover:text-purple-700 ml-0.5" />
+              )}
             </span>
           ))}
           <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-100 text-slate-500 border border-slate-200">
@@ -221,10 +354,9 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
       label: 'Priority',
       sortable: true,
       render: (val) => (
-        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-          val === 'Urgent' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
-          val === 'High' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-purple-50 text-purple-700 border border-purple-200'
-        }`}>
+        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${val === 'Urgent' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+            val === 'High' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-purple-50 text-purple-700 border border-purple-200'
+          }`}>
           {val}
         </span>
       ),
@@ -239,17 +371,15 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
           <button
             type="button"
             onClick={() => handleToggleStatus(row)}
-            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-              isActive ? 'bg-teal-600' : 'bg-slate-300'
-            }`}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isActive ? 'bg-teal-600' : 'bg-slate-300'
+              }`}
             role="switch"
             aria-checked={isActive}
             title={isActive ? 'Active (Click to disable)' : 'Removed (Click to enable)'}
           >
             <span
-              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                isActive ? 'translate-x-5' : 'translate-x-0'
-              }`}
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${isActive ? 'translate-x-5' : 'translate-x-0'
+                }`}
             />
           </button>
         );
@@ -308,13 +438,24 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
         </div>
 
         {!isEmployeeRole && (
-          <button
-            onClick={openCreateModal}
-            className="px-4 py-2.5 btn-gradient-primary text-white rounded-xl font-bold text-sm flex items-center space-x-2 self-start sm:self-auto shadow-md cursor-pointer"
-          >
-            <Plus size={18} />
-            <span>New Assignment</span>
-          </button>
+          <div className="flex items-center gap-2.5 self-start sm:self-auto">
+            <button
+              onClick={() => openTransferModal()}
+              className="px-3.5 py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl font-bold text-xs flex items-center space-x-1.5 transition cursor-pointer shadow-2xs"
+              title="Transfer a Brand between team members"
+            >
+              <ArrowRightLeft size={16} className="text-purple-600" />
+              <span>Transfer Brand</span>
+            </button>
+
+            <button
+              onClick={openCreateModal}
+              className="px-4 py-2.5 btn-gradient-primary text-white rounded-xl font-bold text-sm flex items-center space-x-2 shadow-md cursor-pointer"
+            >
+              <Plus size={18} />
+              <span>New Assignment</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -339,20 +480,127 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
         maxWidth="max-w-xl"
       >
         <form onSubmit={handleSaveAssignments} className="space-y-4 text-sm font-bold">
-          <div>
-            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Select Member *</label>
-            <select
-              required
-              disabled={!!editingEmployeeId}
-              value={selectedEmployeeId}
-              onChange={(e) => setSelectedEmployeeId(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 focus:outline-none font-bold text-xs disabled:opacity-60"
-            >
-              <option value="">-- Select Member --</option>
-              {employees.map((emp) => (
-                <option key={emp._id} value={emp._id}>{emp.name} ({emp.designation})</option>
-              ))}
-            </select>
+          {/* Member Selection Dropdown */}
+          <div className="relative">
+            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1.5">
+              Select Member *
+            </label>
+
+            {editingEmployeeId ? (
+              /* Locked Member Card in Edit Mode */
+              <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-xl flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                    <UserIcon size={14} />
+                  </div>
+                  <div>
+                    <div className="text-slate-900 font-extrabold text-xs">
+                      {employees.find(e => e._id === selectedEmployeeId)?.name || 'Member'}
+                    </div>
+                    <div className="text-[10px] text-purple-700 font-semibold">
+                      {employees.find(e => e._id === selectedEmployeeId)?.designation || 'Staff'}
+                    </div>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-white text-purple-800 border border-purple-200 px-2 py-0.5 rounded-md font-bold">
+                  Editing Portfolio
+                </span>
+              </div>
+            ) : (
+              /* Custom Floating Member Dropdown */
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowMemberDropdown(!showMemberDropdown)}
+                  className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2.5 text-slate-900 font-bold text-xs flex items-center justify-between transition cursor-pointer shadow-2xs"
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <div className="w-6 h-6 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs shrink-0">
+                      <UserIcon size={12} />
+                    </div>
+                    <span className="truncate">
+                      {employees.find(e => e._id === selectedEmployeeId)?.name
+                        ? `${employees.find(e => e._id === selectedEmployeeId)?.name} (${employees.find(e => e._id === selectedEmployeeId)?.designation || 'Staff'})`
+                        : '-- Select Member --'}
+                    </span>
+                  </div>
+                  <ChevronDown size={15} className={`text-slate-400 transition-transform duration-200 shrink-0 ml-1 ${showMemberDropdown ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Floating Dropdown Menu */}
+                {showMemberDropdown && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowMemberDropdown(false)}
+                    />
+                    <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-purple-200 rounded-2xl shadow-xl z-50 p-2 space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-150">
+                      <div className="relative">
+                        <Search size={13} className="absolute left-3 top-2.5 text-slate-400 pointer-events-none" />
+                        <input
+                          type="text"
+                          autoFocus
+                          placeholder="Search member by name..."
+                          value={assignMemberSearch}
+                          onChange={(e) => setAssignMemberSearch(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl pl-8 pr-3 py-1.5 text-slate-900 placeholder:text-slate-400 text-xs font-medium focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="max-h-48 overflow-y-auto space-y-1 pr-0.5">
+                        {employees
+                          .filter(e => e.name.toLowerCase().includes(assignMemberSearch.toLowerCase()) || (e.designation || '').toLowerCase().includes(assignMemberSearch.toLowerCase()))
+                          .map((emp) => {
+                            const isSelected = selectedEmployeeId === emp._id;
+                            const assignedGroup = groupedAssignments.find(g => g.employeeId === emp._id);
+                            const brandCount = assignedGroup?.brands.length || 0;
+
+                            return (
+                              <div
+                                key={emp._id}
+                                onClick={() => {
+                                  const newEmpId = emp._id;
+                                  setSelectedEmployeeId(newEmpId);
+                                  setShowMemberDropdown(false);
+                                  setAssignMemberSearch('');
+                                  if (assignedGroup) {
+                                    setSelectedBrandIds(assignedGroup.brands.map(b => b._id));
+                                    setResponsibility(assignedGroup.responsibility || 'Brand Operations & Content Posting');
+                                    setPriority(assignedGroup.priority as any || 'High');
+                                  } else {
+                                    setSelectedBrandIds([]);
+                                  }
+                                }}
+                                className={`p-2 rounded-xl text-xs font-bold flex items-center justify-between cursor-pointer transition ${
+                                  isSelected
+                                    ? 'bg-purple-600 text-white shadow-2xs'
+                                    : 'hover:bg-purple-50 text-slate-800'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 truncate">
+                                  <span className="truncate">{emp.name}</span>
+                                  <span className={`text-[10px] ${isSelected ? 'text-purple-200' : 'text-slate-400'}`}>
+                                    ({emp.designation || 'Staff'})
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
+                                    isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                                  }`}>
+                                    {brandCount} {brandCount === 1 ? 'Brand' : 'Brands'}
+                                  </span>
+                                  {isSelected && <CheckSquare size={14} className="text-white shrink-0" />}
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Searchable Multi-Select Brand Picker for 100+ Brands */}
@@ -404,18 +652,23 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
               <Search size={14} className="absolute left-3 top-2.5 text-slate-400 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Search by brand name or industry..."
+                placeholder="Search unassigned brands..."
                 value={brandSearch}
                 onChange={(e) => setBrandSearch(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl pl-9 pr-3 py-2 text-slate-900 placeholder:text-slate-400 focus:outline-none font-medium text-xs"
               />
             </div>
 
+            {/* Unassigned Brands Counter Header */}
+            <div className="flex items-center justify-between text-[11px] text-slate-500 font-extrabold mb-1.5 px-0.5">
+              <span>{filteredBrandsForSelect.length} Unassigned Brands Available to Add</span>
+            </div>
+
             {/* Filtered Brands List */}
             <div className="space-y-1.5 p-2 bg-slate-50 rounded-2xl border border-slate-200 max-h-44 overflow-y-auto">
               {filteredBrandsForSelect.length === 0 ? (
-                <p className="text-slate-400 text-xs italic font-medium p-3 text-center">
-                  No brands found matching "{brandSearch}".
+                <p className="text-slate-400 text-xs italic font-medium p-4 text-center">
+                  {brandSearch ? `No unassigned brands matching "${brandSearch}".` : 'No unassigned brands available (All brands are currently assigned to team members).'}
                 </p>
               ) : (
                 filteredBrandsForSelect.map((b) => {
@@ -430,11 +683,10 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
                           setSelectedBrandIds([...selectedBrandIds, b._id]);
                         }
                       }}
-                      className={`p-2 rounded-xl border text-xs font-extrabold flex items-center justify-between cursor-pointer transition select-none ${
-                        isChecked
+                      className={`p-2 rounded-xl border text-xs font-extrabold flex items-center justify-between cursor-pointer transition select-none ${isChecked
                           ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
                           : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center space-x-2">
                         {isChecked ? <CheckSquare size={16} className="shrink-0" /> : <Square size={16} className="text-slate-400 shrink-0" />}
@@ -496,6 +748,248 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
                 </>
               ) : (
                 <span>{editingEmployeeId ? "Save Portfolio Changes" : "Create Assignment"}</span>
+              )}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Transfer Brand Modal */}
+      <Modal
+        isOpen={showTransferModal}
+        onClose={() => setShowTransferModal(false)}
+        title="Transfer Brand Assignment"
+        maxWidth="max-w-xl"
+      >
+        <form onSubmit={handleTransferBrand} className="space-y-4 text-sm font-bold">
+          {/* Header Banner */}
+          <div className="p-3 bg-gradient-to-r from-purple-50 via-indigo-50 to-pink-50 border border-purple-200 rounded-2xl text-xs text-purple-950 flex items-center gap-2.5 shadow-2xs">
+            <ArrowRightLeft size={16} className="text-purple-600 shrink-0" />
+            <p className="leading-tight">
+              Transferring a brand will reassign it from the current member to the new member while preserving all team data.
+            </p>
+          </div>
+
+          {/* 1. Select Brand to Transfer */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">
+                1. Select Brand to Transfer *
+              </label>
+              {transferSelectedBrandId && (
+                <span className="text-[10px] text-purple-700 font-bold bg-purple-100/80 px-2 py-0.5 rounded-md border border-purple-200">
+                  Selected: {allAssignedBrandsList.find(x => x.brand._id === transferSelectedBrandId)?.brand.brandName}
+                </span>
+              )}
+            </div>
+
+            {/* Search Input for Brands */}
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-2.5 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search brand name or current manager..."
+                value={transferBrandSearch}
+                onChange={(e) => setTransferBrandSearch(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl pl-9 pr-3 py-2 text-slate-900 placeholder:text-slate-400 focus:outline-none font-medium text-xs shadow-2xs"
+              />
+            </div>
+
+            {/* Scrollable Brands Grid */}
+            <div className="space-y-1.5 p-2 bg-slate-50 rounded-2xl border border-slate-200 max-h-36 overflow-y-auto">
+              {allAssignedBrandsList
+                .filter(item => {
+                  const q = transferBrandSearch.toLowerCase();
+                  const bName = item.brand.brandName?.toLowerCase() || '';
+                  const empName = item.currentEmp?.name?.toLowerCase() || '';
+                  const ind = item.brand.industry?.toLowerCase() || '';
+                  return bName.includes(q) || empName.includes(q) || ind.includes(q);
+                })
+                .sort((a, b) => {
+                  const aSelected = a.brand._id === transferSelectedBrandId;
+                  const bSelected = b.brand._id === transferSelectedBrandId;
+                  if (aSelected && !bSelected) return -1;
+                  if (!aSelected && bSelected) return 1;
+                  return (a.brand.brandName || '').localeCompare(b.brand.brandName || '');
+                })
+                .map(({ brand, currentEmp }) => {
+                  const isSelected = transferSelectedBrandId === brand._id;
+                  return (
+                    <div
+                      key={brand._id}
+                      onClick={() => handleTransferBrandSelect(brand._id)}
+                      className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-between cursor-pointer transition select-none ${isSelected
+                          ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                          : 'bg-white border-slate-200 text-slate-800 hover:bg-purple-50/60 hover:border-purple-200'
+                        }`}
+                    >
+                      <div className="flex items-center space-x-2 min-w-0">
+                        <Briefcase size={14} className={isSelected ? 'text-white' : 'text-purple-600 shrink-0'} />
+                        <span className="font-extrabold truncate">{brand.brandName}</span>
+                        {brand.industry && (
+                          <span className={`text-[10px] font-normal px-1.5 py-0.5 rounded ${isSelected ? 'bg-purple-700 text-purple-100' : 'bg-slate-100 text-slate-500'
+                            }`}>
+                            {brand.industry}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center space-x-1.5 shrink-0 ml-2">
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${isSelected ? 'bg-white/20 text-white border border-white/30' : 'bg-purple-100 text-purple-800 border border-purple-200'
+                          }`}>
+                          👤 {currentEmp?.name || 'Staff'}
+                        </span>
+                        {isSelected && <CheckSquare size={16} className="text-white shrink-0" />}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+
+          {/* 2. Visual Transfer Route Card: [From Current Owner] -> [To New Assignee] */}
+          <div className="p-3 bg-purple-50/60 border border-purple-200 rounded-2xl flex items-center justify-between gap-3 shadow-2xs">
+            {/* From */}
+            <div className="flex items-center space-x-2.5 flex-1 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs shrink-0 border border-purple-200">
+                <UserIcon size={14} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] uppercase font-black text-slate-400 block tracking-wider">From (Current Owner)</span>
+                <div className="font-extrabold text-xs text-slate-900 truncate">
+                  {employees.find(e => e._id === transferFromEmployeeId)?.name || (transferSelectedBrandId ? 'Current Owner' : 'Select Brand First')}
+                </div>
+              </div>
+            </div>
+
+            {/* Transfer Arrow Icon */}
+            <div className="flex items-center justify-center px-1 shrink-0">
+              <div className="w-7 h-7 rounded-full bg-purple-600 text-white flex items-center justify-center shadow-xs">
+                <ArrowRightLeft size={13} />
+              </div>
+            </div>
+
+            {/* To */}
+            <div className="flex items-center space-x-2.5 flex-1 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs shrink-0 border border-emerald-200">
+                <UserIcon size={14} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] uppercase font-black text-emerald-700 block tracking-wider">To (New Assignee)</span>
+                <div className="font-extrabold text-xs text-emerald-900 truncate">
+                  {employees.find(e => e._id === transferToEmployeeId)?.name
+                    ? `${employees.find(e => e._id === transferToEmployeeId)?.name}`
+                    : 'Select Member Below'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Select Destination Member (Searchable List) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">
+                2. Select New Team Member to Assign *
+              </label>
+              {transferToEmployeeId && (
+                <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                  Target: {employees.find(e => e._id === transferToEmployeeId)?.name}
+                </span>
+              )}
+            </div>
+
+            {/* Search Input for Members */}
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-2.5 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search member name or designation..."
+                value={toEmployeeSearch}
+                onChange={(e) => setToEmployeeSearch(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl pl-9 pr-3 py-2 text-slate-900 placeholder:text-slate-400 focus:outline-none font-medium text-xs shadow-2xs"
+              />
+            </div>
+
+            {/* Scrollable Members List */}
+            <div className="space-y-1.5 p-2 bg-slate-50 rounded-2xl border border-slate-200 max-h-36 overflow-y-auto">
+              {employees
+                .filter(e => e._id !== transferFromEmployeeId)
+                .filter(e => e.name.toLowerCase().includes(toEmployeeSearch.toLowerCase()) || (e.designation || '').toLowerCase().includes(toEmployeeSearch.toLowerCase()))
+                .sort((a, b) => {
+                  const aSelected = a._id === transferToEmployeeId;
+                  const bSelected = b._id === transferToEmployeeId;
+                  if (aSelected && !bSelected) return -1;
+                  if (!aSelected && bSelected) return 1;
+                  return (a.name || '').localeCompare(b.name || '');
+                })
+                .map((emp) => {
+                  const isSelected = transferToEmployeeId === emp._id;
+                  return (
+                    <div
+                      key={emp._id}
+                      onClick={() => setTransferToEmployeeId(emp._id)}
+                      className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-between cursor-pointer transition select-none ${isSelected
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                          : 'bg-white border-slate-200 text-slate-800 hover:bg-emerald-50/50 hover:border-emerald-200'
+                        }`}
+                    >
+                      <div className="flex items-center space-x-2 min-w-0">
+                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${isSelected ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-700'
+                          }`}>
+                          <UserIcon size={12} />
+                        </div>
+                        <span className="font-extrabold truncate">{emp.name}</span>
+                        <span className={`text-[10px] font-normal px-1.5 py-0.5 rounded ${isSelected ? 'bg-emerald-700 text-emerald-100' : 'bg-slate-100 text-slate-500'
+                          }`}>
+                          {emp.designation || 'Influencer Executive'}
+                        </span>
+                      </div>
+
+                      {isSelected && <CheckSquare size={16} className="text-white shrink-0" />}
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+
+          {/* 4. Responsibility */}
+          <div>
+            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">
+              Responsibility / Role
+            </label>
+            <input
+              type="text"
+              value={transferResponsibility}
+              onChange={(e) => setTransferResponsibility(e.target.value)}
+              placeholder="e.g. Brand Operations & Content Posting"
+              className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 focus:outline-none font-medium text-xs"
+            />
+          </div>
+
+          {/* 5. Action Buttons */}
+          <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setShowTransferModal(false)}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={transferringBrand || !transferSelectedBrandId || !transferToEmployeeId}
+              className="px-5 py-2.5 btn-gradient-primary text-white rounded-xl font-bold text-xs flex items-center space-x-1.5 transition shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {transferringBrand ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Transferring Brand...</span>
+                </>
+              ) : (
+                <>
+                  <ArrowRightLeft size={14} />
+                  <span>Confirm & Transfer Brand</span>
+                </>
               )}
             </button>
           </div>
