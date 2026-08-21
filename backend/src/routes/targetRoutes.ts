@@ -155,7 +155,7 @@ export const recalculateTargetProgress = async (target: any, customDateFilter?: 
         ...filter
       }).select('ad2shipMargin brandOnboardingAmt inAmount influencerOnboardingAmt outAmount').lean();
       const totalMargin = paidRecords.reduce((acc, curr) => {
-        const m = curr.ad2shipMargin || ((curr.brandOnboardingAmt || curr.inAmount || 0) - (curr.influencerOnboardingAmt || curr.outAmount || 0));
+        const m = curr.ad2shipMargin !== undefined ? curr.ad2shipMargin : ((curr.brandOnboardingAmt || curr.inAmount || 0) - (curr.influencerOnboardingAmt || curr.outAmount || 0));
         return acc + m;
       }, 0);
       target.achievedAmount = totalMargin;
@@ -217,7 +217,7 @@ router.get('/team-breakdown', authenticateToken, checkPermission('target.view'),
       });
 
       const netMargin = memberPaid.reduce((acc, curr) => {
-        const m = curr.ad2shipMargin || ((curr.brandOnboardingAmt || curr.inAmount || 0) - (curr.influencerOnboardingAmt || curr.outAmount || 0));
+        const m = curr.ad2shipMargin !== undefined ? curr.ad2shipMargin : ((curr.brandOnboardingAmt || curr.inAmount || 0) - (curr.influencerOnboardingAmt || curr.outAmount || 0));
         return acc + m;
       }, 0);
 
@@ -255,7 +255,7 @@ router.get('/team-breakdown', authenticateToken, checkPermission('target.view'),
       teamQualifyingVideosCount += qualifyingBonusDealsCount;
 
       const orderBonusAmount = qualifyingDeals.reduce((acc, curr) => {
-        const dealMargin = curr.ad2shipMargin || ((curr.brandOnboardingAmt || curr.inAmount || 0) - (curr.influencerOnboardingAmt || curr.outAmount || 0));
+        const dealMargin = curr.ad2shipMargin !== undefined ? curr.ad2shipMargin : ((curr.brandOnboardingAmt || curr.inAmount || 0) - (curr.influencerOnboardingAmt || curr.outAmount || 0));
         return acc + Math.round(dealMargin * 0.10);
       }, 0);
 
@@ -281,7 +281,7 @@ router.get('/team-breakdown', authenticateToken, checkPermission('target.view'),
         category: d.category,
         brandOnboardingAmt: d.brandOnboardingAmt || d.inAmount || 0,
         influencerOnboardingAmt: d.influencerOnboardingAmt || d.outAmount || 0,
-        ad2shipMargin: d.ad2shipMargin || ((d.brandOnboardingAmt || d.inAmount || 0) - (d.influencerOnboardingAmt || d.outAmount || 0)),
+        ad2shipMargin: d.ad2shipMargin !== undefined ? d.ad2shipMargin : ((d.brandOnboardingAmt || d.inAmount || 0) - (d.influencerOnboardingAmt || d.outAmount || 0)),
         ordersGenerated: d.ordersGenerated || d.ordersCount || 0,
         isOrderBonusQualified: (d.ordersGenerated || d.ordersCount || 0) >= 100,
         videoType: d.videoType || 'Single Product Video',

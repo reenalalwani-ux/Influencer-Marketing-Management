@@ -3030,13 +3030,15 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                                 </span>
                               </td>
                               <td className="p-2.5 border-r border-slate-100 text-right font-semibold">
-                                {d.category === 'Paid' ? `₹${new Intl.NumberFormat().format(d.brandOnboardingAmt)}` : '-'}
+                                {d.category === 'Paid' ? `₹${new Intl.NumberFormat().format(d.brandOnboardingAmt || 0)}` : '-'}
                               </td>
                               <td className="p-2.5 border-r border-slate-100 text-right font-semibold text-rose-600">
-                                {d.category === 'Paid' ? `₹${new Intl.NumberFormat().format(d.influencerOnboardingAmt)}` : '-'}
+                                {d.category === 'Paid' ? `₹${new Intl.NumberFormat().format(d.influencerOnboardingAmt || 0)}` : '-'}
                               </td>
-                              <td className="p-2.5 border-r border-slate-100 text-right font-black text-emerald-600">
-                                {d.category === 'Paid' ? `₹${new Intl.NumberFormat().format(d.ad2shipMargin)}` : '-'}
+                              <td className={`p-2.5 border-r border-slate-100 text-right font-black ${
+                                (d.ad2shipMargin ?? ((d.brandOnboardingAmt || 0) - (d.influencerOnboardingAmt || 0))) >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                              }`}>
+                                {d.category === 'Paid' ? `₹${new Intl.NumberFormat().format(d.ad2shipMargin !== undefined ? d.ad2shipMargin : ((d.brandOnboardingAmt || 0) - (d.influencerOnboardingAmt || 0)))}` : '-'}
                               </td>
                               <td className="p-2.5 text-center">
                                 {d.ordersGenerated >= 100 ? (
