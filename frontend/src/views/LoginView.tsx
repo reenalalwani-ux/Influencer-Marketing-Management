@@ -234,10 +234,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       <div className="w-full max-w-lg bg-white/95 backdrop-blur-2xl p-8 sm:p-10 rounded-3xl shadow-[0_20px_60px_-15px_rgba(124,58,237,0.15)] border border-slate-200/90 relative z-10 animate-fade-in space-y-6">
         {/* Header Branding */}
         <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 rounded-2xl flex items-center justify-center text-white font-black text-2xl mx-auto shadow-lg shadow-purple-600/30 mb-3.5 tracking-wider ring-4 ring-purple-100/80">
-            IM
+          <div className="flex justify-center mb-4">
+            <img
+              src="/logo.png"
+              alt="Ad2ship Logo"
+              className="h-12 sm:h-14 w-auto max-w-[220px] object-contain drop-shadow-sm"
+            />
           </div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Influencer Marketing Operation</h1>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">AD2ship Influencer Marketing</h1>
           <p className="text-xs font-bold text-slate-500 mt-1">Enterprise Passwordless Email Verification & Manager Approval</p>
         </div>
 

@@ -116,12 +116,15 @@ export const Navbar: React.FC<NavbarProps> = ({ user, onLogout, activeView, setA
     <>
       <header className="h-16 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl sticky top-0 z-20 px-6 flex items-center justify-between shadow-xs">
         <div className="flex items-center space-x-3.5">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-pink-500 to-amber-500 flex items-center justify-center text-white font-extrabold text-base shadow-md shadow-purple-500/25">
-            IM
-          </div>
+          <img
+            src="/logo.png"
+            alt="Ad2ship Logo"
+            className="h-9 w-auto max-w-[140px] object-contain drop-shadow-xs"
+          />
+          <div className="h-6 w-px bg-slate-200" />
           <div>
-            <h1 className="font-extrabold text-slate-900 text-lg leading-none tracking-tight">
-              Influencer Marketing Operation
+            <h1 className="font-extrabold text-slate-900 text-base leading-none tracking-tight">
+              AD2ship Influencer Marketing
             </h1>
             <p className="text-[11px] text-purple-600 font-bold mt-0.5 tracking-wide">Enterprise Work Management System v1.0</p>
           </div>
