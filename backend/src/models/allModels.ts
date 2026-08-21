@@ -172,7 +172,7 @@ export interface ITask extends Document {
   scheduledDate: Date;
   scheduledTime: string; // e.g. "10:00 AM"
   deadline: Date;
-  status: 'Pending' | 'In Progress' | 'Submitted' | 'Verified' | 'Rejected' | 'Delayed' | 'Missed';
+  status: 'Pending' | 'In Progress' | 'Submitted' | 'Verified' | 'Completed' | 'Rejected' | 'Delayed' | 'Missed';
   publishedUrl?: string;
   publishedDate?: Date;
   verificationStatus: 'Unsubmitted' | 'Pending Verification' | 'Verified' | 'Rejected';
@@ -180,6 +180,7 @@ export interface ITask extends Document {
   verifiedAt?: Date;
   rejectionReason?: string;
   comments?: string;
+  remarks?: string;
   isMainTask?: boolean;
   parentTaskId?: mongoose.Types.ObjectId;
 }
@@ -192,13 +193,14 @@ const TaskSchema = new Schema<ITask>({
   contentType: { type: String, required: true },
   title: { type: String, required: true },
   description: { type: String },
+  remarks: { type: String },
   priority: { type: String, enum: ['Low', 'Medium', 'High', 'Urgent'], default: 'Medium' },
   scheduledDate: { type: Date, required: true },
   scheduledTime: { type: String, required: true },
   deadline: { type: Date, required: true },
   status: {
     type: String,
-    enum: ['Pending', 'In Progress', 'Submitted', 'Verified', 'Rejected', 'Delayed', 'Missed'],
+    enum: ['Pending', 'In Progress', 'Submitted', 'Verified', 'Completed', 'Rejected', 'Delayed', 'Missed'],
     default: 'Pending'
   },
   publishedUrl: { type: String },

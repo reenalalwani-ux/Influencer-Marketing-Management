@@ -69,7 +69,7 @@ export interface TaskItem {
   scheduledDate: string;
   scheduledTime: string;
   deadline: string;
-  status: 'Pending' | 'In Progress' | 'Submitted' | 'Verified' | 'Rejected' | 'Delayed' | 'Missed';
+  status: 'Pending' | 'In Progress' | 'Submitted' | 'Verified' | 'Completed' | 'Rejected' | 'Delayed' | 'Missed';
   publishedUrl?: string;
   publishedDate?: string;
   verificationStatus: 'Unsubmitted' | 'Pending Verification' | 'Verified' | 'Rejected';
@@ -77,6 +77,7 @@ export interface TaskItem {
   verifiedAt?: string;
   rejectionReason?: string;
   comments?: string;
+  remarks?: string;
   isMainTask?: boolean;
   parentTaskId?: TaskItem | any;
 }

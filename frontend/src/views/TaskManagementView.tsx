@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { CheckSquare, Plus, Send, ExternalLink, Calendar, Clock, Filter, Tag, ChevronDown, ChevronRight, Layers, FolderPlus, User as UserIcon, Eye, Edit2, Trash2, Loader2 } from 'lucide-react';
+import { CheckSquare, Plus, Send, ExternalLink, ChevronDown, ChevronRight, Layers, FolderPlus, User as UserIcon, Eye, Edit2, Trash2, Loader2, Search } from 'lucide-react';
 import { api } from '../services/api';
-import { TaskItem, Employee, Brand, User } from '../types';
+import { TaskItem, Employee, Brand, User, EmployeeBrandAssignment } from '../types';
 import { Modal } from '../components/Modal';
 import { Pagination } from '../components/Pagination';
 import { InlineLoader } from '../components/PageLoader';
@@ -16,6 +16,7 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [assignments, setAssignments] = useState<EmployeeBrandAssignment[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Pagination State
@@ -30,6 +31,13 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
   const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
   const [viewingTask, setViewingTask] = useState<TaskItem | null>(null);
   const [selectedParentTaskId, setSelectedParentTaskId] = useState('');
+  const [showBrandDropdown, setShowBrandDropdown] = useState(false);
+  const [brandSearch, setBrandSearch] = useState('');
+  const [showParentTaskDropdown, setShowParentTaskDropdown] = useState(false);
+  const [parentTaskSearch, setParentTaskSearch] = useState('');
+  const [showPlatformDropdown, setShowPlatformDropdown] = useState(false);
+  const [showContentTypeDropdown, setShowContentTypeDropdown] = useState(false);
+  const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
 
   // Expanded main tasks state
   const [expandedMainTasks, setExpandedMainTasks] = useState<Record<string, boolean>>({});
@@ -41,10 +49,12 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
   const [contentType, setContentType] = useState('Reel');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [remarks, setRemarks] = useState('');
   const [priority, setPriority] = useState('High');
   const [scheduledDate, setScheduledDate] = useState(new Date().toISOString().split('T')[0]);
   const [scheduledTime, setScheduledTime] = useState('10:00 AM');
   const [deadlineHours, setDeadlineHours] = useState('4');
+  const [taskStatus, setTaskStatus] = useState<'Pending' | 'In Progress' | 'Submitted' | 'Verified' | 'Rejected'>('Pending');
 
   // Manager Verification Modal state
   const [selectedVerifyTask, setSelectedVerifyTask] = useState<TaskItem | null>(null);
@@ -56,10 +66,11 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
 
   const fetchData = async () => {
     try {
-      const [tRes, eRes, bRes] = await Promise.all([
+      const [tRes, eRes, bRes, aRes] = await Promise.all([
         api.get('/tasks'),
         api.get('/employees'),
-        api.get('/brands')
+        api.get('/brands'),
+        api.get('/employee-brands?status=Active')
       ]);
 
       if (tRes.success) {
@@ -89,17 +100,26 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
 
       setEmployees(empList);
       if (bRes.success) setBrands(bRes.data);
+      if (aRes?.success) setAssignments(aRes.data);
 
-      if (currentUser) {
-        const myEmp = empList.find(e =>
-          e.email?.toLowerCase() === currentUser.email?.toLowerCase() ||
-          e.name?.toLowerCase() === currentUser.name?.toLowerCase()
-        ) || empList[0];
-
-        if (myEmp) setEmployeeId(myEmp._id);
-      }
-      if (bRes.success && bRes.data.length > 0) {
-        setBrandId(bRes.data[0]._id);
+      const defaultBrandId = bRes.success && bRes.data.length > 0 ? bRes.data[0]._id : '';
+      if (defaultBrandId) {
+        setBrandId(defaultBrandId);
+        // Find assigned member for default brand
+        const assign = aRes?.data?.find((a: EmployeeBrandAssignment) => {
+          const b = typeof a.brandId === 'object' ? a.brandId._id : a.brandId;
+          return b === defaultBrandId && a.status === 'Active';
+        });
+        if (assign) {
+          const empId = typeof assign.employeeId === 'object' ? assign.employeeId._id : assign.employeeId;
+          setEmployeeId(empId);
+        } else if (currentUser) {
+          const myEmp = empList.find(e =>
+            e.email?.toLowerCase() === currentUser.email?.toLowerCase() ||
+            e.name?.toLowerCase() === currentUser.name?.toLowerCase()
+          ) || empList[0];
+          if (myEmp) setEmployeeId(myEmp._id);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -116,12 +136,46 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
     setExpandedMainTasks(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const getAssignedMemberForBrand = (targetBrandId: string): Employee | null => {
+    if (!targetBrandId) return null;
+    const assign = assignments.find(a => {
+      const b = typeof a.brandId === 'object' ? a.brandId._id : a.brandId;
+      return b === targetBrandId && a.status === 'Active';
+    });
+    if (assign) {
+      const empId = typeof assign.employeeId === 'object' ? assign.employeeId._id : assign.employeeId;
+      return employees.find(e => e._id === empId) || (typeof assign.employeeId === 'object' ? assign.employeeId as Employee : null);
+    }
+    const br = brands.find(b => b._id === targetBrandId);
+    if (br?.assignedEmployees && br.assignedEmployees.length > 0) {
+      const first = br.assignedEmployees[0];
+      const empId = typeof first.employeeId === 'object' ? (first.employeeId as any)._id : first.employeeId;
+      return employees.find(e => e._id === empId) || null;
+    }
+    return null;
+  };
+
+  const handleBrandChange = (newBrandId: string) => {
+    setBrandId(newBrandId);
+    const assigned = getAssignedMemberForBrand(newBrandId);
+    if (assigned) {
+      setEmployeeId(assigned._id);
+    }
+  };
+
   const openCreateMainTaskModal = () => {
     setEditingTask(null);
     setCreationType('main');
     setSelectedParentTaskId('');
+    const targetBrand = brands.length > 0 ? brands[0]._id : '';
+    setBrandId(targetBrand);
+    const assigned = getAssignedMemberForBrand(targetBrand);
+    if (assigned) {
+      setEmployeeId(assigned._id);
+    }
     setTitle('');
     setDescription('');
+    setRemarks('');
     setPlatform('Instagram');
     setContentType('Reel');
     setScheduledDate(new Date().toISOString().split('T')[0]);
@@ -132,15 +186,28 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
   const openCreateSubTaskModal = (parentTask?: TaskItem) => {
     setEditingTask(null);
     setCreationType('sub');
+    let targetBrand = '';
     if (parentTask) {
       setSelectedParentTaskId(parentTask._id);
       const bId = typeof parentTask.brandId === 'object' ? parentTask.brandId._id : parentTask.brandId;
-      if (bId) setBrandId(bId);
+      if (bId) {
+        targetBrand = bId;
+        setBrandId(bId);
+      }
     } else {
       setSelectedParentTaskId('');
+      targetBrand = brands.length > 0 ? brands[0]._id : '';
+      setBrandId(targetBrand);
     }
+
+    const assigned = getAssignedMemberForBrand(targetBrand);
+    if (assigned) {
+      setEmployeeId(assigned._id);
+    }
+
     setTitle('');
     setDescription('');
+    setRemarks('');
     setPlatform('Instagram');
     setContentType('Reel');
     setScheduledDate(new Date().toISOString().split('T')[0]);
@@ -149,26 +216,48 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
   };
 
   const openEditTaskModal = (task: TaskItem) => {
-    setEditingTask(task);
-    setCreationType(task.isMainTask ? 'main' : 'sub');
+    if (!task) return;
+    try {
+      setEditingTask(task);
+      setCreationType(task.isMainTask ? 'main' : 'sub');
 
-    const pId = typeof task.parentTaskId === 'object' ? task.parentTaskId?._id : task.parentTaskId;
-    setSelectedParentTaskId(pId || '');
+      const pId = typeof task.parentTaskId === 'object' ? (task.parentTaskId?._id || (task.parentTaskId as any)?.id) : task.parentTaskId;
+      setSelectedParentTaskId(pId || '');
 
-    const eId = typeof task.employeeId === 'object' ? task.employeeId?._id : task.employeeId;
-    if (eId) setEmployeeId(eId);
+      const eId = typeof task.employeeId === 'object' ? (task.employeeId?._id || (task.employeeId as any)?.id) : task.employeeId;
+      if (eId) setEmployeeId(eId);
 
-    const bId = typeof task.brandId === 'object' ? task.brandId?._id : task.brandId;
-    if (bId) setBrandId(bId);
+      const bId = typeof task.brandId === 'object' ? (task.brandId?._id || (task.brandId as any)?.id) : task.brandId;
+      if (bId) setBrandId(bId);
 
-    setTitle(task.title || '');
-    setDescription(task.description || '');
-    setPlatform(task.platform || 'Instagram');
-    setContentType(task.contentType || 'Reel');
-    setPriority(task.priority || 'High');
-    setScheduledDate(task.scheduledDate ? new Date(task.scheduledDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
-    setScheduledTime(task.scheduledTime || '10:00 AM');
-    setShowAddModal(true);
+      setTitle(task.title || '');
+      setDescription(task.description || '');
+      setRemarks(task.remarks || '');
+      setPlatform(task.platform || 'Instagram');
+      setContentType(task.contentType || 'Reel');
+      setPriority(task.priority || 'High');
+      setTaskStatus((task.status as any) || 'Pending');
+
+      let parsedDate = '';
+      if (task.scheduledDate) {
+        try {
+          const d = new Date(task.scheduledDate);
+          if (!isNaN(d.getTime())) {
+            parsedDate = d.toISOString().split('T')[0];
+          }
+        } catch (_) {}
+      }
+      if (!parsedDate) {
+        parsedDate = new Date().toISOString().split('T')[0];
+      }
+      setScheduledDate(parsedDate);
+      setScheduledTime(task.scheduledTime || '10:00 AM');
+      setShowAddModal(true);
+    } catch (err) {
+      console.error('Error opening edit task modal:', err);
+      // Fallback: still open modal
+      setShowAddModal(true);
+    }
   };
 
   const handleDeleteTask = async (id: string, isMain: boolean) => {
@@ -184,6 +273,17 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
       }
     } catch (err: any) {
       alert(err.message || 'Failed to delete task');
+    }
+  };
+
+  const handleQuickCompleteTask = async (taskId: string) => {
+    try {
+      const res = await api.put(`/tasks/${taskId}/status`, { status: 'Verified' });
+      if (res.success) {
+        fetchData();
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to complete task');
     }
   };
 
@@ -205,7 +305,9 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
         contentType: isMain ? 'Master Task' : contentType,
         title,
         description,
+        remarks,
         priority,
+        status: editingTask ? taskStatus : undefined,
         scheduledDate: sched,
         scheduledTime: isMain ? '09:00 AM' : scheduledTime,
         deadline
@@ -224,6 +326,7 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
         fetchData();
         setTitle('');
         setDescription('');
+        setRemarks('');
       }
     } catch (err: any) {
       alert(err.message || 'Failed to save task');
@@ -377,35 +480,49 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
 
                           <div className="flex items-center space-x-1 border-l border-purple-200 pl-3">
                             <button
-                              onClick={() => setViewingTask(mainTask)}
-                              className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 transition"
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setViewingTask(mainTask);
+                              }}
+                              className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 transition cursor-pointer"
                               title="View Details"
                             >
                               <Eye size={14} />
                             </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditTaskModal(mainTask);
+                              }}
+                              className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-purple-50 text-purple-600 transition cursor-pointer"
+                              title="Edit Task"
+                            >
+                              <Edit2 size={14} />
+                            </button>
                             {isManagerOrAdmin && (
-                              <>
-                                <button
-                                  onClick={() => openEditTaskModal(mainTask)}
-                                  className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-purple-600 transition"
-                                  title="Edit Task"
-                                >
-                                  <Edit2 size={14} />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteTask(mainTask._id, true)}
-                                  className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-red-50 text-red-600 transition"
-                                  title="Delete Task"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteTask(mainTask._id, true);
+                                }}
+                                className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-red-50 text-red-600 transition cursor-pointer"
+                                title="Delete Task"
+                              >
+                                <Trash2 size={14} />
+                              </button>
                             )}
                           </div>
 
                           <button
-                            onClick={() => openCreateSubTaskModal(mainTask)}
-                            className="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-800 font-extrabold text-xs rounded-xl transition flex items-center gap-1 shadow-2xs"
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openCreateSubTaskModal(mainTask);
+                            }}
+                            className="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-800 font-extrabold text-xs rounded-xl transition flex items-center gap-1 shadow-2xs cursor-pointer"
                           >
                             <Plus size={14} /> + Add Sub-Task
                           </button>
@@ -414,112 +531,162 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
 
                       {/* Sub-Tasks Nested List */}
                       {isExpanded && (
-                        <div className="p-3 bg-slate-50/50 pl-6 md:pl-10 space-y-2 border-t border-slate-100">
+                        <div className="p-3.5 bg-slate-50/60 pl-6 md:pl-10 space-y-2.5 border-t border-slate-100">
                           {subTasks.length === 0 ? (
-                            <div className="p-3 text-slate-400 text-xs italic font-semibold">
+                            <div className="p-4 text-center text-slate-400 text-xs italic font-semibold bg-white rounded-xl border border-dashed border-slate-200">
                               No sub-tasks created under this brand task yet. Click "+ Add Sub-Task" above to create one.
                             </div>
                           ) : (
                             subTasks.map((sub) => {
                               const emp = sub.employeeId as any;
+                              const isDone = sub.status === 'Verified' || sub.status === 'Completed';
+
                               return (
                                 <div
                                   key={sub._id}
-                                  className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3 hover:border-purple-200 transition"
+                                  className="p-3.5 bg-white rounded-xl border border-slate-200 hover:border-purple-300 transition shadow-2xs hover:shadow-xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3"
                                 >
-                                  <div className="space-y-1">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-mono text-[10px] font-bold text-slate-400">{sub.taskId}</span>
-                                      <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                  {/* Left: Deliverable Info */}
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="font-mono text-[10px] font-bold text-slate-400">#{sub.taskId}</span>
+                                      <span className="font-extrabold text-xs text-slate-900 truncate">
+                                        {sub.title}
+                                      </span>
+                                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-100">
                                         {sub.platform} • {sub.contentType}
                                       </span>
-                                      <span className="text-[11px] font-extrabold text-slate-600">
+                                      <span className="text-[10px] font-semibold text-slate-500">
                                         🗓️ {new Date(sub.scheduledDate).toLocaleDateString()} {sub.scheduledTime}
                                       </span>
                                     </div>
-                                    <div className="font-extrabold text-slate-900 text-xs">{sub.title}</div>
-                                    <div className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
-                                      <UserIcon size={12} className="text-purple-500" />
-                                      Assigned: <strong className="text-slate-800">{emp?.name || 'Unassigned'}</strong> ({emp?.designation || 'Staff'})
+                                    <div className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5 mt-0.5">
+                                      <UserIcon size={11} className="text-purple-500" />
+                                      <span>Assigned: <strong className="text-slate-800">{emp?.name || 'Unassigned'}</strong> <span className="text-slate-400 text-[10px]">({emp?.designation || 'Staff'})</span></span>
                                     </div>
                                   </div>
 
-                                  <div className="flex items-center gap-2 whitespace-nowrap self-end md:self-auto">
-                                    {/* Action Buttons: View, Edit, Delete */}
-                                    <div className="flex items-center space-x-1 mr-1">
-                                      <button
-                                        onClick={() => setViewingTask(sub)}
-                                        className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 transition"
-                                        title="View Details"
-                                      >
-                                        <Eye size={13} />
-                                      </button>
-                                      {isManagerOrAdmin && (
-                                        <>
-                                          <button
-                                            onClick={() => openEditTaskModal(sub)}
-                                            className="p-1.5 rounded-lg bg-slate-50 hover:bg-purple-50 text-purple-600 transition"
-                                            title="Edit Sub-Task"
-                                          >
-                                            <Edit2 size={13} />
-                                          </button>
-                                          <button
-                                            onClick={() => handleDeleteTask(sub._id, false)}
-                                            className="p-1.5 rounded-lg bg-slate-50 hover:bg-red-50 text-red-600 transition"
-                                            title="Delete Sub-Task"
-                                          >
-                                            <Trash2 size={13} />
-                                          </button>
-                                        </>
-                                      )}
-                                    </div>
-
-                                    {/* Status Badge */}
-                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
-                                      sub.status === 'Verified' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
-                                      sub.status === 'Submitted' ? 'bg-amber-100 text-amber-900 border border-amber-300' :
-                                      sub.status === 'Rejected' ? 'bg-rose-100 text-rose-800 border border-rose-300' :
-                                      'bg-slate-100 text-slate-700 border border-slate-300'
+                                  {/* Right: Unified Status, Link & Actions */}
+                                  <div className="flex items-center gap-2 shrink-0 self-end lg:self-auto flex-wrap">
+                                    {/* Clean Status Pill */}
+                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold tracking-wide border flex items-center gap-1.5 ${
+                                      isDone ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                      sub.status === 'Submitted' ? 'bg-amber-50 text-amber-800 border-amber-200' :
+                                      sub.status === 'In Progress' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                      sub.status === 'Rejected' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                                      'bg-slate-50 text-slate-600 border-slate-200'
                                     }`}>
-                                      {sub.status === 'Verified' ? '✓ Verified' :
-                                       sub.status === 'Submitted' ? '⏳ Pending Verification' :
-                                       sub.status === 'Rejected' ? '✕ Rejected' : 'Pending URL'}
+                                      <span className={`w-1.5 h-1.5 rounded-full ${
+                                        isDone ? 'bg-emerald-500' :
+                                        sub.status === 'Submitted' ? 'bg-amber-500' :
+                                        sub.status === 'In Progress' ? 'bg-blue-500' :
+                                        sub.status === 'Rejected' ? 'bg-rose-500' :
+                                        'bg-slate-400'
+                                      }`} />
+                                      {isDone ? 'Completed' :
+                                       sub.status === 'Submitted' ? 'Under Verification' :
+                                       sub.status === 'In Progress' ? 'In Progress' :
+                                       sub.status === 'Rejected' ? 'Rejected' : 'Pending'}
                                     </span>
 
-                                    {/* Submit URL Button */}
-                                    {(sub.status === 'Pending' || sub.status === 'Rejected') && (
-                                      <button
-                                        onClick={() => onOpenSubmitUrlModal(sub)}
-                                        className="px-3 py-1.5 btn-gradient-primary text-white text-xs font-extrabold rounded-xl shadow-2xs flex items-center space-x-1"
-                                      >
-                                        <Send size={12} />
-                                        <span>{sub.status === 'Rejected' ? 'Re-submit URL' : 'Submit URL'}</span>
-                                      </button>
-                                    )}
-
-                                    {/* Manager Verification Button */}
-                                    {isManagerOrAdmin && (sub.status === 'Submitted' || sub.verificationStatus === 'Pending Verification') && (
-                                      <button
-                                        onClick={() => setSelectedVerifyTask(sub)}
-                                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl shadow-2xs flex items-center space-x-1"
-                                      >
-                                        <CheckSquare size={12} />
-                                        <span>Verify Task</span>
-                                      </button>
-                                    )}
-
-                                    {/* Published URL Link */}
+                                    {/* Post Link */}
                                     {sub.publishedUrl && (
                                       <a
                                         href={sub.publishedUrl}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold transition flex items-center gap-1"
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1"
+                                        title="View Published Social Post"
                                       >
-                                        <ExternalLink size={12} />
-                                        <span>Link</span>
+                                        <ExternalLink size={11} />
+                                        <span>Post Link</span>
                                       </a>
                                     )}
+
+                                    {/* Action Buttons if not Done */}
+                                    {!isDone && (
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleQuickCompleteTask(sub._id);
+                                          }}
+                                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-2xs flex items-center gap-1 cursor-pointer transition"
+                                          title="Mark Task Completed Directly"
+                                        >
+                                          <CheckSquare size={12} />
+                                          <span>Done</span>
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            onOpenSubmitUrlModal(sub);
+                                          }}
+                                          className="px-2 py-1 bg-slate-100 hover:bg-purple-50 text-slate-700 hover:text-purple-700 border border-slate-200 hover:border-purple-200 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1"
+                                          title="Attach live post URL (Optional)"
+                                        >
+                                          <Send size={11} />
+                                          <span>{sub.status === 'Rejected' ? 'Re-submit' : 'URL'}</span>
+                                        </button>
+                                      </div>
+                                    )}
+
+                                    {/* Manager Verify Action */}
+                                    {isManagerOrAdmin && (sub.status === 'Submitted' || sub.verificationStatus === 'Pending Verification') && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedVerifyTask(sub);
+                                        }}
+                                        className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-lg shadow-2xs flex items-center gap-1 cursor-pointer"
+                                      >
+                                        <CheckSquare size={12} />
+                                        <span>Verify</span>
+                                      </button>
+                                    )}
+
+                                    {/* Toolset: Edit, Details, Delete */}
+                                    <div className="flex items-center space-x-1 pl-1.5 border-l border-slate-200">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          openEditTaskModal(sub);
+                                        }}
+                                        className="p-1.5 rounded-lg bg-slate-50 hover:bg-purple-50 text-slate-500 hover:text-purple-700 transition cursor-pointer"
+                                        title="Edit Task & Status"
+                                      >
+                                        <Edit2 size={13} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setViewingTask(sub);
+                                        }}
+                                        className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition cursor-pointer"
+                                        title="View Task Details"
+                                      >
+                                        <Eye size={13} />
+                                      </button>
+                                      {isManagerOrAdmin && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteTask(sub._id, false);
+                                          }}
+                                          className="p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition cursor-pointer"
+                                          title="Delete Deliverable"
+                                        >
+                                          <Trash2 size={13} />
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               );
@@ -555,57 +722,68 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
                 {standaloneTasks.map((sub) => {
                   const emp = sub.employeeId as any;
                   const brand = sub.brandId as any;
+                  const isDone = sub.status === 'Verified' || sub.status === 'Completed';
+
                   return (
-                    <div key={sub._id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between text-xs">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-purple-700">{brand?.brandName || 'Brand'}</span>
+                    <div
+                      key={sub._id}
+                      className="p-3.5 bg-white rounded-xl border border-slate-200 hover:border-purple-300 transition flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 shadow-2xs"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-extrabold text-purple-700 text-xs">💼 {brand?.brandName || 'Brand'}</span>
                           <span className="text-slate-400">•</span>
-                          <span className="font-bold text-slate-800">{sub.title}</span>
+                          <span className="font-mono text-[10px] font-bold text-slate-400">#{sub.taskId}</span>
+                          <span className="font-extrabold text-xs text-slate-900 truncate">
+                            {sub.title}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-100">
+                            {sub.platform} • {sub.contentType}
+                          </span>
                         </div>
-                        <span className="text-[10px] text-slate-500">Assigned: {emp?.name || 'Staff'}</span>
+                        <span className="text-[10px] text-slate-500 mt-0.5 block">Assigned: {emp?.name || 'Staff'}</span>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setViewingTask(sub)}
-                          className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 transition"
-                          title="View Details"
-                        >
-                          <Eye size={12} />
-                        </button>
-                        {isManagerOrAdmin && (
-                          <>
-                            <button
-                              onClick={() => openEditTaskModal(sub)}
-                              className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-purple-50 text-purple-600 transition"
-                              title="Edit Task"
-                            >
-                              <Edit2 size={12} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteTask(sub._id, false)}
-                              className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-red-50 text-red-600 transition"
-                              title="Delete Task"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </>
-                        )}
-                        {(sub.status === 'Pending' || sub.status === 'Rejected') && (
-                          <button
-                            onClick={() => onOpenSubmitUrlModal(sub)}
-                            className="px-3 py-1 btn-gradient-primary text-white text-xs font-bold rounded-lg shadow-2xs flex items-center space-x-1"
-                          >
-                            <Send size={11} />
-                            <span>Submit URL</span>
-                          </button>
-                        )}
+                      <div className="flex items-center gap-2 shrink-0 self-end lg:self-auto">
+                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold border flex items-center gap-1.5 ${
+                          isDone ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                          sub.status === 'Submitted' ? 'bg-amber-50 text-amber-800 border-amber-200' :
+                          sub.status === 'In Progress' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                          'bg-slate-100 text-slate-600 border-slate-200'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${isDone ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                          {isDone ? 'Completed' : sub.status}
+                        </span>
+
                         {sub.publishedUrl && (
-                          <a href={sub.publishedUrl} target="_blank" rel="noreferrer" className="text-purple-600 font-bold hover:underline flex items-center gap-1">
-                            <ExternalLink size={12} /> Link
+                          <a
+                            href={sub.publishedUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1"
+                          >
+                            <ExternalLink size={11} />
+                            <span>Post</span>
                           </a>
                         )}
+
+                        {!isDone && (
+                          <button
+                            type="button"
+                            onClick={() => handleQuickCompleteTask(sub._id)}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-2xs cursor-pointer"
+                          >
+                            Done
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => openEditTaskModal(sub)}
+                          className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-purple-50 text-purple-600 transition cursor-pointer"
+                        >
+                          <Edit2 size={12} />
+                        </button>
                       </div>
                     </div>
                   );
@@ -623,6 +801,7 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
           setShowAddModal(false);
           setEditingTask(null);
         }}
+        maxWidth="max-w-xl"
         title={
           editingTask
             ? (editingTask.isMainTask ? "Edit Main Brand Task" : "Edit Sub-Task")
@@ -632,150 +811,369 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
         <form onSubmit={handleSaveTask} className="space-y-3.5 text-sm font-bold">
           {/* Task Type Switch */}
           {isManagerOrAdmin && !editingTask && (
-            <div className="flex items-center space-x-4 p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs">
-              <label className="flex items-center space-x-1.5 cursor-pointer">
-                <input
-                  type="radio"
-                  name="creationType"
-                  value="main"
-                  checked={creationType === 'main'}
-                  onChange={() => setCreationType('main')}
-                  className="text-purple-600 focus:ring-purple-500"
-                />
-                <span className="font-extrabold text-slate-900">Main Brand Task</span>
-              </label>
-
-              <label className="flex items-center space-x-1.5 cursor-pointer">
-                <input
-                  type="radio"
-                  name="creationType"
-                  value="sub"
-                  checked={creationType === 'sub'}
-                  onChange={() => setCreationType('sub')}
-                  className="text-purple-600 focus:ring-purple-500"
-                />
-                <span className="font-extrabold text-slate-900">Sub-Task Deliverable</span>
-              </label>
-            </div>
-          )}
-
-          {/* Select Parent Task if Sub-Task */}
-          {creationType === 'sub' && mainTasks.length > 0 && (
-            <div>
-              <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Select Main Brand Task *</label>
-              <select
-                value={selectedParentTaskId}
-                onChange={(e) => {
-                  setSelectedParentTaskId(e.target.value);
-                  const parent = mainTasks.find(m => m._id === e.target.value);
-                  if (parent) {
-                    const bId = typeof parent.brandId === 'object' ? parent.brandId._id : parent.brandId;
-                    if (bId) setBrandId(bId);
-                  }
-                }}
-                className="w-full bg-purple-50/50 border border-purple-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 focus:outline-none font-bold text-xs"
+            <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-xl border border-slate-200 gap-1">
+              <button
+                type="button"
+                onClick={() => setCreationType('main')}
+                className={`py-2 text-xs font-black rounded-lg transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  creationType === 'main'
+                    ? 'bg-white text-purple-700 shadow-2xs border border-purple-200/80'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
               >
-                <option value="">-- Select Main Task (Optional) --</option>
-                {mainTasks.map((main) => {
-                  const b = main.brandId as any;
-                  return (
-                    <option key={main._id} value={main._id}>
-                      [{b?.brandName || 'Brand'}] {main.title}
-                    </option>
-                  );
-                })}
-              </select>
+                <span>📦</span>
+                <span>Main Brand Task</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCreationType('sub')}
+                className={`py-2 text-xs font-black rounded-lg transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  creationType === 'sub'
+                    ? 'bg-white text-purple-700 shadow-2xs border border-purple-200/80'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>📄</span>
+                <span>Sub-Task Deliverable</span>
+              </button>
             </div>
           )}
 
-          <div>
-            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Select Brand *</label>
-            <select
-              required
-              value={brandId}
-              onChange={(e) => setBrandId(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 focus:outline-none font-bold text-xs"
-            >
-              <option value="">-- Select Brand --</option>
-              {brands.map((b) => (
-                <option key={b._id} value={b._id}>{b.brandName}</option>
-              ))}
-            </select>
+          {/* Row 1: Brand & Parent Task */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {creationType === 'sub' && mainTasks.length > 0 && (
+              <div>
+                <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Parent Main Task</label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowParentTaskDropdown(!showParentTaskDropdown);
+                      setShowBrandDropdown(false);
+                    }}
+                    className="w-full bg-purple-50/60 hover:bg-purple-50/90 border border-purple-200 focus:border-purple-500 rounded-xl px-3.5 py-2.5 text-slate-900 font-bold text-xs flex items-center justify-between transition cursor-pointer shadow-2xs"
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="truncate">
+                        {selectedParentTaskId
+                          ? (() => {
+                              const p = mainTasks.find(m => m._id === selectedParentTaskId);
+                              const b = p?.brandId as any;
+                              return p ? `[${b?.brandName || 'Brand'}] ${p.title}` : '-- Select Parent Task (Opt) --';
+                            })()
+                          : '-- Select Parent Task (Opt) --'}
+                      </span>
+                    </div>
+                    <ChevronDown size={14} className={`text-purple-400 transition-transform duration-200 shrink-0 ml-1 ${showParentTaskDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {/* Floating Parent Task Dropdown Menu */}
+                  {showParentTaskDropdown && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setShowParentTaskDropdown(false)}
+                      />
+                      <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-purple-200 rounded-2xl shadow-xl z-50 p-2 space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-150">
+                        <div className="relative">
+                          <Search size={13} className="absolute left-3 top-2.5 text-slate-400 pointer-events-none" />
+                          <input
+                            type="text"
+                            autoFocus
+                            placeholder="Search main task..."
+                            value={parentTaskSearch}
+                            onChange={(e) => setParentTaskSearch(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl pl-8 pr-3 py-1.5 text-slate-900 placeholder:text-slate-400 text-xs font-medium focus:outline-none"
+                          />
+                        </div>
+
+                        <div className="max-h-48 overflow-y-auto space-y-0.5 pr-0.5">
+                          <div
+                            onClick={() => {
+                              setSelectedParentTaskId('');
+                              setShowParentTaskDropdown(false);
+                              setParentTaskSearch('');
+                            }}
+                            className={`p-2 rounded-xl text-xs flex items-center justify-between cursor-pointer transition ${
+                              !selectedParentTaskId ? 'bg-purple-50 text-purple-900 font-extrabold border border-purple-200/80' : 'hover:bg-slate-50 text-slate-600 font-medium'
+                            }`}
+                          >
+                            <span>-- No Parent Task (Independent) --</span>
+                          </div>
+                          {mainTasks
+                            .filter(m => m.title.toLowerCase().includes(parentTaskSearch.toLowerCase()) || ((m.brandId as any)?.brandName || '').toLowerCase().includes(parentTaskSearch.toLowerCase()))
+                            .map((main) => {
+                              const b = main.brandId as any;
+                              const isSelected = selectedParentTaskId === main._id;
+
+                              return (
+                                <div
+                                  key={main._id}
+                                  onClick={() => {
+                                    setSelectedParentTaskId(main._id);
+                                    if (b?._id) handleBrandChange(b._id);
+                                    setShowParentTaskDropdown(false);
+                                    setParentTaskSearch('');
+                                  }}
+                                  className={`p-2 rounded-xl text-xs flex items-center justify-between cursor-pointer transition ${
+                                    isSelected ? 'bg-purple-50 text-purple-900 font-extrabold border border-purple-200/80' : 'hover:bg-slate-50 text-slate-700 font-medium'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-1.5 truncate">
+                                    <span className="text-[10px] text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded font-black shrink-0">
+                                      {b?.brandName || 'Brand'}
+                                    </span>
+                                    <span className="truncate">{main.title}</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className={creationType === 'sub' && mainTasks.length > 0 ? '' : 'sm:col-span-2'}>
+              <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Select Brand *</label>
+              {/* Custom Floating Searchable Brand Dropdown */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBrandDropdown(!showBrandDropdown);
+                    setShowParentTaskDropdown(false);
+                  }}
+                  className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 focus:border-purple-500 rounded-xl px-3.5 py-2.5 text-slate-900 font-bold text-xs flex items-center justify-between transition cursor-pointer shadow-2xs"
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <div className="w-5 h-5 rounded-md bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-[10px] shrink-0">
+                      💼
+                    </div>
+                    <span className="truncate">
+                      {brands.find(b => b._id === brandId)?.brandName || '-- Select Brand --'}
+                    </span>
+                  </div>
+                  <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 shrink-0 ml-1 ${showBrandDropdown ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Floating Brand Dropdown Menu */}
+                {showBrandDropdown && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowBrandDropdown(false)}
+                    />
+                    <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-purple-200 rounded-2xl shadow-xl z-50 p-2 space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-150">
+                      <div className="relative">
+                        <Search size={13} className="absolute left-3 top-2.5 text-slate-400 pointer-events-none" />
+                        <input
+                          type="text"
+                          autoFocus
+                          placeholder="Search brand by name..."
+                          value={brandSearch}
+                          onChange={(e) => setBrandSearch(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl pl-8 pr-3 py-1.5 text-slate-900 placeholder:text-slate-400 text-xs font-medium focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="max-h-48 overflow-y-auto space-y-0.5 pr-0.5">
+                        {brands
+                          .filter(b => b.brandName.toLowerCase().includes(brandSearch.toLowerCase()) || (b.industry || '').toLowerCase().includes(brandSearch.toLowerCase()))
+                          .map((b) => {
+                            const isSelected = brandId === b._id;
+                            const assigned = getAssignedMemberForBrand(b._id);
+
+                            return (
+                              <div
+                                key={b._id}
+                                onClick={() => {
+                                  handleBrandChange(b._id);
+                                  setShowBrandDropdown(false);
+                                  setBrandSearch('');
+                                }}
+                                className={`p-2 rounded-xl text-xs flex items-center justify-between cursor-pointer transition ${
+                                  isSelected ? 'bg-purple-50 text-purple-900 font-extrabold border border-purple-200/80' : 'hover:bg-slate-50 text-slate-700 font-medium'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 truncate">
+                                  <span className="text-xs">💼</span>
+                                  <span className="truncate">{b.brandName}</span>
+                                  {b.industry && (
+                                    <span className="text-[10px] text-slate-400">({b.industry})</span>
+                                  )}
+                                </div>
+                                {assigned && (
+                                  <span className="text-[10px] text-purple-600 font-semibold shrink-0 ml-2 bg-purple-50/80 px-1.5 py-0.5 rounded">
+                                    👤 {assigned.name}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        {brands.filter(b => b.brandName.toLowerCase().includes(brandSearch.toLowerCase())).length === 0 && (
+                          <div className="p-3 text-center text-slate-400 text-xs italic">
+                            No brands found matching "{brandSearch}"
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Assign Member *</label>
-            <select
-              required
-              value={employeeId}
-              onChange={(e) => setEmployeeId(e.target.value)}
-              disabled={currentUser?.role?.toLowerCase() === 'employee'}
-              className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 focus:outline-none font-bold text-xs disabled:bg-slate-100 disabled:cursor-not-allowed"
-            >
-              {currentUser?.role?.toLowerCase() !== 'employee' && (
-                <option value="">-- Select Member --</option>
-              )}
-              {(currentUser?.role?.toLowerCase() === 'employee'
-                ? employees.filter(emp =>
-                    emp.email?.toLowerCase() === currentUser?.email?.toLowerCase() ||
-                    emp.name?.toLowerCase() === currentUser?.name?.toLowerCase()
-                  )
-                : employees
-              ).map((emp) => (
-                <option key={emp._id} value={emp._id}>{emp.name} ({emp.designation})</option>
-              ))}
-            </select>
+          {/* Row 2: Title & Assigned Member */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">
+                {creationType === 'main' ? 'Main Task Title *' : 'Sub-Task Title *'}
+              </label>
+              <input
+                type="text"
+                required
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder={creationType === 'main' ? "e.g. August Reel Promotion" : "e.g. Single Product Reel Posting"}
+                className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none font-bold text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">
+                Assigned Member
+              </label>
+              <div className="w-full bg-slate-100/90 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 font-bold text-xs flex items-center justify-between cursor-default">
+                <div className="flex items-center gap-2 truncate">
+                  <div className="w-5 h-5 rounded-md bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-[10px] shrink-0">
+                    <UserIcon size={12} />
+                  </div>
+                  <span className="truncate">
+                    {employees.find(e => e._id === employeeId)
+                      ? `${employees.find(e => e._id === employeeId)?.name} (${employees.find(e => e._id === employeeId)?.designation || 'Staff'})`
+                      : (getAssignedMemberForBrand(brandId)?.name || 'Auto Assigned to Brand Lead')}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">
-              {creationType === 'main' ? 'Main Task Title *' : 'Sub-Task Title *'}
-            </label>
-            <input
-              type="text"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={creationType === 'main' ? "e.g. August Reel Promotion" : "e.g. Single Product Reel Posting - Prajakta"}
-              className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-bold text-xs"
-            />
-          </div>
-
+          {/* Row 3: Platform & Content Type (if Sub-Task) */}
           {creationType === 'sub' && (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Platform</label>
-                <select
-                  value={platform}
-                  onChange={(e) => setPlatform(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 focus:outline-none font-bold text-xs"
-                >
-                  <option value="Instagram">Instagram</option>
-                  <option value="YouTube">YouTube</option>
-                  <option value="TikTok">TikTok</option>
-                  <option value="X (Twitter)">X (Twitter)</option>
-                  <option value="LinkedIn">LinkedIn</option>
-                </select>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPlatformDropdown(!showPlatformDropdown);
+                      setShowContentTypeDropdown(false);
+                      setShowBrandDropdown(false);
+                      setShowParentTaskDropdown(false);
+                    }}
+                    className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 focus:border-purple-500 rounded-xl px-3.5 py-2.5 text-slate-900 font-bold text-xs flex items-center justify-between transition cursor-pointer shadow-2xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>
+                        {platform === 'Instagram' ? '📸' : platform === 'YouTube' ? '▶️' : platform === 'TikTok' ? '🎵' : platform === 'X (Twitter)' ? '𝕏' : '💼'}
+                      </span>
+                      <span>{platform}</span>
+                    </div>
+                    <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 shrink-0 ml-1 ${showPlatformDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {showPlatformDropdown && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowPlatformDropdown(false)} />
+                      <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-purple-200 rounded-2xl shadow-xl z-50 p-1.5 space-y-0.5 animate-in fade-in slide-in-from-top-2 duration-150">
+                        {[
+                          { name: 'Instagram', icon: '📸' },
+                          { name: 'YouTube', icon: '▶️' },
+                          { name: 'TikTok', icon: '🎵' },
+                          { name: 'X (Twitter)', icon: '𝕏' },
+                          { name: 'LinkedIn', icon: '💼' }
+                        ].map(p => (
+                          <div
+                            key={p.name}
+                            onClick={() => {
+                              setPlatform(p.name);
+                              setShowPlatformDropdown(false);
+                            }}
+                            className={`p-2 rounded-xl text-xs flex items-center gap-2 cursor-pointer transition ${
+                              platform === p.name ? 'bg-purple-50 text-purple-900 font-extrabold border border-purple-200/80' : 'hover:bg-slate-50 text-slate-700 font-medium'
+                            }`}
+                          >
+                            <span>{p.icon}</span>
+                            <span>{p.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
 
               <div>
                 <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Content Type</label>
-                <select
-                  value={contentType}
-                  onChange={(e) => setContentType(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 focus:outline-none font-bold text-xs"
-                >
-                  <option value="Reel">Reel</option>
-                  <option value="Story">Story</option>
-                  <option value="Short">Short</option>
-                  <option value="Video">Video</option>
-                  <option value="Post">Post</option>
-                </select>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowContentTypeDropdown(!showContentTypeDropdown);
+                      setShowPlatformDropdown(false);
+                      setShowBrandDropdown(false);
+                      setShowParentTaskDropdown(false);
+                    }}
+                    className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 focus:border-purple-500 rounded-xl px-3.5 py-2.5 text-slate-900 font-bold text-xs flex items-center justify-between transition cursor-pointer shadow-2xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>
+                        {contentType === 'Reel' ? '🎬' : contentType === 'Story' ? '⏱️' : contentType === 'Short' ? '⚡' : contentType === 'Video' ? '🎥' : '📝'}
+                      </span>
+                      <span>{contentType}</span>
+                    </div>
+                    <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 shrink-0 ml-1 ${showContentTypeDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {showContentTypeDropdown && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowContentTypeDropdown(false)} />
+                      <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-purple-200 rounded-2xl shadow-xl z-50 p-1.5 space-y-0.5 animate-in fade-in slide-in-from-top-2 duration-150">
+                        {[
+                          { name: 'Reel', icon: '🎬' },
+                          { name: 'Story', icon: '⏱️' },
+                          { name: 'Short', icon: '⚡' },
+                          { name: 'Video', icon: '🎥' },
+                          { name: 'Post', icon: '📝' }
+                        ].map(c => (
+                          <div
+                            key={c.name}
+                            onClick={() => {
+                              setContentType(c.name);
+                              setShowContentTypeDropdown(false);
+                            }}
+                            className={`p-2 rounded-xl text-xs flex items-center gap-2 cursor-pointer transition ${
+                              contentType === c.name ? 'bg-purple-50 text-purple-900 font-extrabold border border-purple-200/80' : 'hover:bg-slate-50 text-slate-700 font-medium'
+                            }`}
+                          >
+                            <span>{c.icon}</span>
+                            <span>{c.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-2">
+          {/* Row 4: Scheduled Date & Scheduled Time / Priority */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Scheduled Date *</label>
               <input
@@ -783,11 +1181,11 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
                 required
                 value={scheduledDate}
                 onChange={(e) => setScheduledDate(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 focus:outline-none font-bold text-xs"
+                className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none font-bold text-xs"
               />
             </div>
 
-            {creationType === 'sub' && (
+            {creationType === 'sub' ? (
               <div>
                 <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Scheduled Time</label>
                 <input
@@ -796,27 +1194,129 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
                   value={scheduledTime}
                   onChange={(e) => setScheduledTime(e.target.value)}
                   placeholder="10:00 AM"
-                  className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-bold text-xs"
+                  className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder-slate-400 focus:outline-none font-bold text-xs"
                 />
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Priority</label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPriorityDropdown(!showPriorityDropdown);
+                      setShowBrandDropdown(false);
+                      setShowParentTaskDropdown(false);
+                    }}
+                    className="w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 focus:border-purple-500 rounded-xl px-3.5 py-2.5 text-slate-900 font-bold text-xs flex items-center justify-between transition cursor-pointer shadow-2xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>
+                        {priority === 'Low' ? '🟢' : priority === 'Medium' ? '🟡' : priority === 'High' ? '🟠' : '🔴'}
+                      </span>
+                      <span>{priority}</span>
+                    </div>
+                    <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 shrink-0 ml-1 ${showPriorityDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {showPriorityDropdown && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowPriorityDropdown(false)} />
+                      <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-purple-200 rounded-2xl shadow-xl z-50 p-1.5 space-y-0.5 animate-in fade-in slide-in-from-top-2 duration-150">
+                        {[
+                          { name: 'Low', icon: '🟢' },
+                          { name: 'Medium', icon: '🟡' },
+                          { name: 'High', icon: '🟠' },
+                          { name: 'Urgent', icon: '🔴' }
+                        ].map(p => (
+                          <div
+                            key={p.name}
+                            onClick={() => {
+                              setPriority(p.name);
+                              setShowPriorityDropdown(false);
+                            }}
+                            className={`p-2 rounded-xl text-xs flex items-center gap-2 cursor-pointer transition ${
+                              priority === p.name ? 'bg-purple-50 text-purple-900 font-extrabold border border-purple-200/80' : 'hover:bg-slate-50 text-slate-700 font-medium'
+                            }`}
+                          >
+                            <span>{p.icon}</span>
+                            <span>{p.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             )}
           </div>
 
-          <div className="flex justify-end space-x-2 pt-3">
+          {/* Row 5: Remarks / Notes */}
+          <div>
+            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Remarks / Notes (Optional)</label>
+            <textarea
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="Add any specific remarks, delivery instructions, or notes..."
+              rows={2}
+              className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3.5 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium text-xs resize-none"
+            />
+          </div>
+
+          {/* Row 6: Task Status Selector (when editing) */}
+          {editingTask && (
+            <div className="pt-1">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-extrabold text-slate-700 uppercase">
+                  Task Status *
+                </label>
+                <span className="text-[10px] text-purple-700 font-bold bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                  Current: {taskStatus}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                {[
+                  { val: 'Pending', label: 'Pending', icon: '⏳', color: 'border-slate-200 hover:border-slate-300 text-slate-700', active: 'bg-slate-800 text-white border-slate-800 shadow-xs' },
+                  { val: 'In Progress', label: 'In Progress', icon: '⚡', color: 'border-blue-200 hover:border-blue-300 text-blue-700 bg-blue-50/40', active: 'bg-blue-600 text-white border-blue-600 shadow-xs' },
+                  { val: 'Submitted', label: 'Submitted', icon: '📤', color: 'border-amber-200 hover:border-amber-300 text-amber-800 bg-amber-50/40', active: 'bg-amber-500 text-white border-amber-500 shadow-xs' },
+                  { val: 'Verified', label: 'Completed', icon: '✓', color: 'border-emerald-200 hover:border-emerald-300 text-emerald-800 bg-emerald-50/40', active: 'bg-emerald-600 text-white border-emerald-600 shadow-xs' },
+                  { val: 'Rejected', label: 'Rejected', icon: '✕', color: 'border-rose-200 hover:border-rose-300 text-rose-700 bg-rose-50/40', active: 'bg-rose-600 text-white border-rose-600 shadow-xs' },
+                ].map((st) => {
+                  const isSelected = taskStatus === st.val;
+                  return (
+                    <button
+                      key={st.val}
+                      type="button"
+                      onClick={() => setTaskStatus(st.val as any)}
+                      className={`p-2 rounded-xl text-xs font-extrabold border flex items-center justify-center gap-1 transition cursor-pointer ${
+                        isSelected ? st.active : `bg-white ${st.color}`
+                      }`}
+                    >
+                      <span>{st.icon}</span>
+                      <span className="truncate">{st.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
             <button
               type="button"
               onClick={() => {
                 setShowAddModal(false);
                 setEditingTask(null);
               }}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition text-xs border border-slate-200"
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition text-xs border border-slate-200 cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={savingTask}
-              className="px-4 py-2 btn-gradient-primary text-white rounded-xl font-bold transition text-xs shadow-md flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="px-5 py-2 btn-gradient-primary text-white rounded-xl font-bold transition text-xs shadow-md flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
             >
               {savingTask ? (
                 <>
@@ -852,6 +1352,12 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
               <h3 className="text-base font-extrabold text-slate-900">{viewingTask.title}</h3>
               {viewingTask.description && (
                 <p className="text-slate-600">{viewingTask.description}</p>
+              )}
+              {viewingTask.remarks && (
+                <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-xl text-purple-950 mt-2">
+                  <span className="font-extrabold block text-[10px] uppercase text-purple-700 mb-0.5">Remarks / Notes</span>
+                  <p className="text-xs font-medium">{viewingTask.remarks}</p>
+                </div>
               )}
 
               <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200 text-xs">

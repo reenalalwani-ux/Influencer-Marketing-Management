@@ -24,19 +24,24 @@ export const URLSubmissionModal: React.FC<URLSubmissionModalProps> = ({ task, on
 
   if (!task) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, completeWithoutUrl = false) => {
     e.preventDefault();
     setSubmitting(true);
     setError('');
 
+    const urlValue = completeWithoutUrl ? '' : publishedUrl.trim();
+
     try {
-      const res = await api.post(`/tasks/${task._id}/submit-url`, { publishedUrl });
+      const res = await api.post(`/tasks/${task._id}/submit-url`, { 
+        publishedUrl: urlValue,
+        status: 'Verified'
+      });
       if (res.success) {
-        onSuccess(task._id as string, publishedUrl);
+        onSuccess(task._id as string, urlValue);
         onClose();
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to submit URL');
+      setError(err.message || 'Failed to update task status');
     } finally {
       setSubmitting(false);
     }
@@ -46,7 +51,7 @@ export const URLSubmissionModal: React.FC<URLSubmissionModalProps> = ({ task, on
     <Modal
       isOpen={!!task}
       onClose={onClose}
-      title="Submit Published Content URL"
+      title="Complete Task / Submit Content URL"
       maxWidth="max-w-lg"
     >
       <div className="space-y-4">
@@ -66,49 +71,64 @@ export const URLSubmissionModal: React.FC<URLSubmissionModalProps> = ({ task, on
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-4">
           <div>
-            <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5">
-              Social Media Published URL
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">
+                Social Media Published URL <span className="text-slate-400 font-normal normal-case">(Optional)</span>
+              </label>
+              <span className="text-[10px] text-purple-700 font-bold bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                Optional
+              </span>
+            </div>
             <input
               type="url"
-              required
               value={publishedUrl}
               onChange={(e) => setPublishedUrl(e.target.value)}
-              placeholder="https://instagram.com/p/..."
+              placeholder="e.g. https://instagram.com/p/... (Optional)"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-purple-500 transition font-medium"
             />
             <p className="text-[11px] text-slate-500 mt-1.5 font-medium">
-              Important: Do not upload video/image files directly. Store only the social media URL.
+              You can paste the live social media link, or mark the task as complete directly without a URL.
             </p>
           </div>
 
-          <div className="flex justify-end space-x-2 pt-2">
+          <div className="flex items-center justify-end space-x-2 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-200 transition border border-slate-200"
+              className="px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-200 transition border border-slate-200 cursor-pointer"
             >
               Cancel
             </button>
             <button
-              type="submit"
+              type="button"
               disabled={submitting}
-              className="px-5 py-2.5 btn-gradient-primary text-white rounded-xl font-bold text-xs transition shadow-md flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={(e) => handleSubmit(e, true)}
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition shadow-md flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
             >
-              {submitting ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  <span>Submitting...</span>
-                </>
-              ) : (
-                <>
-                  <Send size={14} />
-                  <span>Submit URL</span>
-                </>
-              )}
+              <CheckCircle2 size={14} />
+              <span>Mark Complete</span>
             </button>
+            {publishedUrl.trim() && (
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-5 py-2.5 btn-gradient-primary text-white rounded-xl font-bold text-xs transition shadow-md flex items-center space-x-2 cursor-pointer disabled:opacity-50"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send size={14} />
+                    <span>Submit with URL</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </form>
       </div>

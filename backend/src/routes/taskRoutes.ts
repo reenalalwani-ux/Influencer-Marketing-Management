@@ -81,7 +81,7 @@ router.get('/:id', authenticateToken, checkPermission('task.view'), async (req: 
 
 // POST /api/v1/tasks
 router.post('/', authenticateToken, checkPermission('task.create'), async (req: AuthRequest, res: Response) => {
-  let { employeeId, brandId, platform, contentType, title, description, priority, scheduledDate, scheduledTime, deadline, isMainTask, parentTaskId } = req.body;
+  let { employeeId, brandId, platform, contentType, title, description, remarks, priority, scheduledDate, scheduledTime, deadline, isMainTask, parentTaskId } = req.body;
 
   // Force employeeId to self if user has Employee role and not a main task
   if (!isMainTask && req.user?.role?.toLowerCase() === 'employee') {
@@ -130,6 +130,7 @@ router.post('/', authenticateToken, checkPermission('task.create'), async (req: 
       contentType: contentType || 'Reel',
       title,
       description,
+      remarks,
       priority: priority || 'Medium',
       scheduledDate: new Date(scheduledDate),
       scheduledTime: scheduledTime || '10:00 AM',
@@ -195,59 +196,108 @@ router.put('/:id', authenticateToken, checkPermission('task.update'), async (req
   }
 });
 
-// POST /api/v1/tasks/:id/submit-url (Published URL Submission)
+// POST /api/v1/tasks/:id/submit-url (Published URL Submission / Task Completion)
 router.post('/:id/submit-url', authenticateToken, async (req: AuthRequest, res: Response) => {
-  const { publishedUrl } = req.body;
-  if (!publishedUrl) {
-    return res.status(400).json({ success: false, message: 'Published URL is required' });
-  }
+  const { publishedUrl, status } = req.body;
 
-  // Basic URL regex validation
   try {
-    new URL(publishedUrl);
-  } catch (_) {
-    return res.status(400).json({ success: false, message: 'Invalid URL format' });
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ success: false, message: 'No record exists for this task' });
+
+    let detected = 'Manual';
+
+    if (publishedUrl && typeof publishedUrl === 'string' && publishedUrl.trim() !== '') {
+      const trimmedUrl = publishedUrl.trim();
+      // Basic URL regex validation
+      try {
+        new URL(trimmedUrl);
+      } catch (_) {
+        return res.status(400).json({ success: false, message: 'Invalid URL format' });
+      }
+
+      // Check duplicate URL check across other tasks
+      const duplicate = await Task.findOne({ publishedUrl: trimmedUrl, _id: { $ne: task._id } });
+      if (duplicate) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `This URL has already been submitted for task #${duplicate.taskId}` 
+        });
+      }
+
+      detected = detectPlatform(trimmedUrl);
+      task.publishedUrl = trimmedUrl;
+      task.publishedDate = new Date();
+      task.status = status || 'Verified';
+      task.verificationStatus = status === 'Submitted' ? 'Pending Verification' : 'Verified';
+    } else {
+      // URL is optional: mark as Completed/Verified directly
+      task.publishedDate = new Date();
+      task.status = status || 'Verified';
+      task.verificationStatus = status === 'Submitted' ? 'Pending Verification' : 'Verified';
+    }
+
+    await task.save();
+
+    await logActivity({
+      userId: req.user?._id,
+      userName: req.user?.name || 'System',
+      action: task.publishedUrl ? 'SUBMIT_PUBLISHED_URL' : 'COMPLETE_TASK_WITHOUT_URL',
+      module: 'Published URL Management',
+      entity: 'Task',
+      entityId: (task._id as any).toString(),
+      newValue: { publishedUrl: task.publishedUrl, detectedPlatform: detected, status: task.status }
+    });
+
+    return res.status(200).json({ 
+      success: true, 
+      message: task.publishedUrl 
+        ? 'Published URL submitted successfully' 
+        : 'Task marked as completed successfully', 
+      detectedPlatform: detected,
+      data: task 
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to complete task or submit URL', error });
+  }
+});
+
+// PUT /api/v1/tasks/:id/status (Direct status update / toggle)
+router.put('/:id/status', authenticateToken, async (req: AuthRequest, res: Response) => {
+  const { status, publishedUrl } = req.body;
+  if (!status) {
+    return res.status(400).json({ success: false, message: 'Status is required' });
   }
 
   try {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ success: false, message: 'No record exists for this task' });
 
-    // Check duplicate URL check across completed/submitted tasks
-    const duplicate = await Task.findOne({ publishedUrl, _id: { $ne: task._id } });
-    if (duplicate) {
-      return res.status(400).json({ 
-        success: false, 
-        message: `This URL has already been submitted for task #${duplicate.taskId}` 
-      });
+    task.status = status;
+    if (status === 'Verified' || status === 'Completed' || status === 'Submitted') {
+      task.publishedDate = task.publishedDate || new Date();
+      if (status === 'Verified' || status === 'Completed') {
+        task.verificationStatus = 'Verified';
+      }
+    }
+    if (publishedUrl) {
+      task.publishedUrl = publishedUrl;
     }
 
-    const detected = detectPlatform(publishedUrl);
-
-    task.publishedUrl = publishedUrl;
-    task.publishedDate = new Date();
-    task.status = 'Submitted';
-    task.verificationStatus = 'Pending Verification';
     await task.save();
 
     await logActivity({
       userId: req.user?._id,
       userName: req.user?.name || 'System',
-      action: 'SUBMIT_PUBLISHED_URL',
-      module: 'Published URL Management',
+      action: 'UPDATE_TASK_STATUS',
+      module: 'Task Management',
       entity: 'Task',
       entityId: (task._id as any).toString(),
-      newValue: { publishedUrl, detectedPlatform: detected }
+      newValue: { status: task.status }
     });
 
-    return res.status(200).json({ 
-      success: true, 
-      message: 'Published URL submitted successfully and sent for verification', 
-      detectedPlatform: detected,
-      data: task 
-    });
+    return res.status(200).json({ success: true, message: `Task status updated to ${status}`, data: task });
   } catch (error) {
-    return res.status(500).json({ success: false, message: 'Failed to submit published URL', error });
+    return res.status(500).json({ success: false, message: 'Failed to update task status', error });
   }
 });
 
