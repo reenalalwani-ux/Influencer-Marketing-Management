@@ -131,6 +131,92 @@ export const seedDatabase = async () => {
       console.log('[Seed] Initial AD2ship Paid Target (₹500,000) and Barter Target (120 Collabs) seeded in database.');
     }
 
+    // Auto-consolidate any split Paid Collab records in database on server boot
+    try {
+      const vaasvaIn = await Influencer.findOne({
+        brandName: /vaasva/i,
+        category: 'Paid',
+        brandOnboardingAmt: 6500,
+        influencerOnboardingAmt: 0
+      });
+      const vaasvaOut = await Influencer.findOne({
+        brandName: /vaasva/i,
+        category: 'Paid',
+        influencerOnboardingAmt: 5000,
+        brandOnboardingAmt: 0
+      });
+      if (vaasvaIn && vaasvaOut) {
+        vaasvaIn.brandName = 'Vaasva';
+        vaasvaIn.influencerName = 'Vaasva';
+        vaasvaIn.brandOnboardingAmt = 6500;
+        vaasvaIn.brandReceivedAmt = 6500;
+        vaasvaIn.brandPendingAmt = 0;
+        vaasvaIn.influencerOnboardingAmt = 5000;
+        vaasvaIn.influencerPaidAmt = 5000;
+        vaasvaIn.influencerPendingAmt = 0;
+        vaasvaIn.inAmount = 6500;
+        vaasvaIn.outAmount = 5000;
+        vaasvaIn.balance = 1500;
+        vaasvaIn.ad2shipMargin = 1500;
+        vaasvaIn.status = 'Completed';
+        vaasvaIn.isApproved = true;
+        vaasvaIn.remark = 'Client Billing ₹6,500 / Influencer Payout ₹5,000 (Margin ₹1,500)';
+        await vaasvaIn.save();
+        await Influencer.findByIdAndDelete(vaasvaOut._id);
+        console.log('[Seed] Auto-consolidated split Vaasva deal: Brand IN ₹6,500, Creator OUT ₹5,000, Margin ₹1,500');
+      }
+
+      const bunaaiIn = await Influencer.findOne({
+        brandName: /bunaaiwala/i,
+        category: 'Paid',
+        brandOnboardingAmt: 7500,
+        influencerOnboardingAmt: 0
+      });
+      const bunaaiOut = await Influencer.findOne({
+        brandName: /bunaaiwala/i,
+        category: 'Paid',
+        influencerOnboardingAmt: 4000,
+        brandOnboardingAmt: 0
+      });
+      if (bunaaiIn && bunaaiOut) {
+        bunaaiIn.influencerOnboardingAmt = 4000;
+        bunaaiIn.influencerPaidAmt = 4000;
+        bunaaiIn.influencerPendingAmt = 0;
+        bunaaiIn.outAmount = 4000;
+        bunaaiIn.balance = 3500;
+        bunaaiIn.ad2shipMargin = 3500;
+        bunaaiIn.remark = 'Client Billing ₹7,500 / Influencer Payout ₹4,000 (Margin ₹3,500)';
+        await bunaaiIn.save();
+        await Influencer.findByIdAndDelete(bunaaiOut._id);
+      }
+
+      const rudraIn = await Influencer.findOne({
+        brandName: /rudravatika/i,
+        category: 'Paid',
+        brandOnboardingAmt: 10000,
+        influencerOnboardingAmt: 0
+      });
+      const rudraOut = await Influencer.findOne({
+        brandName: /rudravatika/i,
+        category: 'Paid',
+        influencerOnboardingAmt: 5000,
+        brandOnboardingAmt: 0
+      });
+      if (rudraIn && rudraOut) {
+        rudraIn.influencerOnboardingAmt = 5000;
+        rudraIn.influencerPaidAmt = 5000;
+        rudraIn.influencerPendingAmt = 0;
+        rudraIn.outAmount = 5000;
+        rudraIn.balance = 5000;
+        rudraIn.ad2shipMargin = 5000;
+        rudraIn.remark = 'Client Billing ₹10,000 / Influencer Payout ₹5,000 (Margin ₹5,000)';
+        await rudraIn.save();
+        await Influencer.findByIdAndDelete(rudraOut._id);
+      }
+    } catch (migErr) {
+      console.warn('[Seed] Collab deal consolidation notice:', migErr);
+    }
+
     const userCount = await User.countDocuments();
     if (userCount > 0) {
       console.log(`[Seed] MongoDB Cloud Database connected with ${userCount} active users (Roles & Permissions synced).`);
