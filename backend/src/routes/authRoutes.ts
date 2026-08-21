@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { User, Employee, Role } from '../models/allModels';
 import { generateToken, authenticateToken, AuthRequest, COOKIE_NAME, JWT_SECRET } from '../middleware/auth';
 import { logActivity } from '../middleware/auditLog';
-import { sendOTPEmail } from '../services/emailService';
+import { sendOTPEmail, sendManagerApprovalEmail } from '../services/emailService';
 
 const router = Router();
 
@@ -39,10 +39,41 @@ router.post('/request-otp', async (req: AuthRequest, res: Response) => {
   try {
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
-      return res.status(404).json({ success: false, message: 'No registered user found with this email address' });
+      return res.status(404).json({ success: false, message: 'No registered user found with this email address. Please sign up first.' });
     }
 
-    if (user.status !== 'Active') {
+    const isManagerRole = ['Super Admin', 'Admin', 'Marketing Manager', 'Assistant Manager', 'Assistant Marketing Manager'].includes(user.role);
+
+    if (user.status === 'Active' || isManagerRole) {
+      // Mark email as verified on OTP login so future manager lookups include this user
+      let changed = false;
+      if (!user.isApproved || user.status !== 'Active') {
+        user.isApproved = true;
+        user.status = 'Active';
+        changed = true;
+        await Employee.findOneAndUpdate({ email: user.email }, { isApproved: true, status: 'Active' });
+      }
+      if (!user.emailVerified) {
+        user.emailVerified = true;
+        changed = true;
+      }
+      if (changed) await user.save();
+    } else if (user.status === 'Pending Verification') {
+      // User signed up but hasn't verified their email OTP yet — redirect them to sign-up OTP step
+      return res.status(403).json({
+        success: false,
+        status: 'Pending Verification',
+        message: 'Please verify your email first. Check your inbox for the verification OTP sent during sign-up.'
+      });
+    } else if (user.status === 'Pending Approval' || !user.isApproved) {
+      return res.status(403).json({
+        success: false,
+        status: 'Pending Approval',
+        message: 'Your email address is verified, but your account is awaiting Manager approval. Please contact your Manager.'
+      });
+    }
+
+    if (user.status === 'Inactive') {
       return res.status(403).json({ success: false, message: 'Your account is deactivated' });
     }
 
@@ -91,6 +122,30 @@ router.post('/verify-otp', async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'No record exists for this user account' });
     }
 
+    const isManagerRole = ['Super Admin', 'Admin', 'Marketing Manager', 'Assistant Manager', 'Assistant Marketing Manager'].includes(user.role);
+
+    if (user.status === 'Active' || isManagerRole) {
+      // Mark email as verified (so future manager email lookups include this user)
+      let changed = false;
+      if (!user.isApproved || user.status !== 'Active') {
+        user.isApproved = true;
+        user.status = 'Active';
+        changed = true;
+        await Employee.findOneAndUpdate({ email: user.email }, { isApproved: true, status: 'Active' });
+      }
+      if (!user.emailVerified) {
+        user.emailVerified = true;
+        changed = true;
+      }
+      if (changed) await user.save();
+    } else if (user.status === 'Pending Approval' || !user.isApproved) {
+      return res.status(403).json({
+        success: false,
+        status: 'Pending Approval',
+        message: 'Your email address is verified, but your account is awaiting Manager approval.'
+      });
+    }
+
     if (!user.otpCode || user.otpCode !== otpCode.trim()) {
       return res.status(400).json({ success: false, message: 'Invalid OTP code. Please try again.' });
     }
@@ -124,7 +179,7 @@ router.post('/verify-otp', async (req: AuthRequest, res: Response) => {
       entityId: (user._id as any).toString()
     });
 
-    // Set JWT as HttpOnly cookie — browser stores it, JS cannot read it
+    // Set JWT as HttpOnly cookie
     res.cookie(COOKIE_NAME, token, cookieOptions);
 
     return res.status(200).json({
@@ -146,12 +201,12 @@ router.post('/verify-otp', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// POST /api/v1/auth/signup
+// POST /api/v1/auth/signup (Passwordless Sign Up Request & OTP Generation)
 router.post('/signup', async (req: AuthRequest, res: Response) => {
-  const { name, email, password, phone, department, designation, role } = req.body;
+  const { name, email, phone, department, designation } = req.body;
 
-  if (!name || !email || !password) {
-    return res.status(400).json({ success: false, message: 'Name, email, and password are required' });
+  if (!name || !email) {
+    return res.status(400).json({ success: false, message: 'Full name and company email address are required' });
   }
 
   if (!isValidCompanyEmail(email)) {
@@ -163,12 +218,42 @@ router.post('/signup', async (req: AuthRequest, res: Response) => {
 
   try {
     const existingUser = await User.findOne({ email: email.toLowerCase() });
+    
     if (existingUser) {
-      return res.status(400).json({ success: false, message: 'User with this email already exists' });
+      if (existingUser.isApproved && existingUser.status === 'Active') {
+        return res.status(400).json({
+          success: false,
+          message: 'Account already registered and active. Please log in with OTP.'
+        });
+      }
+
+      if (existingUser.status === 'Pending Approval' || (existingUser.emailVerified && !existingUser.isApproved)) {
+        return res.status(200).json({
+          success: true,
+          status: 'Pending Approval',
+          message: 'Email address verified! Your account registration request is currently awaiting Manager approval.'
+        });
+      }
+
+      // Re-send OTP if pending verification
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      existingUser.otpCode = otpCode;
+      existingUser.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      await existingUser.save();
+
+      sendOTPEmail(existingUser.email, otpCode, existingUser.name).catch((err) => {
+        console.error('[Background Email Dispatch Error]', err);
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: `OTP sent to ${existingUser.email}. Please verify your email to submit for Manager approval.`,
+        email: existingUser.email,
+        status: 'Pending Verification'
+      });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const assignedRole = role || 'Employee';
+    // Auto-generate Employee ID
     const existingEmps = await Employee.find({ employeeId: /^EMP-\d+$/ }, { employeeId: 1 });
     let maxEmpNum = 1000;
     existingEmps.forEach(e => {
@@ -185,16 +270,22 @@ router.post('/signup', async (req: AuthRequest, res: Response) => {
       generatedEmpId = `EMP-${nextEmpNum}`;
     }
 
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
     const newUser = await User.create({
       name,
       email: email.toLowerCase(),
-      password: hashedPassword,
-      role: assignedRole,
+      role: 'Employee',
       employeeId: generatedEmpId,
-      status: 'Active'
+      status: 'Pending Verification',
+      emailVerified: false,
+      isApproved: false,
+      otpCode,
+      otpExpiresAt
     });
 
-    const newEmployee = await Employee.create({
+    await Employee.create({
       employeeId: generatedEmpId,
       userId: newUser._id,
       name,
@@ -202,49 +293,116 @@ router.post('/signup', async (req: AuthRequest, res: Response) => {
       phone: phone || '+91 98765 43210',
       department: department || 'Influencer Marketing',
       designation: designation || 'Influencer Executive',
-      role: assignedRole,
+      role: 'Employee',
       joiningDate: new Date(),
-      status: 'Active'
+      status: 'Pending Verification',
+      emailVerified: false,
+      isApproved: false
     });
 
-    const token = generateToken((newUser._id as any).toString(), newUser.role);
-
-    // Save token to database
-    newUser.activeToken = token;
-    newUser.tokenIssuedAt = new Date();
-    await newUser.save();
-
-    const roleDoc = await Role.findOne({ name: newUser.role });
-    const permissions = roleDoc ? roleDoc.permissions : [];
-
-    await logActivity({
-      userId: newUser._id,
-      userName: newUser.name,
-      action: 'REGISTER',
-      module: 'Authentication',
-      entity: 'User',
-      entityId: (newUser._id as any).toString()
+    sendOTPEmail(newUser.email, otpCode, newUser.name).catch((err) => {
+      console.error('[Background Email Dispatch Error]', err);
     });
-
-    // Set JWT as HttpOnly cookie
-    res.cookie(COOKIE_NAME, token, cookieOptions);
 
     return res.status(200).json({
       success: true,
-      message: 'Account created successfully',
-      user: {
-        id: newUser._id,
-        name: newUser.name,
-        email: newUser.email,
-        role: newUser.role,
-        employeeId: generatedEmpId,
-        permissions,
-        employeeDetails: newEmployee
-      }
+      message: `OTP sent to ${newUser.email}. Please verify to complete account registration request.`,
+      email: newUser.email,
+      status: 'Pending Verification'
     });
   } catch (error: any) {
     console.error('Signup error:', error);
     return res.status(500).json({ success: false, message: error.message || 'Server error during signup' });
+  }
+});
+
+// POST /api/v1/auth/verify-signup-otp (Verifies OTP & Submits to Manager for Approval)
+router.post('/verify-signup-otp', async (req: AuthRequest, res: Response) => {
+  const { email, otpCode } = req.body;
+
+  if (!email || !otpCode) {
+    return res.status(400).json({ success: false, message: 'Email and OTP code are required' });
+  }
+
+  try {
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'No registration request found for this email address' });
+    }
+
+    if (!user.otpCode || user.otpCode !== otpCode.trim()) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP code. Please try again.' });
+    }
+
+    if (!user.otpExpiresAt || user.otpExpiresAt < new Date()) {
+      return res.status(400).json({ success: false, message: 'OTP code has expired. Please request a new OTP.' });
+    }
+
+    // Mark email as verified and account as awaiting Manager approval
+    user.emailVerified = true;
+    user.status = 'Pending Approval';
+    user.isApproved = false;
+    user.otpCode = undefined;
+    user.otpExpiresAt = undefined;
+    await user.save();
+
+    const empRecord = await Employee.findOneAndUpdate(
+      { email: user.email },
+      { emailVerified: true, status: 'Pending Approval', isApproved: false },
+      { new: true }
+    );
+
+    // Find REAL Marketing Managers to notify (by role + status, excluding dummy seed emails)
+    const DUMMY_SEED_EMAILS = ['admin@ad2ship.com', 'manager@ad2ship.com', 'manager@influencer.com', 'admin@influencer.com'];
+
+    // Auto-mark any active Marketing Manager as emailVerified (handles pre-existing accounts)
+    await User.updateMany(
+      { role: { $regex: /^marketing manager$/i }, status: 'Active', email: { $nin: DUMMY_SEED_EMAILS } },
+      { $set: { emailVerified: true } }
+    );
+
+    const managerUsers = await User.find({
+      role: { $regex: /^marketing manager$/i },
+      status: 'Active',
+      email: { $nin: DUMMY_SEED_EMAILS }
+    });
+
+    const managerEmails = managerUsers
+      .map(m => m.email.toLowerCase().trim())
+      .filter(email => !DUMMY_SEED_EMAILS.includes(email));
+
+    console.log(`[Manager Email Dispatch] Found ${managerEmails.length} manager(s) to notify:`, managerEmails);
+
+    if (managerEmails.length > 0) {
+      sendManagerApprovalEmail(managerEmails, {
+        name: user.name,
+        email: user.email,
+        phone: empRecord?.phone,
+        department: empRecord?.department
+      }).catch(err => {
+        console.error('[Manager Email Background Error]', err);
+      });
+    } else {
+      console.warn('[Manager Email Dispatch] No active Marketing Managers found to notify!');
+    }
+
+    await logActivity({
+      userId: user._id,
+      userName: user.name,
+      action: 'REGISTER_EMAIL_VERIFIED',
+      module: 'Authentication',
+      entity: 'User',
+      entityId: (user._id as any).toString()
+    });
+
+    return res.status(200).json({
+      success: true,
+      status: 'Pending Approval',
+      message: 'Email address verified successfully! Your account registration request has been submitted to the Manager for approval.'
+    });
+  } catch (error: any) {
+    console.error('Verify signup OTP error:', error);
+    return res.status(500).json({ success: false, message: 'Server error during signup OTP verification' });
   }
 });
 
@@ -269,7 +427,7 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch = await bcrypt.compare(password, user.password || '');
     if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
@@ -434,7 +592,7 @@ router.post('/change-password', authenticateToken, async (req: AuthRequest, res:
     return res.status(400).json({ success: false, message: 'Current and new password required' });
   }
 
-  const isMatch = await bcrypt.compare(currentPassword, req.user.password);
+  const isMatch = await bcrypt.compare(currentPassword, req.user.password || '');
   if (!isMatch) {
     return res.status(400).json({ success: false, message: 'Incorrect current password' });
   }

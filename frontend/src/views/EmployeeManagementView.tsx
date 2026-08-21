@@ -30,10 +30,16 @@ export const EmployeeManagementView: React.FC = () => {
   const [password, setPassword] = useState('User@123');
   const [status, setStatus] = useState<'Active' | 'Inactive'>('Active');
 
+  const [pendingEmployees, setPendingEmployees] = useState<Employee[]>([]);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+
   const fetchEmployees = async () => {
     try {
       const res = await api.get('/employees');
       if (res.success) setEmployees(res.data);
+      
+      const pRes = await api.get('/employees/pending-approvals');
+      if (pRes.success) setPendingEmployees(pRes.data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -44,6 +50,25 @@ export const EmployeeManagementView: React.FC = () => {
   useEffect(() => {
     fetchEmployees();
   }, []);
+
+  const handleApproveSignup = async (emp: Employee) => {
+    setApprovingId(emp._id);
+    try {
+      const res = await api.put(`/employees/${emp._id}/approve`, {
+        role: emp.role || 'Employee',
+        designation: emp.designation || 'Influencer Executive',
+        department: emp.department || 'Influencer Marketing'
+      });
+      if (res.success) {
+        alert(`Account for ${emp.name} (${emp.email}) has been approved successfully!`);
+        fetchEmployees();
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to approve account');
+    } finally {
+      setApprovingId(null);
+    }
+  };
 
   const handleCreateEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -257,6 +282,55 @@ export const EmployeeManagementView: React.FC = () => {
           <span>Add Member</span>
         </button>
       </div>
+
+      {/* PENDING SIGN-UP APPROVALS BANNER */}
+      {pendingEmployees.length > 0 && (
+        <div className="p-5 bg-gradient-to-r from-amber-50 via-purple-50 to-indigo-50 border border-amber-200/90 rounded-2xl shadow-xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping shrink-0" />
+              <h3 className="text-sm font-black text-slate-900 flex items-center gap-1.5">
+                <span>Pending Registration Requests</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-200 text-amber-900">
+                  {pendingEmployees.length} Awaiting Manager Approval
+                </span>
+              </h3>
+            </div>
+            <p className="text-xs text-slate-500 font-semibold hidden sm:block">
+              Review and approve verified user email requests to grant dashboard access.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {pendingEmployees.map((pEmp) => (
+              <div key={pEmp._id} className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between gap-3">
+                <div className="space-y-0.5 overflow-hidden">
+                  <div className="font-extrabold text-xs text-slate-900 truncate">{pEmp.name}</div>
+                  <div className="text-[11px] text-purple-700 font-bold truncate">{pEmp.email}</div>
+                  <div className="text-[10px] text-amber-700 font-bold flex items-center gap-1">
+                    <CheckCircle2 size={11} className="text-emerald-600" />
+                    <span>Email Verified • Pending Manager Approval</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={approvingId === pEmp._id}
+                  onClick={() => handleApproveSignup(pEmp)}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-extrabold text-xs shadow-2xs shrink-0 flex items-center gap-1 transition disabled:opacity-50"
+                >
+                  {approvingId === pEmp._id ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <CheckCircle2 size={13} />
+                  )}
+                  <span>Approve</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Search */}
       <div className="bg-white p-3 rounded-2xl flex items-center space-x-3 border border-slate-200 shadow-xs">

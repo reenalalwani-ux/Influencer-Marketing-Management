@@ -22,6 +22,37 @@ router.get('/', authenticateToken, checkPermission('employee.view'), async (req:
   }
 });
 
+// GET /api/v1/employees/pending-approvals
+router.get('/pending-approvals', authenticateToken, checkPermission('employee.view'), async (req: AuthRequest, res: Response) => {
+  try {
+    // Auto-fix: ensure all Active employees are marked isApproved
+    await User.updateMany({ status: 'Active', isApproved: false }, { isApproved: true });
+    await Employee.updateMany({ status: 'Active', isApproved: false }, { isApproved: true });
+
+    // Debug: count all non-approved employees
+    const allNonApproved = await Employee.find({ isApproved: false }, { name: 1, email: 1, status: 1 }).lean();
+    console.log('[Pending Approvals Debug] All non-approved employees:', allNonApproved.map(e => `${e.name}|${e.email}|${e.status}`));
+
+    // Find ONLY employees who have completed email OTP verification and are awaiting manager approval
+    const pendingEmployees = await Employee.find({
+      isApproved: false,
+      emailVerified: true,
+      status: 'Pending Approval'
+    }).sort({ createdAt: -1 });
+
+    console.log('[Pending Approvals Debug] Matched verified pending:', pendingEmployees.length);
+
+    return res.status(200).json({
+      success: true,
+      count: pendingEmployees.length,
+      data: pendingEmployees,
+      message: pendingEmployees.length === 0 ? 'No pending signup approvals' : 'Pending employee approvals fetched'
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to fetch pending approvals', error });
+  }
+});
+
 // GET /api/v1/employees/:id
 router.get('/:id', authenticateToken, checkPermission('employee.view'), async (req: AuthRequest, res: Response) => {
   try {
@@ -177,6 +208,53 @@ router.delete('/:id', authenticateToken, checkPermission('employee.delete'), asy
     return res.status(200).json({ success: true, message: 'Employee deleted successfully' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to delete employee', error });
+  }
+});
+
+
+// PUT /api/v1/employees/:id/approve (Manager approves user account and assigns role/designation)
+router.put('/:id/approve', authenticateToken, checkPermission('employee.update'), async (req: AuthRequest, res: Response) => {
+  const { role, designation, department } = req.body;
+
+  try {
+    const employee = await Employee.findById(req.params.id);
+    if (!employee) {
+      return res.status(404).json({ success: false, message: 'Employee record not found' });
+    }
+
+    const assignedRole = role || employee.role || 'Employee';
+    const assignedDesignation = designation || employee.designation || 'Influencer Executive';
+    const assignedDepartment = department || employee.department || 'Influencer Marketing';
+
+    employee.status = 'Active';
+    employee.isApproved = true;
+    employee.role = assignedRole;
+    employee.designation = assignedDesignation;
+    employee.department = assignedDepartment;
+    await employee.save();
+
+    await User.findOneAndUpdate(
+      { email: employee.email },
+      { status: 'Active', isApproved: true, role: assignedRole }
+    );
+
+    await logActivity({
+      userId: req.user?._id,
+      userName: req.user?.name || 'Manager',
+      action: 'APPROVE_EMPLOYEE_SIGNUP',
+      module: 'Employee Management',
+      entity: 'Employee',
+      entityId: (employee._id as any).toString(),
+      newValue: { status: 'Active', isApproved: true, role: assignedRole, designation: assignedDesignation }
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Account for ${employee.name} approved successfully as ${assignedRole}!`,
+      data: employee
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to approve employee signup', error });
   }
 });
 

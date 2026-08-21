@@ -9,11 +9,17 @@ const parseJsonResponse = async (res: Response) => {
   const contentType = res.headers.get('content-type');
   if (contentType && contentType.includes('application/json')) {
     const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'API request failed');
+    if (!res.ok) {
+      // Attach status field so catch blocks can inspect it (e.g. 'Pending Approval')
+      const err: any = new Error(data.message || 'API request failed');
+      err.status = data.status;
+      err.data = data;
+      throw err;
+    }
     return data;
   }
   const text = await res.text();
-  throw new Error(`Server returned status ${res.status}: ${res.statusText || 'Non-JSON response'}`);
+  throw new Error(`Server returned status ${res.status}: ${res.statusText || 'Non-JSON response: ' + text.slice(0, 100)}`);
 };
 
 export const api = {

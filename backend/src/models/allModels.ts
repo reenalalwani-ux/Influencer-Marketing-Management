@@ -34,10 +34,12 @@ const RoleSchema = new Schema<IRole>({
 export interface IUser extends Document {
   name: string;
   email: string;
-  password: string;
+  password?: string;
   role: string; // Role name or ID
   employeeId?: string;
-  status: 'Active' | 'Inactive';
+  status: 'Pending Verification' | 'Pending Approval' | 'Active' | 'Inactive';
+  emailVerified?: boolean;
+  isApproved?: boolean;
   refreshToken?: string;
   activeToken?: string;
   tokenIssuedAt?: Date;
@@ -48,10 +50,12 @@ export interface IUser extends Document {
 const UserSchema = new Schema<IUser>({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true, lowercase: true },
-  password: { type: String, required: true },
+  password: { type: String, default: '' },
   role: { type: String, required: true, default: 'Employee' },
   employeeId: { type: String },
-  status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
+  status: { type: String, enum: ['Pending Verification', 'Pending Approval', 'Active', 'Inactive'], default: 'Pending Verification' },
+  emailVerified: { type: Boolean, default: false },
+  isApproved: { type: Boolean, default: false },
   refreshToken: { type: String },
   activeToken: { type: String },
   tokenIssuedAt: { type: Date },
@@ -72,7 +76,9 @@ export interface IEmployee extends Document {
   role: string;
   reportingManagerId?: mongoose.Types.ObjectId;
   joiningDate: Date;
-  status: 'Active' | 'Inactive';
+  status: 'Pending Verification' | 'Pending Approval' | 'Active' | 'Inactive';
+  emailVerified?: boolean;
+  isApproved?: boolean;
 }
 
 const EmployeeSchema = new Schema<IEmployee>({
@@ -80,14 +86,16 @@ const EmployeeSchema = new Schema<IEmployee>({
   userId: { type: Schema.Types.ObjectId, ref: 'User' },
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
-  phone: { type: String, required: true },
+  phone: { type: String, default: '' },
   profileImage: { type: String },
-  department: { type: String, required: true },
-  designation: { type: String, required: true },
-  role: { type: String, required: true },
+  department: { type: String, default: 'Influencer Marketing' },
+  designation: { type: String, default: 'Influencer Executive' },
+  role: { type: String, default: 'Employee' },
   reportingManagerId: { type: Schema.Types.ObjectId, ref: 'Employee' },
   joiningDate: { type: Date, default: Date.now },
-  status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' }
+  status: { type: String, enum: ['Pending Verification', 'Pending Approval', 'Active', 'Inactive'], default: 'Pending Verification' },
+  emailVerified: { type: Boolean, default: false },
+  isApproved: { type: Boolean, default: false }
 }, { timestamps: true });
 
 // 5. Brand Schema

@@ -21,6 +21,7 @@ import { AuditLogView } from './views/AuditLogView';
 import { ReportsView } from './views/ReportsView';
 import { SettingsView } from './views/SettingsView';
 import { URLSubmissionModal } from './components/URLSubmissionModal';
+import { PendingApprovalModal } from './components/PendingApprovalModal';
 
 import { PublicCalendarShareView } from './views/PublicCalendarShareView';
 
@@ -158,6 +159,9 @@ export const App: React.FC = () => {
         onNavigateToTargets={() => handleNavigate('targets')}
         refreshTrigger={targetRefreshCount}
       />
+
+      {/* Automatic Manager Approval Popup Modal */}
+      <PendingApprovalModal currentUser={user} />
 
       <div className="flex flex-1 overflow-hidden">
         <Sidebar

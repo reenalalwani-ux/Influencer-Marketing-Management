@@ -3,7 +3,7 @@ import {
   Users, Briefcase, Target, CheckCircle2, Clock, AlertTriangle,
   ArrowUpRight, ExternalLink, Calendar, Send, ShieldCheck,
   BarChart3, Trophy, Medal, TrendingUp, Award, Sparkles, Plus,
-  Layers, ChevronRight, CheckSquare, Star, Pencil
+  Layers, ChevronRight, CheckSquare, Star, Pencil, Loader2
 } from 'lucide-react';
 import { api } from '../services/api';
 import { User, TaskItem, EmployeePerformanceData } from '../types';
@@ -239,10 +239,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
           >
             <div className="flex justify-between items-center text-slate-500 mb-2 text-xs uppercase font-extrabold">
               <span>Active Employees</span>
-              <Users size={18} className="text-purple-600" />
+              <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold group-hover:scale-110 transition">
+                <Users size={18} />
+              </div>
             </div>
-            <div className="text-3xl font-black text-slate-900">{data?.totalEmployees || 0}</div>
-            <p className="text-xs text-slate-500 font-semibold mt-1">Company internal staff</p>
+            <div className="flex items-baseline justify-between">
+              <div className="text-3xl font-black text-slate-900">{data?.totalEmployees || 0}</div>
+            </div>
+            <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-xs">
+              <span className="text-slate-500 font-semibold">Company internal staff</span>
+              <span className="text-purple-600 font-bold flex items-center gap-0.5 group-hover:translate-x-1 transition">
+                Manage <ChevronRight size={14} />
+              </span>
+            </div>
           </div>
 
           <div
