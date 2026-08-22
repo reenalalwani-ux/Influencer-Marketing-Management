@@ -283,7 +283,9 @@ export async function syncBarterFromGoogleSheet(): Promise<{
 }> {
   try {
     let config = await GoogleSheetConfig.findOne();
-    const defaultUrl = process.env.GOOGLE_SHEET_BARTER_URL || process.env.GOOGLE_SCRIPT_URL || process.env.GOOGLE_SHEET_CSV_URL || '';
+    const FULL_VERIFIED_URL = 'https://script.google.com/macros/s/AKfycbwNv3pDStT-kRQ4zlQ9bB0snEfxqgZ--6BNarou3RNR3KWY6qebp4Uq94jerw7_5xJHaw/exec';
+    const defaultUrl = process.env.GOOGLE_SHEET_BARTER_URL || process.env.GOOGLE_SCRIPT_URL || process.env.GOOGLE_SHEET_CSV_URL || FULL_VERIFIED_URL;
+
     if (!config) {
       config = await GoogleSheetConfig.create({
         sheetUrl: defaultUrl,
@@ -293,16 +295,16 @@ export async function syncBarterFromGoogleSheet(): Promise<{
       });
     }
 
-    // Auto-Fix: If database stored a raw private docs.google.com link, but backend has a script.google.com URL in env, auto-update config to use Apps Script URL
-    if (config.sheetUrl && config.sheetUrl.includes('docs.google.com/spreadsheets/d/') && defaultUrl.includes('script.google.com')) {
-      console.log('[GoogleSheetSync] Auto-updating database sheetUrl from docs.google.com link to Google Apps Script Web App URL from environment...');
-      config.sheetUrl = defaultUrl;
+    // Auto-Fix: Overwrite broken/truncated URL (e.g. AKfycbzAbg) or docs.google.com link with verified full Apps Script URL
+    if (!config.sheetUrl || config.sheetUrl.includes('AKfycbzAbg') || config.sheetUrl.length < 50 || config.sheetUrl.includes('docs.google.com')) {
+      console.log('[GoogleSheetSync] Auto-correcting database sheetUrl to verified Google Script Web App URL...');
+      config.sheetUrl = defaultUrl.length > 50 ? defaultUrl : FULL_VERIFIED_URL;
       await config.save();
     }
 
-    const targetUrl = (config && config.sheetUrl && config.sheetUrl.trim().length > 0) 
-      ? config.sheetUrl.trim() 
-      : defaultUrl;
+    const targetUrl = (config && config.sheetUrl && config.sheetUrl.trim().length > 40 && !config.sheetUrl.includes('AKfycbzAbg'))
+      ? config.sheetUrl.trim()
+      : FULL_VERIFIED_URL;
 
     // Check if Google Service Account is configured in backend/.env for PRIVATE Sheets!
     const sheetIdMatch = targetUrl ? targetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/) : null;
