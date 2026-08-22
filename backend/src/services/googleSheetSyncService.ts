@@ -76,6 +76,7 @@ function parseCSVLine(line: string): string[] {
 // Core function to insert / upsert Barter records from row objects
 export async function processBarterRows(rows: Record<string, string>[]): Promise<number> {
   let syncedCount = 0;
+  const syncedDocIds: any[] = [];
 
   // Fetch all registered users and employees to validate Assignee against database
   const registeredUsers = await User.find({}, 'name email').lean();
@@ -190,10 +191,11 @@ export async function processBarterRows(rows: Record<string, string>[]): Promise
       existing.isApproved = approvalStatus === 'Approved' || finalStatus === 'Completed';
 
       await existing.save();
+      syncedDocIds.push(existing._id);
       syncedCount++;
     } else {
       const count = await Influencer.countDocuments();
-      await Influencer.create({
+      const created = await Influencer.create({
         sNo: count + 1,
         transactionDate,
         connectedDate: transactionDate,
@@ -227,11 +229,21 @@ export async function processBarterRows(rows: Record<string, string>[]): Promise
         outAmount: 0,
         balance: 0
       });
+      syncedDocIds.push(created._id);
       syncedCount++;
     }
   }
 
-  return syncedCount;
+  // Automatically remove older / dummy Barter records that do not exist in the Google Sheet
+  if (syncedDocIds.length > 0) {
+    const deleteResult = await Influencer.deleteMany({
+      category: 'Barter',
+      _id: { $nin: syncedDocIds }
+    });
+    if (deleteResult.deletedCount > 0) {
+      console.log(`[GoogleSheetSync] 🧹 Cleaned up ${deleteResult.deletedCount} old/unmatched Barter records.`);
+    }
+  }
 
   return syncedCount;
 }
