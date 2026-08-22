@@ -87,12 +87,13 @@ export async function processBarterRows(rows: Record<string, string>[]): Promise
     ...registeredEmployees.map(e => (e.name || '').trim())
   ])).filter(name => name.length > 0);
 
-  for (const row of rows) {
+  for (let idx = 0; idx < rows.length; idx++) {
+    const row = rows[idx];
     // Extract column values matching sheet headers case-insensitively
     const getCol = (...names: string[]) => {
       for (const n of names) {
         const key = Object.keys(row).find(k => k.trim().toLowerCase() === n.toLowerCase());
-        if (key && row[key] && String(row[key]).trim().length > 0) return String(row[key]).trim();
+        if (key && row[key] && typeof row[key] !== 'object' && String(row[key]).trim().length > 0) return String(row[key]).trim();
       }
       return '';
     };
@@ -162,33 +163,46 @@ export async function processBarterRows(rows: Record<string, string>[]): Promise
     else if (lowerStat.includes('settle')) finalStatus = 'Settled';
     else if (lowerStat.includes('review')) finalStatus = 'Under Review';
 
-    // Deduplicate using Order ID or (brandName + influencerName)
-    const dedupeQuery: any = { category: 'Barter' };
+    // Unique match query per sheet row to prevent collapsing multiple deals of the same brand
+    let existing: any = null;
     if (orderId) {
-      dedupeQuery.orderId = orderId;
-    } else {
-      dedupeQuery.brandName = brandName;
-      dedupeQuery.influencerName = cleanInfName;
+      existing = await Influencer.findOne({ category: 'Barter', orderId });
+    }
+    if (!existing) {
+      existing = await Influencer.findOne({ category: 'Barter', sheetRowIndex: idx });
+    }
+    if (!existing && productLink) {
+      existing = await Influencer.findOne({ category: 'Barter', brandName, productLink });
     }
 
-    const existing = await Influencer.findOne(dedupeQuery);
-
     if (existing) {
-      existing.influencerManager = managerName;
-      existing.brandManagerTeam = managerTeam;
+      existing.influencerManager = managerName || existing.influencerManager;
+      existing.brandManagerTeam = managerTeam || existing.brandManagerTeam;
       existing.productLink = productLink || existing.productLink;
       existing.videoType = videoType || existing.videoType;
       existing.videoDescription = videoDescription || existing.videoDescription;
       existing.refVideoLink = refVideoLink || existing.refVideoLink;
       if (parsedRowDate) existing.orderDate = parsedRowDate;
       if (parsedRowDate) existing.transactionDate = parsedRowDate;
-      existing.status = finalStatus;
-      existing.contentLink = contentLink || existing.contentLink;
-      existing.adsCode = adsCode || existing.adsCode;
-      existing.influencerInstagramId = instaId || existing.influencerInstagramId;
-      existing.approvalStatus = approvalStatus;
-      existing.reason = reason || existing.reason;
-      existing.isApproved = approvalStatus === 'Approved' || finalStatus === 'Completed';
+
+      // PRESERVE PANEL STATUS: If team member updated status in our panel (e.g. Completed, Under Review, Settled), DO NOT overwrite back to Pending unless Google Sheet explicitly specifies "Done" or "Completed"
+      if (finalStatus === 'Completed' || finalStatus === 'Approved') {
+        existing.status = finalStatus;
+        existing.isApproved = true;
+      } else if (!existing.status || existing.status === 'Pending') {
+        existing.status = finalStatus;
+      }
+
+      // PRESERVE CREATOR HANDLE: If team member entered a real Instagram handle or custom creator name, KEEP IT!
+      if (cleanInfName && !cleanInfName.endsWith('Creator') && !cleanInfName.startsWith('Creator #')) {
+        existing.influencerName = cleanInfName;
+        if (instaId) existing.influencerInstagramId = instaId;
+      }
+
+      if (contentLink) existing.contentLink = contentLink;
+      if (adsCode) existing.adsCode = adsCode;
+      if (reason) existing.reason = reason;
+      existing.sheetRowIndex = idx;
 
       await existing.save();
       syncedDocIds.push(existing._id);
@@ -218,6 +232,7 @@ export async function processBarterRows(rows: Record<string, string>[]): Promise
         approvalStatus,
         isApproved: approvalStatus === 'Approved' || finalStatus === 'Completed',
         reason,
+        sheetRowIndex: idx,
         brandOnboardingAmt: 0,
         brandReceivedAmt: 0,
         brandPendingAmt: 0,

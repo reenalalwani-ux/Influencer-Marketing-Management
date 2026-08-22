@@ -375,6 +375,7 @@ export interface IInfluencer extends Document {
   reason?: string;
   notes?: string;
   remark?: string;
+  sheetRowIndex?: number;
   createdBy?: mongoose.Types.ObjectId;
 }
 
@@ -426,6 +427,7 @@ const InfluencerSchema = new Schema<IInfluencer>({
   reason: { type: String, default: '' },
   notes: { type: String, default: '' },
   remark: { type: String, default: '' },
+  sheetRowIndex: { type: Number },
   createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
