@@ -293,6 +293,13 @@ export async function syncBarterFromGoogleSheet(): Promise<{
       });
     }
 
+    // Auto-Fix: If database stored a raw private docs.google.com link, but backend has a script.google.com URL in env, auto-update config to use Apps Script URL
+    if (config.sheetUrl && config.sheetUrl.includes('docs.google.com/spreadsheets/d/') && defaultUrl.includes('script.google.com')) {
+      console.log('[GoogleSheetSync] Auto-updating database sheetUrl from docs.google.com link to Google Apps Script Web App URL from environment...');
+      config.sheetUrl = defaultUrl;
+      await config.save();
+    }
+
     const targetUrl = (config && config.sheetUrl && config.sheetUrl.trim().length > 0) 
       ? config.sheetUrl.trim() 
       : defaultUrl;
