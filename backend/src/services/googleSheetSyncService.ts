@@ -163,16 +163,11 @@ export async function processBarterRows(rows: Record<string, string>[]): Promise
     else if (lowerStat.includes('settle')) finalStatus = 'Settled';
     else if (lowerStat.includes('review')) finalStatus = 'Under Review';
 
-    // Unique match query per sheet row to prevent collapsing multiple deals of the same brand
+    // Unique match query per sheet row to prevent collapsing multiple deals of the same brand or shared order ID
     let existing: any = null;
-    if (orderId) {
-      existing = await Influencer.findOne({ category: 'Barter', orderId });
-    }
-    if (!existing) {
-      existing = await Influencer.findOne({ category: 'Barter', sheetRowIndex: idx });
-    }
-    if (!existing && productLink) {
-      existing = await Influencer.findOne({ category: 'Barter', brandName, productLink });
+    existing = await Influencer.findOne({ category: 'Barter', sheetRowIndex: idx });
+    if (!existing && orderId && !orderId.toLowerCase().includes('directly')) {
+      existing = await Influencer.findOne({ category: 'Barter', orderId, brandName, productLink });
     }
 
     if (existing) {
