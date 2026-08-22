@@ -256,9 +256,12 @@ export interface InfluencerTransaction {
   transactionDate?: string;
   connectedDate?: string;
   influencerManager?: string;
+  brandManagerTeam?: string;
+  assignedExecutive?: string;
   brandId?: Brand | any;
   brandName: string;
   influencerName: string;
+  influencerInstagramId?: string;
   phone?: string;
   profileLink?: string;
   category: 'Paid' | 'Barter';
@@ -281,6 +284,7 @@ export interface InfluencerTransaction {
   videoType?: string;
   videoDescription?: string;
   refVideoLink?: string;
+  referenceVideoLink?: string;
   orderId?: string;
   orderDate?: string;
   platform: string;
@@ -292,6 +296,8 @@ export interface InfluencerTransaction {
   ordersGenerated?: number;
   isOrderBonusQualified?: boolean;
   isApproved?: boolean;
+  approvalStatus?: 'Approved' | 'Not Approved' | 'Pending';
+  reason?: string;
   notes?: string;
   remark?: string;
   createdBy?: any;

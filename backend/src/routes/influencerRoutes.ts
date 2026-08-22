@@ -135,7 +135,7 @@ router.get('/', authenticateToken, checkPermission('influencer.view'), async (re
 
     const influencers = await Influencer.find(filter)
       .populate('brandId', 'brandName brandId logo')
-      .sort({ sNo: 1, transactionDate: 1 });
+      .sort({ transactionDate: 1, orderDate: 1, sNo: 1 });
 
     // Aggregate metrics
     const totalIn = influencers.reduce((acc, curr) => acc + (curr.inAmount || 0), 0);
@@ -163,10 +163,10 @@ router.get('/', authenticateToken, checkPermission('influencer.view'), async (re
 router.post('/', authenticateToken, checkPermission('influencer.create'), async (req: AuthRequest, res: Response) => {
   try {
     const {
-      influencerName, influencerManager, brandId, brandName, phone, profileLink, category,
+      influencerName, influencerManager, brandManagerTeam, brandId, brandName, phone, profileLink, influencerInstagramId, category,
       brandOnboardingAmt, brandReceivedAmt, influencerOnboardingAmt, influencerPaidAmt, finalPaymentReceived,
-      inAmount, outAmount, productLink, videoType, videoDescription, refVideoLink, orderId, orderDate,
-      platform, status, contentLink, adsCode, viewsCount, ordersCount, ordersGenerated, isApproved, notes, remark, transactionDate, connectedDate
+      inAmount, outAmount, productLink, videoType, videoDescription, refVideoLink, referenceVideoLink, orderId, orderDate,
+      platform, status, contentLink, adsCode, viewsCount, ordersCount, ordersGenerated, isApproved, approvalStatus, reason, notes, remark, transactionDate, connectedDate
     } = req.body;
 
     if (!influencerName) {
@@ -197,17 +197,22 @@ router.post('/', authenticateToken, checkPermission('influencer.create'), async 
     const isOrderBonusQualified = (category === 'Paid' || !category) && actualOrders >= 100;
 
     const count = await Influencer.countDocuments();
+    const targetStatus = status || 'Pending';
+    const finalRefLink = refVideoLink || referenceVideoLink || '';
+    const finalInstaId = influencerInstagramId || profileLink || '';
 
     const newRecord = await Influencer.create({
       sNo: count + 1,
       transactionDate: transactionDate ? new Date(transactionDate) : undefined,
       connectedDate: connectedDate ? new Date(connectedDate) : new Date(),
       influencerManager: influencerManager || req.user?.name || '',
+      brandManagerTeam: brandManagerTeam || '',
       brandId: brandId || undefined,
       brandName: finalBrandName || 'General',
       influencerName,
+      influencerInstagramId: finalInstaId,
       phone: phone || '',
-      profileLink: profileLink || '',
+      profileLink: profileLink || finalInstaId || '',
       category: category || 'Paid',
 
       brandOnboardingAmt: bOnboard,
@@ -225,18 +230,20 @@ router.post('/', authenticateToken, checkPermission('influencer.create'), async 
       productLink: productLink || '',
       videoType: videoType || 'Single Product Video',
       videoDescription: videoDescription || '',
-      refVideoLink: refVideoLink || '',
+      refVideoLink: finalRefLink,
       orderId: orderId || '',
       orderDate: orderDate ? new Date(orderDate) : undefined,
       platform: platform || 'Instagram',
-      status: status || (req.user?.role === 'Employee' ? 'Under Review' : 'Completed'),
+      status: targetStatus,
       contentLink: contentLink || '',
       adsCode: adsCode || '',
       viewsCount: Number(viewsCount) || 0,
       ordersCount: actualOrders,
       ordersGenerated: actualOrders,
       isOrderBonusQualified,
-      isApproved: isApproved !== undefined ? !!isApproved : ((status || (req.user?.role === 'Employee' ? 'Under Review' : 'Completed')) !== 'Under Review' && (status || (req.user?.role === 'Employee' ? 'Under Review' : 'Completed')) !== 'Pending'),
+      isApproved: isApproved !== undefined ? !!isApproved : (approvalStatus === 'Approved' || targetStatus === 'Approved' || targetStatus === 'Completed'),
+      approvalStatus: approvalStatus || (targetStatus === 'Approved' || targetStatus === 'Completed' ? 'Approved' : 'Pending'),
+      reason: reason || '',
       notes: notes || '',
       remark: remark || '',
       createdBy: req.user?._id
@@ -251,11 +258,8 @@ router.post('/', authenticateToken, checkPermission('influencer.create'), async 
         type: 'IN',
         amount: bRecv,
         paymentMode: 'Bank Transfer',
-        referenceNo: newRecord.orderId || 'SHEET-REC-IN',
-        handledBy: newRecord.influencerManager || req.user?.name || 'Admin',
-        notes: `Brand payment received for ${newRecord.influencerName} (${newRecord.brandName})`,
-        transactionDate: newRecord.transactionDate,
-        createdBy: req.user?._id
+        transactionDate: newRecord.transactionDate || new Date(),
+        notes: `Brand onboarding payment received for ${newRecord.influencerName}`
       });
     }
 
@@ -266,12 +270,9 @@ router.post('/', authenticateToken, checkPermission('influencer.create'), async 
         brandName: newRecord.brandName,
         type: 'OUT',
         amount: infPaid,
-        paymentMode: 'UPI',
-        referenceNo: newRecord.orderId || 'SHEET-PAID-OUT',
-        handledBy: newRecord.influencerManager || req.user?.name || 'Admin',
-        notes: `Creator payout made to ${newRecord.influencerName} (${newRecord.brandName})`,
-        transactionDate: newRecord.transactionDate,
-        createdBy: req.user?._id
+        paymentMode: 'Bank Transfer',
+        transactionDate: newRecord.transactionDate || new Date(),
+        notes: `Influencer payout disbursed for ${newRecord.influencerName}`
       });
     }
 
@@ -297,10 +298,10 @@ router.post('/', authenticateToken, checkPermission('influencer.create'), async 
 router.put('/:id', authenticateToken, checkPermission('influencer.update'), async (req: AuthRequest, res: Response) => {
   try {
     const {
-      influencerName, influencerManager, brandId, brandName, phone, profileLink, category,
+      influencerName, influencerManager, brandManagerTeam, brandId, brandName, phone, profileLink, influencerInstagramId, category,
       brandOnboardingAmt, brandReceivedAmt, influencerOnboardingAmt, influencerPaidAmt, finalPaymentReceived,
-      inAmount, outAmount, productLink, videoType, videoDescription, refVideoLink, orderId, orderDate,
-      platform, status, contentLink, adsCode, viewsCount, ordersCount, ordersGenerated, isApproved, notes, remark, transactionDate, connectedDate
+      inAmount, outAmount, productLink, videoType, videoDescription, refVideoLink, referenceVideoLink, orderId, orderDate,
+      platform, status, contentLink, adsCode, viewsCount, ordersCount, ordersGenerated, isApproved, approvalStatus, reason, notes, remark, transactionDate, connectedDate
     } = req.body;
 
     const record = await Influencer.findById(req.params.id);
@@ -310,10 +311,12 @@ router.put('/:id', authenticateToken, checkPermission('influencer.update'), asyn
 
     if (influencerName) record.influencerName = influencerName;
     if (influencerManager !== undefined) record.influencerManager = influencerManager;
+    if (brandManagerTeam !== undefined) record.brandManagerTeam = brandManagerTeam;
     if (brandId) record.brandId = brandId;
     if (brandName) record.brandName = brandName;
     if (phone !== undefined) record.phone = phone;
     if (profileLink !== undefined) record.profileLink = profileLink;
+    if (influencerInstagramId !== undefined) record.influencerInstagramId = influencerInstagramId;
     if (category) record.category = category;
 
     if (brandOnboardingAmt !== undefined) record.brandOnboardingAmt = Number(brandOnboardingAmt) || 0;
@@ -334,15 +337,18 @@ router.put('/:id', authenticateToken, checkPermission('influencer.update'), asyn
     if (videoType !== undefined) record.videoType = videoType;
     if (videoDescription !== undefined) record.videoDescription = videoDescription;
     if (refVideoLink !== undefined) record.refVideoLink = refVideoLink;
+    if (referenceVideoLink !== undefined) record.refVideoLink = referenceVideoLink;
     if (orderId !== undefined) record.orderId = orderId;
-    if (orderDate) record.orderDate = new Date(orderDate);
+    if (orderDate !== undefined) record.orderDate = orderDate ? new Date(orderDate) : undefined;
     if (platform) record.platform = platform;
     if (status) {
       record.status = status;
       if (status === 'Completed' || status === 'Approved' || status === 'Settled') {
         record.isApproved = true;
+        record.approvalStatus = 'Approved';
       } else if (status === 'Under Review' || status === 'Pending') {
         record.isApproved = false;
+        record.approvalStatus = 'Pending';
       }
     }
     if (contentLink !== undefined) record.contentLink = contentLink;
@@ -355,6 +361,8 @@ router.put('/:id', authenticateToken, checkPermission('influencer.update'), asyn
       record.isOrderBonusQualified = (record.category === 'Paid') && orders >= 100;
     }
     if (isApproved !== undefined) record.isApproved = !!isApproved;
+    if (approvalStatus !== undefined) record.approvalStatus = approvalStatus;
+    if (reason !== undefined) record.reason = reason;
     if (notes !== undefined) record.notes = notes;
     if (remark !== undefined) record.remark = remark;
     if (transactionDate !== undefined) record.transactionDate = transactionDate ? new Date(transactionDate) : (undefined as any);

@@ -2,6 +2,11 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+import dns from 'dns';
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch (e) {}
+
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -27,6 +32,8 @@ import dbRoutes from './routes/dbRoutes';
 import targetRoutes from './routes/targetRoutes';
 import influencerRoutes from './routes/influencerRoutes';
 import contentCalendarRoutes from './routes/contentCalendarRoutes';
+import syncRoutes from './routes/syncRoutes';
+import { syncBarterFromGoogleSheet } from './services/googleSheetSyncService';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -82,6 +89,7 @@ app.use('/api/v1/settings', settingsRoutes);
 app.use('/api/v1/targets', targetRoutes);
 app.use('/api/v1/influencers', influencerRoutes);
 app.use('/api/v1/content-calendar', contentCalendarRoutes);
+app.use('/api/v1/sync', syncRoutes);
 app.use('/api/v1/db', dbRoutes);
 
 // Start server and initialize DB
@@ -90,9 +98,24 @@ const startServer = async () => {
     await connectDB();
     await seedDatabase();
 
+    // Start Background Google Sheet Auto-Sync Worker (runs every 60 seconds)
+    console.log('[Cron Worker] Initializing Google Sheet Auto-Sync worker...');
+    setTimeout(() => {
+      syncBarterFromGoogleSheet().catch(() => {});
+    }, 5000);
+
+    setInterval(async () => {
+      try {
+        await syncBarterFromGoogleSheet();
+      } catch (err) {
+        // Prevent poller exceptions from bubbling up
+      }
+    }, 60000);
+
     app.listen(PORT, () => {
       console.log(`=======================================================`);
       console.log(`🚀 Influencer Management Backend API running on port ${PORT}`);
+      console.log(`🔄 Google Sheet Auto-Sync Cron Active (60s interval)`);
       console.log(`🌐 API Endpoint: http://localhost:${PORT}/api/v1`);
       console.log(`=======================================================`);
     });

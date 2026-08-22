@@ -332,9 +332,12 @@ export interface IInfluencer extends Document {
   transactionDate?: Date;
   connectedDate?: Date;
   influencerManager?: string;
+  brandManagerTeam?: string;
+  assignedExecutive?: string;
   brandId?: mongoose.Types.ObjectId;
   brandName: string;
   influencerName: string;
+  influencerInstagramId?: string;
   phone?: string;
   profileLink?: string;
   category: 'Paid' | 'Barter';
@@ -368,8 +371,8 @@ export interface IInfluencer extends Document {
   ordersGenerated?: number;
   isOrderBonusQualified?: boolean;
   isApproved?: boolean;
-  brandManagerTeam?: string;
-  assignedExecutive?: string;
+  approvalStatus?: 'Approved' | 'Not Approved' | 'Pending';
+  reason?: string;
   notes?: string;
   remark?: string;
   createdBy?: mongoose.Types.ObjectId;
@@ -385,6 +388,7 @@ const InfluencerSchema = new Schema<IInfluencer>({
   brandId: { type: Schema.Types.ObjectId, ref: 'Brand' },
   brandName: { type: String, required: true },
   influencerName: { type: String, required: true },
+  influencerInstagramId: { type: String, default: '' },
   phone: { type: String, default: '' },
   profileLink: { type: String, default: '' },
   category: { type: String, enum: ['Paid', 'Barter'], default: 'Paid', required: true },
@@ -410,14 +414,16 @@ const InfluencerSchema = new Schema<IInfluencer>({
   orderId: { type: String, default: '' },
   orderDate: { type: Date },
   platform: { type: String, default: 'Instagram' },
-  status: { type: String, enum: ['Pending', 'Under Review', 'Completed', 'Settled', 'Approved'], default: 'Under Review' },
+  status: { type: String, enum: ['Pending', 'Under Review', 'Completed', 'Settled', 'Approved'], default: 'Pending' },
   contentLink: { type: String, default: '' },
   adsCode: { type: String, default: '' },
   viewsCount: { type: Number, default: 0 },
   ordersCount: { type: Number, default: 0 },
   ordersGenerated: { type: Number, default: 0 },
   isOrderBonusQualified: { type: Boolean, default: false },
-  isApproved: { type: Boolean, default: true },
+  isApproved: { type: Boolean, default: false },
+  approvalStatus: { type: String, enum: ['Approved', 'Not Approved', 'Pending'], default: 'Pending' },
+  reason: { type: String, default: '' },
   notes: { type: String, default: '' },
   remark: { type: String, default: '' },
   createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
@@ -501,6 +507,30 @@ export const ContentCalendarSchema = new Schema<IContentCalendar>({
 }, { timestamps: true });
 
 // Export Models
+export interface IGoogleSheetConfig extends Document {
+  sheetUrl: string;
+  sheetId?: string;
+  autoSyncEnabled: boolean;
+  syncIntervalSeconds: number;
+  lastSyncedAt?: Date;
+  lastSyncedCount: number;
+  lastSyncStatus: 'SUCCESS' | 'ERROR' | 'IDLE';
+  lastSyncMessage?: string;
+  updatedBy?: mongoose.Types.ObjectId;
+}
+
+export const GoogleSheetConfigSchema = new Schema<IGoogleSheetConfig>({
+  sheetUrl: { type: String, default: '' },
+  sheetId: { type: String, default: '' },
+  autoSyncEnabled: { type: Boolean, default: true },
+  syncIntervalSeconds: { type: Number, default: 60 },
+  lastSyncedAt: { type: Date },
+  lastSyncedCount: { type: Number, default: 0 },
+  lastSyncStatus: { type: String, enum: ['SUCCESS', 'ERROR', 'IDLE'], default: 'IDLE' },
+  lastSyncMessage: { type: String, default: '' },
+  updatedBy: { type: Schema.Types.ObjectId, ref: 'User' }
+}, { timestamps: true });
+
 export const Permission = mongoose.model<IPermission>('Permission', PermissionSchema);
 export const Role = mongoose.model<IRole>('Role', RoleSchema);
 export const User = mongoose.model<IUser>('User', UserSchema);
@@ -515,5 +545,7 @@ export const Target = mongoose.model<ITarget>('Target', TargetSchema);
 export const Influencer = mongoose.model<IInfluencer>('Influencer', InfluencerSchema);
 export const PaymentLog = mongoose.model<IPaymentLog>('PaymentLog', PaymentLogSchema);
 export const ContentCalendar = mongoose.model<IContentCalendar>('ContentCalendar', ContentCalendarSchema);
+export const GoogleSheetConfig = mongoose.model<IGoogleSheetConfig>('GoogleSheetConfig', GoogleSheetConfigSchema);
+
 
 

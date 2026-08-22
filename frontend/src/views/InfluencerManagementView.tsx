@@ -4,7 +4,7 @@ import {
   ArrowUpRight, ArrowDownRight, ExternalLink, Video, Link2, ChevronDown, 
   Receipt, Eye, ShoppingBag, ChevronUp, ChevronsUpDown, Target, TrendingUp,
   Award, Clock, AlertCircle, CheckCircle2, ShieldCheck, Layers, RefreshCw, Users,
-  Calendar, ChevronLeft, ChevronRight, CalendarDays, Loader2, Lock
+  Calendar, ChevronLeft, ChevronRight, CalendarDays, Loader2, Lock, Settings, X
 } from 'lucide-react';
 import { api } from '../services/api';
 import { InfluencerTransaction, Brand, PaymentLogItem, TargetItem, TeamTargetBreakdown, MemberTargetItem } from '../types';
@@ -25,6 +25,139 @@ const getCurrentMonthTimeframe = () => {
   const now = new Date();
   const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
   return `${monthNames[now.getMonth()]}_${now.getFullYear()}`;
+};
+
+// Helper to check if status is achieved (Completed, Approved, Settled)
+const isAchievedStatus = (s?: string) => {
+  if (!s) return false;
+  const st = s.toLowerCase();
+  return st === 'completed' || st === 'approved' || st === 'settled';
+};
+
+// Custom Premium Select Dropdown Component
+const CustomSelectDropdown: React.FC<{
+  label: string;
+  icon?: React.ReactNode;
+  value: string;
+  onChange: (val: string) => void;
+  options: { label: string; value: string; icon?: React.ReactNode }[];
+  allLabel: string;
+}> = ({
+  label,
+  icon,
+  value,
+  onChange,
+  options,
+  allLabel
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOpt = options.find(o => o.value === value);
+  const activeDisplayLabel = value ? (selectedOpt ? selectedOpt.label : value) : allLabel;
+  const filteredOptions = options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div className="relative inline-block text-left" ref={dropdownRef}>
+      {/* Dropdown Trigger Button */}
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-2 transition-all duration-150 shadow-2xs border cursor-pointer select-none ${
+          value
+            ? 'bg-purple-600 text-white border-purple-600 shadow-purple-500/20'
+            : 'bg-white text-slate-700 border-slate-200 hover:border-purple-300 hover:bg-purple-50/50 hover:text-purple-700'
+        }`}
+      >
+        {icon}
+        <span className="truncate max-w-[140px] tracking-tight">{activeDisplayLabel}</span>
+        <ChevronDown size={13} className={`transition-transform duration-200 shrink-0 ${value ? 'text-white' : 'text-slate-400'} ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {/* Floating Popover Panel - Solid Opaque White */}
+      {isOpen && (
+        <div className="absolute left-0 mt-2 min-w-[220px] max-w-[280px] rounded-2xl bg-white border border-slate-200 shadow-2xl z-[100] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          
+          {/* Search Box Header */}
+          {options.length > 4 && (
+            <div className="p-2 border-b border-slate-100 bg-slate-50">
+              <div className="relative flex items-center">
+                <Search size={13} className="absolute left-2.5 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder={`Search ${label}...`}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-8 pr-2.5 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 text-slate-800 placeholder-slate-400"
+                  autoFocus
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Options List */}
+          <div className="max-h-64 overflow-y-auto p-1.5 space-y-0.5 scrollbar-thin bg-white">
+            {/* All Options Default Button */}
+            <button
+              type="button"
+              onClick={() => { onChange(''); setIsOpen(false); setSearch(''); }}
+              className={`w-full px-3 py-2 text-left text-xs font-extrabold rounded-xl flex items-center justify-between transition-all cursor-pointer ${
+                !value
+                  ? 'bg-purple-600 text-white font-extrabold'
+                  : 'text-slate-700 hover:bg-purple-50 hover:text-purple-700'
+              }`}
+            >
+              <div className="flex items-center gap-2 truncate">
+                {icon}
+                <span className="truncate">{allLabel}</span>
+              </div>
+              {!value && <CheckCircle2 size={13} className="text-white shrink-0" />}
+            </button>
+
+            {/* Filtered Option Items */}
+            {filteredOptions.length === 0 ? (
+              <div className="p-3 text-center text-xs text-slate-400 font-medium">
+                No matching options
+              </div>
+            ) : (
+              filteredOptions.map((opt) => {
+                const isSelected = value === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => { onChange(opt.value); setIsOpen(false); setSearch(''); }}
+                    className={`w-full px-3 py-2 text-left text-xs font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-purple-600 text-white font-extrabold'
+                        : 'text-slate-700 hover:bg-purple-50 hover:text-purple-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      {opt.icon}
+                      <span className="truncate">{opt.label}</span>
+                    </div>
+                    {isSelected && <CheckCircle2 size={13} className="text-white shrink-0" />}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 // Custom Pill Select for Status
@@ -257,9 +390,15 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     totalCount: 0
   });
 
-  // Sorting State — Default Ascending (1, 2, 3...) by sNo
-  const [sortKey, setSortKey] = useState<string>('sNo');
+  // Sorting State — Default Ascending (Past Date to Present Date: 8/1 -> 8/22) by transactionDate
+  const [sortKey, setSortKey] = useState<string>('transactionDate');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  // Multi-Filter Dropdown State (Brand, Manager, Status, Deliverable)
+  const [filterBrand, setFilterBrand] = useState<string>('');
+  const [filterManager, setFilterManager] = useState<string>('');
+  const [filterStatus, setFilterStatus] = useState<string>('');
+  const [filterDeliverable, setFilterDeliverable] = useState<string>('');
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -331,6 +470,22 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
   });
   const [savingTarget, setSavingTarget] = useState(false);
   const [submittingInfluencer, setSubmittingInfluencer] = useState(false);
+
+  // Google Sheet Auto-Sync State
+  const [syncStatus, setSyncStatus] = useState<{
+    isConfigured: boolean;
+    maskedUrl?: string;
+    autoSyncEnabled: boolean;
+    syncIntervalSeconds: number;
+    lastSyncedAt?: string;
+    lastSyncedCount: number;
+    lastSyncStatus: string;
+    lastSyncMessage?: string;
+  } | null>(null);
+  const [isSyncingSheet, setIsSyncingSheet] = useState(false);
+  const [showSyncConfigModal, setShowSyncConfigModal] = useState(false);
+  const [inputSheetUrl, setInputSheetUrl] = useState('');
+  const [inputAutoSync, setInputAutoSync] = useState(true);
   const [savingPayLog, setSavingPayLog] = useState(false);
 
   // Form Fields (Influencer Record)
@@ -349,7 +504,9 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
   const [influencerPaidAmt, setInfluencerPaidAmt] = useState<number | ''>(0);
   const [finalPaymentReceived, setFinalPaymentReceived] = useState(false);
 
-  // Content Deliverable Fields
+  // Content Deliverable & Spreadsheet Fields
+  const [brandManagerTeam, setBrandManagerTeam] = useState('');
+  const [influencerInstagramId, setInfluencerInstagramId] = useState('');
   const [productLink, setProductLink] = useState('');
   const [videoType, setVideoType] = useState('Single Product Video');
   const [videoDescription, setVideoDescription] = useState('');
@@ -357,12 +514,14 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
   const [orderId, setOrderId] = useState('');
   const [orderDate, setOrderDate] = useState('');
   const [platform, setPlatform] = useState('Instagram');
-  const [status, setStatus] = useState<'Pending' | 'Under Review' | 'Completed' | 'Settled' | 'Approved'>('Under Review');
+  const [status, setStatus] = useState<'Pending' | 'Under Review' | 'Completed' | 'Settled' | 'Approved'>('Pending');
+  const [approvalStatus, setApprovalStatus] = useState<'Approved' | 'Not Approved' | 'Pending'>('Pending');
+  const [reason, setReason] = useState('');
   const [contentLink, setContentLink] = useState('');
   const [adsCode, setAdsCode] = useState('');
   const [viewsCount, setViewsCount] = useState<number | ''>(0);
   const [ordersCount, setOrdersCount] = useState<number | ''>(0);
-  const [isApproved, setIsApproved] = useState(true);
+  const [isApproved, setIsApproved] = useState(false);
   const [transactionDate, setTransactionDate] = useState('');
   const [connectedDate, setConnectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
@@ -370,6 +529,62 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  // Fetch Google Sheet Sync Status
+  const fetchSyncStatus = async () => {
+    try {
+      const res = await api.get('/sync/status');
+      if (res.success && res.data) {
+        setSyncStatus(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch sync status', err);
+    }
+  };
+
+  const handleTriggerSync = async () => {
+    setIsSyncingSheet(true);
+    try {
+      const res = await api.post('/sync/trigger', {});
+      if (res.success) {
+        fetchSyncStatus();
+        fetchInfluencers();
+        fetchTeamBreakdown();
+        if (onTargetUpdated) onTargetUpdated();
+      } else {
+        alert(res.message || 'Sync failed');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error triggering sync');
+    } finally {
+      setIsSyncingSheet(false);
+    }
+  };
+
+  const handleSaveSyncConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSyncingSheet(true);
+    try {
+      const res = await api.post('/sync/config', {
+        sheetUrl: inputSheetUrl,
+        autoSyncEnabled: inputAutoSync,
+        syncIntervalSeconds: 60
+      });
+      if (res.success) {
+        setShowSyncConfigModal(false);
+        fetchSyncStatus();
+        fetchInfluencers();
+        fetchTeamBreakdown();
+        if (onTargetUpdated) onTargetUpdated();
+      } else {
+        alert(res.message || 'Failed to update config');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error saving sync config');
+    } finally {
+      setIsSyncingSheet(false);
+    }
+  };
 
   // Fetch Brands
   const fetchBrands = async () => {
@@ -585,7 +800,9 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
   const openAddModal = (defaultCategory: 'Paid' | 'Barter' = 'Barter') => {
     setEditingItem(null);
     setInfluencerManager('');
+    setBrandManagerTeam('');
     setInfluencerName('');
+    setInfluencerInstagramId('');
     setSelectedBrandId('');
     setCustomBrandName('');
     setPhone('');
@@ -603,12 +820,14 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     setOrderId('');
     setOrderDate('');
     setPlatform('Instagram');
-    setStatus(isEmployee ? 'Under Review' : 'Completed');
+    setStatus('Pending');
+    setApprovalStatus('Pending');
+    setReason('');
     setContentLink('');
     setAdsCode('');
     setViewsCount('');
     setOrdersCount('');
-    setIsApproved(true);
+    setIsApproved(false);
     setTransactionDate('');
     setConnectedDate(new Date().toISOString().split('T')[0]);
     setNotes('');
@@ -619,11 +838,13 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
   const openEditModal = (item: InfluencerTransaction) => {
     setEditingItem(item);
     setInfluencerManager(item.influencerManager || '');
+    setBrandManagerTeam(item.brandManagerTeam || '');
     setInfluencerName(item.influencerName);
+    setInfluencerInstagramId(item.influencerInstagramId || item.profileLink || '');
     setSelectedBrandId(typeof item.brandId === 'object' ? item.brandId?._id : item.brandId || '');
     setCustomBrandName(item.brandName);
     setPhone(item.phone || '');
-    setProfileLink(item.profileLink || '');
+    setProfileLink(item.profileLink || item.influencerInstagramId || '');
     setCategory(item.category);
     setBrandOnboardingAmt(item.brandOnboardingAmt || item.inAmount || 0);
     setBrandReceivedAmt(item.brandReceivedAmt || item.inAmount || 0);
@@ -633,16 +854,18 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     setProductLink(item.productLink || '');
     setVideoType(item.videoType || 'Single Product Video');
     setVideoDescription(item.videoDescription || '');
-    setRefVideoLink(item.refVideoLink || '');
+    setRefVideoLink(item.refVideoLink || item.referenceVideoLink || '');
     setOrderId(item.orderId || '');
     setOrderDate(item.orderDate ? item.orderDate.split('T')[0] : '');
     setPlatform(item.platform || 'Instagram');
-    setStatus(item.status || 'Completed');
+    setStatus((item.status as any) || 'Pending');
+    setApprovalStatus(item.approvalStatus || (item.isApproved ? 'Approved' : 'Pending'));
+    setReason(item.reason || '');
     setContentLink(item.contentLink || '');
     setAdsCode(item.adsCode || '');
     setViewsCount(item.viewsCount || 0);
     setOrdersCount(item.ordersCount || 0);
-    setIsApproved(item.isApproved !== undefined ? item.isApproved : true);
+    setIsApproved(item.isApproved !== undefined ? item.isApproved : false);
     setTransactionDate(item.transactionDate ? item.transactionDate.split('T')[0] : '');
     setConnectedDate(item.connectedDate ? item.connectedDate.split('T')[0] : (item.transactionDate ? item.transactionDate.split('T')[0] : new Date().toISOString().split('T')[0]));
     setNotes(item.notes || '');
@@ -794,10 +1017,74 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     }
   };
 
+  // Dynamic Unique Options for Toolbar Dropdowns
+  const uniqueBrands: string[] = Array.from(new Set(
+    influencers
+      .filter(i => viewMode === 'All Collaborations' || i.category === (viewMode === 'Barter Collaborations' ? 'Barter' : 'Paid'))
+      .map(i => i.brandName?.trim())
+      .filter((x): x is string => Boolean(x))
+  )).sort();
+
+  const uniqueManagers: string[] = Array.from(new Set(
+    influencers
+      .filter(i => viewMode === 'All Collaborations' || i.category === (viewMode === 'Barter Collaborations' ? 'Barter' : 'Paid'))
+      .map(i => i.influencerManager?.trim())
+      .filter((x): x is string => Boolean(x))
+  )).sort();
+
+  const uniqueDeliverables: string[] = Array.from(new Set(
+    influencers
+      .filter(i => viewMode === 'All Collaborations' || i.category === (viewMode === 'Barter Collaborations' ? 'Barter' : 'Paid'))
+      .map(i => i.videoType?.trim())
+      .filter((x): x is string => Boolean(x))
+  )).sort();
+
+  const hasActiveFilters = !!(filterBrand || filterManager || filterStatus || filterDeliverable || searchTerm);
+
+  const resetAllFilters = () => {
+    setFilterBrand('');
+    setFilterManager('');
+    setFilterStatus('');
+    setFilterDeliverable('');
+    setSearchTerm('');
+  };
+
   // Filtered & Sorted Influencers (Searches only within the active tab view)
   const filteredInfluencers = influencers.filter(i => {
     if (viewMode === 'Paid Collaborations' && i.category !== 'Paid') return false;
     if (viewMode === 'Barter Collaborations' && i.category !== 'Barter') return false;
+
+    // Filter by Brand
+    if (filterBrand && (i.brandName || '').trim().toLowerCase() !== filterBrand.toLowerCase()) {
+      return false;
+    }
+
+    // Filter by Manager / Assignee
+    if (filterManager) {
+      if (filterManager === '__UNASSIGNED__') {
+        if (i.influencerManager && i.influencerManager.trim().length > 0) return false;
+      } else if ((i.influencerManager || '').trim().toLowerCase() !== filterManager.toLowerCase()) {
+        return false;
+      }
+    }
+
+    // Filter by Status
+    if (filterStatus) {
+      if (filterStatus === 'Completed') {
+        if (!isAchievedStatus(i.status)) return false;
+      } else if (filterStatus === 'Pending') {
+        if (isAchievedStatus(i.status)) return false;
+      } else if ((i.status || '').trim().toLowerCase() !== filterStatus.toLowerCase()) {
+        return false;
+      }
+    }
+
+    // Filter by Deliverable
+    if (filterDeliverable) {
+      if ((i.videoType || '').trim().toLowerCase() !== filterDeliverable.toLowerCase()) {
+        return false;
+      }
+    }
 
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
@@ -826,15 +1113,8 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
 
     if (valA < valB) return sortDir === 'asc' ? -1 : 1;
     if (valA > valB) return sortDir === 'asc' ? 1 : -1;
-    return 0;
+    return (a.sNo || 0) - (b.sNo || 0);
   });
-
-  // Helper to check if status is achieved (Completed, Approved, Settled)
-  const isAchievedStatus = (s?: string) => {
-    if (!s) return false;
-    const st = s.toLowerCase();
-    return st === 'completed' || st === 'approved' || st === 'settled';
-  };
 
   // Calculate Metrics from Current View (Include all paid collaborations for metric card totals)
   const allPaidCollabs = influencers.filter(i => i.category === 'Paid');
@@ -1777,7 +2057,82 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
             </div>
           )}
 
-          {/* Main Table */}
+          {/* Dedicated Standalone Quick Filter Toolbar Card */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs mb-4 flex flex-wrap items-center justify-between gap-3 relative z-30">
+            <div className="flex flex-wrap items-center gap-2.5 text-xs">
+              <span className="font-extrabold text-slate-700 flex items-center gap-1.5 mr-1">
+                <Filter size={15} className="text-purple-600" /> Filter Ledger:
+              </span>
+
+              {/* Filter by Assignee */}
+              <CustomSelectDropdown
+                label="Assignee"
+                icon={<User size={13} className="text-purple-600 shrink-0" />}
+                value={filterManager}
+                onChange={(val) => { setFilterManager(val); setCurrentPage(1); }}
+                allLabel={`All Assignees (${uniqueManagers.length})`}
+                options={[
+                  ...uniqueManagers.map(m => ({ label: m, value: m })),
+                  { label: 'Unassigned (—)', value: '__UNASSIGNED__' }
+                ]}
+              />
+
+              {/* Filter by Brand */}
+              <CustomSelectDropdown
+                label="Brand"
+                icon={<ShoppingBag size={13} className="text-blue-600 shrink-0" />}
+                value={filterBrand}
+                onChange={(val) => { setFilterBrand(val); setCurrentPage(1); }}
+                allLabel={`All Brands (${uniqueBrands.length})`}
+                options={uniqueBrands.map(b => ({ label: b, value: b }))}
+              />
+
+              {/* Filter by Status */}
+              <CustomSelectDropdown
+                label="Status"
+                icon={<CheckCircle2 size={13} className="text-emerald-600 shrink-0" />}
+                value={filterStatus}
+                onChange={(val) => { setFilterStatus(val); setCurrentPage(1); }}
+                allLabel="All Statuses"
+                options={[
+                  { label: 'Pending', value: 'Pending' },
+                  { label: 'Completed (Approved)', value: 'Completed' },
+                  { label: 'Under Review', value: 'Under Review' },
+                  { label: 'Settled', value: 'Settled' }
+                ]}
+              />
+
+              {/* Filter by Deliverable */}
+              {uniqueDeliverables.length > 0 && (
+                <CustomSelectDropdown
+                  label="Deliverable"
+                  icon={<Video size={13} className="text-indigo-600 shrink-0" />}
+                  value={filterDeliverable}
+                  onChange={(val) => { setFilterDeliverable(val); setCurrentPage(1); }}
+                  allLabel="All Deliverables"
+                  options={uniqueDeliverables.map(d => ({ label: d, value: d }))}
+                />
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={resetAllFilters}
+                  className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl font-extrabold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                  title="Reset all active filters"
+                >
+                  <X size={14} /> Reset Filters
+                </button>
+              )}
+              <span className="text-xs font-bold text-slate-500">
+                Filtered: <strong className="text-purple-700 font-black">{filteredInfluencers.length}</strong> / {influencers.length}
+              </span>
+            </div>
+          </div>
+
+          {/* Main Table Card */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
             <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
@@ -1792,12 +2147,49 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                 </p>
               </div>
 
-              <button
-                onClick={() => openAddModal(viewMode === 'Barter Collaborations' ? 'Barter' : 'Paid')}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-extrabold text-xs flex items-center gap-1.5 shadow-sm transition"
-              >
-                <Plus size={15} /> Add Record
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                {viewMode === 'Barter Collaborations' && (
+                  <div className="flex items-center gap-2 bg-purple-50/80 p-1.5 rounded-xl border border-purple-100">
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Auto-Sync Active (60s)
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={handleTriggerSync}
+                      disabled={isSyncingSheet}
+                      className="px-3 py-1.5 bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 rounded-lg text-xs font-black flex items-center gap-1 shadow-2xs transition disabled:opacity-50 cursor-pointer"
+                      title="Sync latest rows from Google Sheet now"
+                    >
+                      <RefreshCw size={13} className={isSyncingSheet ? "animate-spin text-purple-600" : "text-purple-600"} />
+                      <span>{isSyncingSheet ? "Syncing..." : "Sync Sheet Now"}</span>
+                    </button>
+
+                    {isManagerOrAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInputSheetUrl('');
+                          setInputAutoSync(syncStatus?.autoSyncEnabled !== false);
+                          setShowSyncConfigModal(true);
+                        }}
+                        className="p-1.5 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-lg text-xs font-bold transition cursor-pointer"
+                        title="Configure Confidential Google Sheet Link"
+                      >
+                        <Settings size={14} />
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <button
+                  onClick={() => openAddModal(viewMode === 'Barter Collaborations' ? 'Barter' : 'Paid')}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-extrabold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                >
+                  <Plus size={15} /> Add Record
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -1806,7 +2198,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                   <tr className="bg-slate-800 text-slate-200 font-bold">
                     <SortHeader field="sNo" label="#" align="center" />
                     <SortHeader field="transactionDate" label="Date" />
-                    <SortHeader field="influencerManager" label="Manager" />
+                    <SortHeader field="influencerManager" label="Assignee" />
                     <SortHeader field="brandName" label="Brand" />
                     <SortHeader field="influencerName" label="Influencer" />
                     <SortHeader field="category" label="Category" align="center" />
@@ -1872,17 +2264,49 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                             )}
                           </td>
 
-                          <td className="p-3 border-r border-slate-100 font-semibold text-slate-700">
-                            {item.influencerManager || 'Staff'}
+                          <td className="p-3 border-r border-slate-100">
+                            {item.influencerManager ? (
+                              <>
+                                <div className="font-bold text-slate-800">{item.influencerManager}</div>
+                                {item.brandManagerTeam && (
+                                  <div className="text-[10px] text-purple-700 font-extrabold block">Team: {item.brandManagerTeam}</div>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-slate-400 font-semibold">—</span>
+                            )}
                           </td>
 
                           <td className="p-3 border-r border-slate-100 font-extrabold text-slate-900">
                             {item.brandName}
                           </td>
 
-                          <td className="p-3 border-r border-slate-100">
-                            <div className="font-extrabold text-purple-700">{item.influencerName}</div>
-                            {item.phone && <div className="text-[10px] text-slate-400 font-medium">{item.phone}</div>}
+                          <td className="p-3 border-r border-slate-100 min-w-[140px]">
+                            {(() => {
+                              const rawName = item.influencerName || '';
+                              // Clean name by removing (Barter) or (Paid) suffix from import
+                              const cleanName = rawName.replace(/\s*\((Barter|Paid)\)\s*/gi, '').trim() || rawName;
+                              const rawInsta = item.influencerInstagramId || (rawName.startsWith('@') ? rawName : item.profileLink) || '';
+                              const instaHandle = rawInsta ? (rawInsta.startsWith('@') ? rawInsta : `@${rawInsta.replace(/https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/$/, '')}`) : '';
+                              const instaUrl = item.profileLink || (rawInsta.startsWith('http') ? rawInsta : `https://instagram.com/${rawInsta.replace(/^@/, '')}`);
+
+                              return (
+                                <div>
+                                  <div className="font-extrabold text-slate-900 text-xs">{cleanName}</div>
+                                  {instaHandle && (
+                                    <a
+                                      href={instaUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-[10px] text-purple-700 font-bold hover:underline block truncate max-w-[140px] mt-0.5"
+                                    >
+                                      📷 {instaHandle}
+                                    </a>
+                                  )}
+                                  {item.phone && <div className="text-[10px] text-slate-400 font-medium">{item.phone}</div>}
+                                </div>
+                              );
+                            })()}
                           </td>
 
                           <td className="p-3 border-r border-slate-100 text-center">
@@ -1934,27 +2358,53 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                           {/* Barter Columns */}
                           {(viewMode === 'Barter Collaborations' || viewMode === 'All Collaborations') && (
                             <>
-                              <td className="p-3 border-r border-slate-100">
-                                <span className="font-semibold text-slate-800">{item.videoType || 'Product Video'}</span>
+                              <td className="p-3 border-r border-slate-100 space-y-0.5">
+                                <div className="font-extrabold text-slate-900">{item.videoType || 'Product Video'}</div>
+                                {item.videoDescription && (
+                                  <div className="text-[10px] text-slate-500 font-medium line-clamp-1">{item.videoDescription}</div>
+                                )}
+                                {item.orderId && (
+                                  <div className="text-[10px] text-purple-700 font-black">Order: {item.orderId}</div>
+                                )}
+                                {(item.refVideoLink || item.referenceVideoLink) && (
+                                  <a href={item.refVideoLink || item.referenceVideoLink} target="_blank" rel="noreferrer" className="text-[10px] text-blue-600 font-bold hover:underline block">
+                                    📹 Ref Video Link
+                                  </a>
+                                )}
                                 {item.contentLink && (
                                   <a href={item.contentLink} target="_blank" rel="noreferrer" className="block text-[10px] text-purple-600 font-bold hover:underline truncate max-w-[120px]">
-                                    🔗 Link
+                                    🔗 Content Link
                                   </a>
                                 )}
                               </td>
 
                               <td className="p-3 border-r border-slate-100 text-right font-bold text-slate-700">
-                                {item.viewsCount || 0} views / {orders} orders
+                                <div>{item.viewsCount || 0} views / {orders} orders</div>
+                                {item.orderDate && (
+                                  <div className="text-[10px] text-slate-400 font-normal">Order Date: {new Date(item.orderDate).toLocaleDateString()}</div>
+                                )}
                               </td>
                             </>
                           )}
 
-                          <td className="p-3 border-r border-slate-100 text-center">
+                          <td className="p-3 border-r border-slate-100 text-center space-y-1">
                             <StatusPillDropdown
                               currentStatus={item.status}
                               userRole={userRole}
                               onSelect={(newStat) => handleStatusChange(item._id, newStat)}
                             />
+                            {item.approvalStatus === 'Not Approved' && (
+                              <div className="mt-1">
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase border bg-rose-100 text-rose-800 border-rose-300">
+                                  ❌ Not Approved
+                                </span>
+                              </div>
+                            )}
+                            {item.reason && (
+                              <div className="text-[9px] text-slate-500 font-semibold italic max-w-[110px] mx-auto truncate" title={item.reason}>
+                                {item.reason}
+                              </div>
+                            )}
                           </td>
 
                           <td className="p-3 text-center space-x-1.5 whitespace-nowrap">
@@ -2117,185 +2567,388 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         title={editingItem ? 'Edit Collaboration Record' : 'New Influencer Collaboration'}
-        maxWidth="max-w-3xl"
+        maxWidth="max-w-4xl"
       >
-        <form onSubmit={handleSubmitInfluencer} className="space-y-4 text-xs font-bold">
-          {/* Category Selector */}
-          <div className="p-3 bg-purple-50/70 rounded-2xl border border-purple-100 flex items-center justify-between">
-            <span className="text-slate-700 font-black">Collaboration Type:</span>
-            <div className="flex space-x-2">
+        <form onSubmit={handleSubmitInfluencer} className="space-y-5 text-xs">
+          {/* Top Header Card: Collaboration Type Selector */}
+          <div className="p-3.5 bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 rounded-2xl border border-purple-100/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+            <div>
+              <span className="text-slate-800 font-extrabold text-sm block">Collaboration Type</span>
+              <p className="text-[11px] text-slate-500 font-medium">Select whether this deal is a paid client contract or product barter deal.</p>
+            </div>
+
+            <div className="flex bg-white/80 p-1 rounded-xl border border-slate-200 shadow-2xs shrink-0">
               <button
                 type="button"
                 onClick={() => setCategory('Paid')}
-                className={`px-4 py-2 rounded-xl text-xs font-black transition ${
-                  category === 'Paid' ? 'bg-purple-600 text-white shadow-md' : 'bg-white text-slate-700 border border-slate-200'
+                className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+                  category === 'Paid' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-600 hover:text-purple-600 hover:bg-slate-50'
                 }`}
               >
-                💼 Paid Collaboration
+                💼 Paid Deal
               </button>
               <button
                 type="button"
                 onClick={() => setCategory('Barter')}
-                className={`px-4 py-2 rounded-xl text-xs font-black transition ${
-                  category === 'Barter' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-700 border border-slate-200'
+                className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+                  category === 'Barter' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:text-blue-600 hover:bg-slate-50'
                 }`}
               >
-                🎁 Barter Collaboration
+                🎁 Barter Deal
               </button>
             </div>
           </div>
 
-          {/* General Details */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-slate-700 mb-1">Influencer Name *</label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Rahul Sharma"
-                value={influencerName}
-                onChange={(e) => setInfluencerName(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
+          {/* Section 1: Influencer & Brand Information */}
+          <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+            <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2 border-b border-slate-100 pb-2">
+              <span className="w-6 h-6 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-black">1</span>
+              <span>Influencer & Brand Profile</span>
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-slate-700 mb-1 font-bold">Influencer Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Rahul Sharma"
+                  value={influencerName}
+                  onChange={(e) => setInfluencerName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none text-xs font-semibold text-slate-900 transition"
+                />
+              </div>
+
+              <SearchableBrandSelect
+                brands={brands}
+                selectedBrandId={selectedBrandId}
+                customBrandName={customBrandName}
+                onSelectBrand={(bId, bName) => {
+                  setSelectedBrandId(bId);
+                  setCustomBrandName(bName);
+                }}
               />
             </div>
 
-            <SearchableBrandSelect
-              brands={brands}
-              selectedBrandId={selectedBrandId}
-              customBrandName={customBrandName}
-              onSelectBrand={(bId, bName) => {
-                setSelectedBrandId(bId);
-                setCustomBrandName(bName);
-              }}
-            />
-          </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-slate-700 mb-1 font-bold">Influencer Instagram ID / Handle</label>
+                <input
+                  type="text"
+                  placeholder="e.g. @payalrajput057 or profile link"
+                  value={influencerInstagramId}
+                  onChange={(e) => setInfluencerInstagramId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none text-xs font-semibold text-slate-900 transition"
+                />
+              </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-slate-700 mb-1">Manager Name</label>
-              <input
-                type="text"
-                placeholder="e.g. Vikram Sethi"
-                value={influencerManager}
-                onChange={(e) => setInfluencerManager(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-slate-700 mb-1">Phone Number</label>
-              <input
-                type="text"
-                placeholder="+91 98765 43210"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Timeline & Status Bar */}
-          <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-slate-700 mb-1 font-extrabold">Connection Date *</label>
-              <input
-                type="date"
-                value={connectedDate}
-                onChange={(e) => setConnectedDate(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none font-semibold text-purple-900 bg-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-slate-700 mb-1 font-extrabold">Transaction Date</label>
-              <input
-                type="date"
-                value={transactionDate}
-                onChange={(e) => setTransactionDate(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none font-semibold bg-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-slate-700 mb-1 font-extrabold">Deal Status</label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none font-bold bg-white"
-              >
-                <option value="Under Review">🟡 Under Review</option>
-                {isManagerOrAdmin ? (
-                  <option value="Completed">🟢 Completed (Approve)</option>
-                ) : (
-                  status === 'Completed' && (
-                    <option value="Completed">🟢 Completed</option>
-                  )
-                )}
-                <option value="Pending">🟠 Pending</option>
-                <option value="Settled">🟣 Settled</option>
-              </select>
+              <div>
+                <label className="block text-slate-700 mb-1 font-bold">Phone Number</label>
+                <input
+                  type="text"
+                  placeholder="+91 98765 43210"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none text-xs font-semibold text-slate-900 transition"
+                />
+              </div>
             </div>
           </div>
 
-          {/* FINANCIAL BREAKDOWN SECTION (PAID COLLABS) */}
+          {/* Section 2: Brand Manager & Timeline */}
+          <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+            <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2 border-b border-slate-100 pb-2">
+              <span className="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-black">2</span>
+              <span>Brand Management & Dates</span>
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-slate-700 mb-1 font-bold">Brand Manager</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Lakshita Jaju"
+                  value={influencerManager}
+                  onChange={(e) => setInfluencerManager(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-xs font-semibold text-slate-900 transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 mb-1 font-bold">Brand Manager Team</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Dev Sharma / Team"
+                  value={brandManagerTeam}
+                  onChange={(e) => setBrandManagerTeam(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-xs font-semibold text-slate-900 transition"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-slate-700 mb-1 font-extrabold text-purple-900">Connection Date *</label>
+                <input
+                  type="date"
+                  value={connectedDate}
+                  onChange={(e) => setConnectedDate(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-xs font-bold text-purple-900 bg-purple-50/30"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 mb-1 font-extrabold">Transaction Date</label>
+                <input
+                  type="date"
+                  value={transactionDate}
+                  onChange={(e) => setTransactionDate(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-xs font-bold text-slate-900 bg-slate-50/50"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: Status & Approval */}
+          <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+            <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2 border-b border-slate-100 pb-2">
+              <span className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-black">3</span>
+              <span>Deal Status & Approval</span>
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-slate-700 mb-1 font-extrabold">Deal Status</label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as any)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl outline-none font-bold bg-white text-xs text-slate-900 focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="Pending">🟠 Pending (Default)</option>
+                  <option value="Under Review">🟡 Under Review</option>
+                  <option value="Approved">🟢 Approved</option>
+                  <option value="Completed">🟢 Completed</option>
+                  <option value="Settled">🟣 Settled</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 mb-1 font-extrabold">Approval Status</label>
+                <select
+                  value={approvalStatus}
+                  onChange={(e) => {
+                    const val = e.target.value as any;
+                    setApprovalStatus(val);
+                    setIsApproved(val === 'Approved');
+                  }}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl outline-none font-bold bg-white text-xs text-slate-900 focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="Pending">⏳ Pending</option>
+                  <option value="Approved">✅ Yes (Approved)</option>
+                  <option value="Not Approved">❌ No (Not Approved)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 mb-1 font-bold">Reason / Remarks</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Approved by client"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-semibold text-slate-900"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 4: Deliverables & Order Links */}
+          <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+            <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2 border-b border-slate-100 pb-2">
+              <span className="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-black">4</span>
+              <span>Deliverables & Orders</span>
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-slate-700 mb-1 font-bold">Deliverable Video Type</label>
+                <select
+                  value={videoType}
+                  onChange={(e) => setVideoType(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl outline-none text-xs font-semibold bg-white focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="Single Product Video">Single Product Video</option>
+                  <option value="Instagram Reel (2 Reels)">Instagram Reel (2 Reels)</option>
+                  <option value="Story Promotion">Story Promotion</option>
+                  <option value="YouTube Integration">YouTube Integration</option>
+                  <option value="Unboxing & Review">Unboxing & Review</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 mb-1 font-bold">Video Description</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Cinderella blush embellished set video review"
+                  value={videoDescription}
+                  onChange={(e) => setVideoDescription(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-xs font-semibold text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 mb-1 font-bold">Reference Video Link</label>
+                <input
+                  type="text"
+                  placeholder="https://instagram.com/reel/..."
+                  value={refVideoLink}
+                  onChange={(e) => setRefVideoLink(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-xs font-semibold text-slate-900"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-slate-700 mb-1 font-bold">Order ID</label>
+                <input
+                  type="text"
+                  placeholder="e.g. #VAASVA16236 or Directly by brand"
+                  value={orderId}
+                  onChange={(e) => setOrderId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-xs font-semibold text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 mb-1 font-bold">Order Date</label>
+                <input
+                  type="date"
+                  value={orderDate}
+                  onChange={(e) => setOrderDate(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-xs font-semibold text-slate-900"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-slate-700 mb-1 font-bold">Product Link</label>
+                <input
+                  type="text"
+                  placeholder="https://..."
+                  value={productLink}
+                  onChange={(e) => setProductLink(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-xs font-semibold text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 mb-1 font-bold">Content Post Link</label>
+                <input
+                  type="text"
+                  placeholder="https://instagram.com/p/..."
+                  value={contentLink}
+                  onChange={(e) => setContentLink(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-xs font-semibold text-slate-900"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-slate-700 mb-1 font-bold">Views Count</label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={viewsCount}
+                  onChange={(e) => setViewsCount(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-xs font-semibold text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 mb-1 font-bold flex items-center justify-between">
+                  <span>Orders Generated</span>
+                  {Number(ordersCount) >= 100 && category === 'Paid' && (
+                    <span className="text-[10px] font-black text-amber-700 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                      🌟 10% Bonus Qualified
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={ordersCount}
+                  onChange={(e) => setOrdersCount(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-xs font-semibold text-slate-900"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 5: Financial Details (Paid Collaborations) */}
           {category === 'Paid' && (
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-              <h4 className="font-black text-slate-900 flex items-center justify-between">
-                <span>Financial Details</span>
+            <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+              <h4 className="font-extrabold text-slate-900 text-sm flex items-center justify-between border-b border-slate-100 pb-2">
+                <span className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-black">5</span>
+                  <span>Financial Breakdown & Payouts</span>
+                </span>
                 {isTargetManager && (
-                  <span className="text-[11px] text-purple-700 font-extrabold bg-purple-100 px-2 py-0.5 rounded-md">
+                  <span className="text-[11px] text-purple-700 font-extrabold bg-purple-100 px-2.5 py-0.5 rounded-md">
                     Auto-Calculated Margin
                   </span>
                 )}
               </h4>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Brand Payment (IN) */}
-                <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
-                  <span className="text-[11px] font-black text-slate-500 uppercase tracking-wider">Client Brand Payment (IN)</span>
+                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
+                  <span className="text-[11px] font-black text-slate-600 uppercase tracking-wider block">Client Brand Payment (IN)</span>
                   <div>
-                    <label className="block text-[10px] text-slate-600">Quoted Price to Brand (IN) ₹</label>
+                    <label className="block text-[11px] text-slate-600 font-semibold mb-0.5">Quoted Price to Brand (IN) ₹</label>
                     <input
                       type="number"
                       placeholder="20000"
                       value={brandOnboardingAmt}
                       onChange={(e) => setBrandOnboardingAmt(e.target.value === '' ? '' : Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-black text-slate-900"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg font-black text-slate-900 bg-white text-xs"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-slate-600">Actual Amount Received (IN) ₹</label>
+                    <label className="block text-[11px] text-slate-600 font-semibold mb-0.5">Actual Amount Received (IN) ₹</label>
                     <input
                       type="number"
                       placeholder="20000"
                       value={brandReceivedAmt}
                       onChange={(e) => setBrandReceivedAmt(e.target.value === '' ? '' : Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-black text-emerald-700"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg font-black text-emerald-700 bg-white text-xs"
                     />
                   </div>
                 </div>
 
                 {/* Creator Payout (OUT) */}
-                <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
-                  <span className="text-[11px] font-black text-slate-500 uppercase tracking-wider">Influencer Payout (OUT)</span>
+                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
+                  <span className="text-[11px] font-black text-slate-600 uppercase tracking-wider block">Influencer Payout (OUT)</span>
                   <div>
-                    <label className="block text-[10px] text-slate-600">Cost Paid to Creator (OUT) ₹</label>
+                    <label className="block text-[11px] text-slate-600 font-semibold mb-0.5">Cost Paid to Creator (OUT) ₹</label>
                     <input
                       type="number"
                       placeholder="10000"
                       value={influencerOnboardingAmt}
                       onChange={(e) => setInfluencerOnboardingAmt(e.target.value === '' ? '' : Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-black text-slate-900"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg font-black text-slate-900 bg-white text-xs"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-slate-600">Actual Amount Disbursed (OUT) ₹</label>
+                    <label className="block text-[11px] text-slate-600 font-semibold mb-0.5">Actual Amount Disbursed (OUT) ₹</label>
                     <input
                       type="number"
                       placeholder="10000"
                       value={influencerPaidAmt}
                       onChange={(e) => setInfluencerPaidAmt(e.target.value === '' ? '' : Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-black text-pink-700"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg font-black text-pink-700 bg-white text-xs"
                     />
                   </div>
                 </div>
@@ -2303,7 +2956,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
 
               {/* Real-time AD2ship Margin Preview (Manager/Admin Only) */}
               {isTargetManager && (
-                <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-3 rounded-xl text-white flex items-center justify-between">
+                <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-3.5 rounded-xl text-white flex items-center justify-between">
                   <div>
                     <span className="text-[10px] uppercase font-bold text-emerald-100">Calculated AD2ship Profit Margin</span>
                     <p className="text-base font-black">
@@ -2319,100 +2972,6 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
               )}
             </div>
           )}
-
-          {/* DELIVERABLES SECTION (BARTER & CONTENT) */}
-          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-            <h4 className="font-black text-slate-900">Deliverable & Video Details</h4>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-slate-700 mb-1">Deliverable Video Type</label>
-                <select
-                  value={videoType}
-                  onChange={(e) => setVideoType(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
-                >
-                  <option value="Single Product Video">Single Product Video</option>
-                  <option value="Instagram Reel (2 Reels)">Instagram Reel (2 Reels)</option>
-                  <option value="Story Promotion">Story Promotion</option>
-                  <option value="YouTube Integration">YouTube Integration</option>
-                  <option value="Unboxing & Review">Unboxing & Review</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-700 mb-1">Platform</label>
-                <select
-                  value={platform}
-                  onChange={(e) => setPlatform(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
-                >
-                  <option value="Instagram">Instagram</option>
-                  <option value="YouTube">YouTube</option>
-                  <option value="X (Twitter)">X (Twitter)</option>
-                  <option value="Facebook">Facebook</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-slate-700 mb-1">Product Link</label>
-                <input
-                  type="text"
-                  placeholder="https://..."
-                  value={productLink}
-                  onChange={(e) => setProductLink(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-700 mb-1">Content Post Link</label>
-                <input
-                  type="text"
-                  placeholder="https://instagram.com/p/..."
-                  value={contentLink}
-                  onChange={(e) => setContentLink(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-slate-700 mb-1">Views Count</label>
-                <input
-                  type="number"
-                  placeholder="0"
-                  value={viewsCount}
-                  onChange={(e) => setViewsCount(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-700 mb-1 flex items-center justify-between">
-                  <span>Orders Generated</span>
-                  {Number(ordersCount) >= 100 && category === 'Paid' && (
-                    <span className="text-[10px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300">
-                      🌟 10% Bonus Qualified
-                    </span>
-                  )}
-                </label>
-                <input
-                  type="number"
-                  placeholder="0"
-                  value={ordersCount}
-                  onChange={(e) => setOrdersCount(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl outline-none"
-                />
-                <p className="text-[10px] text-slate-500 font-semibold mt-1">
-                  100+ orders on a paid collab unlocks an extra 10% bonus on this deal's margin.
-                </p>
-              </div>
-            </div>
-          </div>
 
           {/* Submit Buttons */}
           <div className="pt-3 border-t border-slate-100 flex justify-end space-x-2">
