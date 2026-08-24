@@ -3,6 +3,7 @@ import { Task, Notification, Employee } from '../models/allModels';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 import { logActivity } from '../middleware/auditLog';
+import { getEmployeeForAuthUser } from '../utils/employeeHelper';
 
 const router = Router();
 
@@ -38,7 +39,7 @@ router.get('/', authenticateToken, checkPermission('task.view'), async (req: Aut
 
   // If user is a regular Employee, default filter to their own tasks unless explicit employeeId provided
   if (req.user?.role === 'Employee' && !employeeId) {
-    const empDoc = await Employee.findOne({ email: req.user.email });
+    const empDoc = await getEmployeeForAuthUser(req.user);
     if (empDoc) {
       filter.employeeId = empDoc._id;
     }
@@ -85,9 +86,7 @@ router.post('/', authenticateToken, checkPermission('task.create'), async (req: 
 
   // Force employeeId to self if user has Employee role and not a main task
   if (!isMainTask && req.user?.role?.toLowerCase() === 'employee') {
-    const empDoc = await Employee.findOne({
-      $or: [{ email: req.user?.email }, { name: req.user?.name }]
-    });
+    const empDoc = await getEmployeeForAuthUser(req.user);
     if (empDoc) {
       employeeId = empDoc._id.toString();
     }

@@ -3,6 +3,7 @@ import { ContentCalendar, Brand, Employee, EmployeeBrand } from '../models/allMo
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 import { logActivity } from '../middleware/auditLog';
+import { getEmployeeForAuthUser } from '../utils/employeeHelper';
 
 const router = Router();
 
@@ -15,12 +16,7 @@ router.get('/', authenticateToken, checkPermission('task.view'), async (req: Aut
     // 0. Employee Role Brand Filtering
     const isEmployeeRole = req.user?.role?.toLowerCase() === 'employee';
     if (isEmployeeRole) {
-      const emp = await Employee.findOne({
-        $or: [
-          { email: req.user?.email },
-          { name: req.user?.name }
-        ]
-      });
+      const emp = await getEmployeeForAuthUser(req.user);
       if (emp) {
         const assignments = await EmployeeBrand.find({ employeeId: emp._id, status: 'Active' }).populate('brandId');
         const assignedBrandIds = assignments.map(a => a.brandId?._id || a.brandId);

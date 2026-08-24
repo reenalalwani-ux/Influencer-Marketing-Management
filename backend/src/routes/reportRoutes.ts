@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { Employee, Brand, Task, EmployeeBrand } from '../models/allModels';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
+import { getEmployeeForAuthUser } from '../utils/employeeHelper';
 
 const router = Router();
 
@@ -11,12 +12,7 @@ router.get('/employee-summary', authenticateToken, checkPermission('report.view'
     const isEmployeeRole = req.user?.role?.toLowerCase() === 'employee';
     let empQuery: any = {};
     if (isEmployeeRole) {
-      const currentEmp = await Employee.findOne({
-        $or: [
-          { email: req.user?.email },
-          { name: req.user?.name }
-        ]
-      });
+      const currentEmp = await getEmployeeForAuthUser(req.user);
       if (currentEmp) {
         empQuery._id = currentEmp._id;
       }
@@ -67,12 +63,7 @@ router.get('/brand-summary', authenticateToken, checkPermission('report.view'), 
     const isEmployeeRole = req.user?.role?.toLowerCase() === 'employee';
     let brandQuery: any = {};
     if (isEmployeeRole) {
-      const currentEmp = await Employee.findOne({
-        $or: [
-          { email: req.user?.email },
-          { name: req.user?.name }
-        ]
-      });
+      const currentEmp = await getEmployeeForAuthUser(req.user);
       if (currentEmp) {
         const assignments = await EmployeeBrand.find({ employeeId: currentEmp._id, status: 'Active' });
         const assignedBrandIds = assignments.map(a => a.brandId);
@@ -132,12 +123,7 @@ router.get('/daily-posting', authenticateToken, checkPermission('report.view'), 
     const isEmployeeRole = req.user?.role?.toLowerCase() === 'employee';
     let taskFilter: any = { scheduledDate: { $gte: startOfDay, $lte: endOfDay } };
     if (isEmployeeRole) {
-      const currentEmp = await Employee.findOne({
-        $or: [
-          { email: req.user?.email },
-          { name: req.user?.name }
-        ]
-      });
+      const currentEmp = await getEmployeeForAuthUser(req.user);
       if (currentEmp) {
         const assignments = await EmployeeBrand.find({ employeeId: currentEmp._id, status: 'Active' });
         const assignedBrandIds = assignments.map(a => a.brandId);

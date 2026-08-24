@@ -5,6 +5,7 @@ import { User, Employee, Role } from '../models/allModels';
 import { generateToken, authenticateToken, AuthRequest, COOKIE_NAME, JWT_SECRET } from '../middleware/auth';
 import { logActivity } from '../middleware/auditLog';
 import { sendOTPEmail, sendManagerApprovalEmail } from '../services/emailService';
+import { getEmployeeForAuthUser } from '../utils/employeeHelper';
 
 const router = Router();
 
@@ -512,7 +513,7 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => 
 
   const [roleDoc, employee] = await Promise.all([
     Role.findOne({ name: req.user.role }).lean(),
-    Employee.findOne({ email: req.user.email }).lean()
+    getEmployeeForAuthUser(req.user)
   ]);
   const permissions = roleDoc ? roleDoc.permissions : [];
 
@@ -541,10 +542,7 @@ router.put('/profile', authenticateToken, async (req: AuthRequest, res: Response
     if (name) req.user.name = name;
     await req.user.save();
 
-    let employee = await Employee.findOne({ email: req.user.email });
-    if (!employee) {
-      employee = await Employee.findOne({ userId: req.user._id });
-    }
+    let employee = await getEmployeeForAuthUser(req.user);
 
     if (employee) {
       if (name) employee.name = name;

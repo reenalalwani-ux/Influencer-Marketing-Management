@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { Task, Employee, Brand, EmployeeBrand } from '../models/allModels';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
+import { getEmployeeForAuthUser } from '../utils/employeeHelper';
 
 const router = Router();
 
@@ -34,7 +35,7 @@ router.get('/daily', authenticateToken, checkPermission('posting.view'), async (
 
   // Employee role scoping
   if (req.user?.role === 'Employee' && !employeeId) {
-    const emp = await Employee.findOne({ email: req.user.email });
+    const emp = await getEmployeeForAuthUser(req.user);
     if (emp) filter.employeeId = emp._id;
   }
 
@@ -101,7 +102,7 @@ router.get('/calendar', authenticateToken, checkPermission('posting.view'), asyn
   if (status) filter.status = status;
 
   if (req.user?.role === 'Employee' && !employeeId) {
-    const emp = await Employee.findOne({ email: req.user.email });
+    const emp = await getEmployeeForAuthUser(req.user);
     if (emp) filter.employeeId = emp._id;
   }
 
@@ -140,7 +141,7 @@ router.get('/matrix', authenticateToken, checkPermission('posting.view'), async 
     // Determine target employee
     let targetEmployeeId = employeeId as string;
     if (req.user?.role === 'Employee' && !targetEmployeeId) {
-      const emp = employees.find(e => e.email === req.user?.email);
+      const emp = await getEmployeeForAuthUser(req.user);
       if (emp) targetEmployeeId = (emp._id as any).toString();
     }
     if (!targetEmployeeId && employees.length > 0) {

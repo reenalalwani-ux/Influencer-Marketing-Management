@@ -3,6 +3,7 @@ import { Employee, Task, EmployeeBrand, Influencer, Brand } from '../models/allM
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 import { buildDateFilter } from './targetRoutes';
+import { getEmployeeForAuthUser } from '../utils/employeeHelper';
 
 const router = Router();
 
@@ -17,12 +18,7 @@ router.get('/', authenticateToken, checkPermission('performance.view'), async (r
     // Employee Role Isolation: If user is an employee, only return their own performance data
     const isEmployeeRole = req.user?.role?.toLowerCase() === 'employee';
     if (isEmployeeRole) {
-      const emp = await Employee.findOne({
-        $or: [
-          { email: req.user?.email },
-          { name: req.user?.name }
-        ]
-      });
+      const emp = await getEmployeeForAuthUser(req.user);
       if (emp) {
         filter._id = emp._id;
       } else {

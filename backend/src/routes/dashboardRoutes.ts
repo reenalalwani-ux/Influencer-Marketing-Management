@@ -3,6 +3,7 @@ import { User, Employee, Brand, Task, EmployeeBrand, AuditLog, Target } from '..
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { cacheMiddleware } from '../middleware/cache';
 import { recalculateTargetProgress } from './targetRoutes';
+import { getEmployeeForAuthUser } from '../utils/employeeHelper';
 
 const router = Router();
 
@@ -17,7 +18,7 @@ router.get('/stats', authenticateToken, cacheMiddleware(30), async (req: AuthReq
 
   try {
     if (role === 'Employee') {
-      const emp = await Employee.findOne({ email: req.user.email });
+      const emp = await getEmployeeForAuthUser(req.user);
       if (!emp) {
         return res.status(404).json({ success: false, message: 'No record exists for employee profile' });
       }

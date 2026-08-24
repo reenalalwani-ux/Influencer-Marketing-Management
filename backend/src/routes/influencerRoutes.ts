@@ -3,6 +3,7 @@ import { Influencer, Brand, PaymentLog, Employee, EmployeeBrand, Target } from '
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 import { logActivity } from '../middleware/auditLog';
+import { getEmployeeForAuthUser } from '../utils/employeeHelper';
 
 const router = Router();
 
@@ -45,22 +46,18 @@ router.get('/', authenticateToken, checkPermission('influencer.view'), async (re
     const filter: any = {};
 
 
-    // 0. Employee Role Scoping (Only show data for assigned brands or managed deals)
+    // 0. Employee Role Scoping (Only show data where employee is the assigned manager/executive)
     if (req.user?.role === 'Employee') {
-      const employeeDoc = await Employee.findOne({ email: req.user.email });
+      const employeeDoc = await getEmployeeForAuthUser(req.user);
       if (employeeDoc) {
-        const assignments = await EmployeeBrand.find({ employeeId: employeeDoc._id, status: 'Active' });
-        const assignedBrandIds = assignments.map(a => a.brandId);
-        const assignedBrandDocs = await Brand.find({ _id: { $in: assignedBrandIds } });
-        const assignedBrandNames = assignedBrandDocs.map(b => b.brandName);
-        const empNameRegex = new RegExp(employeeDoc.name, 'i');
+        const empNameRegex = new RegExp(`^${employeeDoc.name.trim()}$`, 'i');
 
         filter.$and = filter.$and || [];
         filter.$and.push({
           $or: [
-            { brandId: { $in: assignedBrandIds } },
-            { brandName: { $in: assignedBrandNames } },
-            { influencerManager: empNameRegex }
+            { influencerManager: empNameRegex },
+            { assignedExecutive: empNameRegex },
+            { createdBy: req.user._id }
           ]
         });
       }
@@ -447,19 +444,15 @@ router.get('/payment-logs', authenticateToken, checkPermission('influencer.view'
     }
 
     if (req.user?.role === 'Employee') {
-      const employeeDoc = await Employee.findOne({ email: req.user.email });
+      const employeeDoc = await getEmployeeForAuthUser(req.user);
       if (employeeDoc) {
-        const assignments = await EmployeeBrand.find({ employeeId: employeeDoc._id, status: 'Active' });
-        const assignedBrandIds = assignments.map(a => a.brandId);
-        const assignedBrandDocs = await Brand.find({ _id: { $in: assignedBrandIds } });
-        const assignedBrandNames = assignedBrandDocs.map(b => b.brandName);
-        const empNameRegex = new RegExp(employeeDoc.name, 'i');
+        const empNameRegex = new RegExp(`^${employeeDoc.name.trim()}$`, 'i');
 
         filter.$and = filter.$and || [];
         filter.$and.push({
           $or: [
-            { brandName: { $in: assignedBrandNames } },
-            { handledBy: empNameRegex }
+            { handledBy: empNameRegex },
+            { createdBy: req.user._id }
           ]
         });
       }
