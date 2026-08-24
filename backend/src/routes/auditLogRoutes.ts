@@ -7,15 +7,30 @@ const router = Router();
 
 // GET /api/v1/audit-logs
 router.get('/', authenticateToken, checkPermission('audit.view'), async (req: AuthRequest, res: Response) => {
-  const { module, action, userName, page, limit } = req.query;
+  const { module, action, userName, userRole, search, page, limit } = req.query;
   const filter: any = {};
 
-  if (module) filter.module = module;
-  if (action) filter.action = action;
-  if (userName) filter.userName = new RegExp(userName as string, 'i');
+  if (module && module !== 'All') filter.module = module;
+  if (action && action !== 'All') filter.action = action;
+  if (userRole && userRole !== 'All') filter.userRole = userRole;
+
+  if (userName && userName !== 'All') {
+    filter.userName = new RegExp(userName as string, 'i');
+  }
+
+  if (search) {
+    const searchRegex = new RegExp(search as string, 'i');
+    filter.$or = [
+      { userName: searchRegex },
+      { userEmail: searchRegex },
+      { details: searchRegex },
+      { action: searchRegex },
+      { module: searchRegex }
+    ];
+  }
 
   const pageNum = Math.max(1, Number(page) || 1);
-  const limitNum = Math.max(1, Number(limit) || 10);
+  const limitNum = Math.min(500, Math.max(1, Number(limit) || 100));
   const skip = (pageNum - 1) * limitNum;
 
   try {
@@ -35,7 +50,7 @@ router.get('/', authenticateToken, checkPermission('audit.view'), async (req: Au
       totalPages, 
       limit: limitNum, 
       data: logs,
-      message: logs.length === 0 ? 'No records found' : 'Audit logs fetched successfully'
+      message: logs.length === 0 ? 'No activity logs found' : 'Audit logs fetched successfully'
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to fetch audit logs', error });

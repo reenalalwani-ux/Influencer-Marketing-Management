@@ -4,10 +4,11 @@ import {
   ArrowUpRight, ArrowDownRight, ExternalLink, Video, Link2, ChevronDown, 
   Receipt, Eye, ShoppingBag, ChevronUp, ChevronsUpDown, Target, TrendingUp,
   Award, Clock, AlertCircle, CheckCircle2, ShieldCheck, Layers, RefreshCw, Users,
-  Calendar, ChevronLeft, ChevronRight, CalendarDays, Loader2, Lock, Settings, X
+  Calendar, ChevronLeft, ChevronRight, CalendarDays, Loader2, Lock, Settings, X,
+  Activity, Shield
 } from 'lucide-react';
 import { api } from '../services/api';
-import { InfluencerTransaction, Brand, PaymentLogItem, TargetItem, TeamTargetBreakdown, MemberTargetItem } from '../types';
+import { InfluencerTransaction, Brand, PaymentLogItem, TargetItem, TeamTargetBreakdown, MemberTargetItem, AuditLogItem } from '../types';
 import { Modal } from '../components/Modal';
 import { Pagination } from '../components/Pagination';
 import { InlineLoader } from '../components/PageLoader';
@@ -341,7 +342,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     return 'Paid Collaborations';
   };
 
-  const [viewMode, setViewMode] = useState<'Targets & Goals' | 'Paid Collaborations' | 'Barter Collaborations' | 'Payment Audit Logs' | 'All Collaborations'>(mapInitialTab(initialTab));
+  const [viewMode, setViewMode] = useState<'Targets & Goals' | 'Paid Collaborations' | 'Barter Collaborations' | 'Payment Audit Logs' | 'User Activity Logs' | 'All Collaborations'>(mapInitialTab(initialTab));
   
   // Category Filter State
   const [activeCategory, setActiveCategory] = useState<'All' | 'Paid' | 'Barter'>('All');
@@ -349,6 +350,15 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
   const [currentDate, setCurrentDate] = useState(new Date());
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPayLogType, setSelectedPayLogType] = useState<'All' | 'IN' | 'OUT'>('All');
+
+  // User Activity & Audit Logs State
+  const [activityLogs, setActivityLogs] = useState<AuditLogItem[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [logFilterUser, setLogFilterUser] = useState('All');
+  const [logFilterRole, setLogFilterRole] = useState('All');
+  const [logFilterModule, setLogFilterModule] = useState('All');
+  const [logFilterAction, setLogFilterAction] = useState('All');
+  const [logSearchTerm, setLogSearchTerm] = useState('');
 
   const monthsList = [
     { label: 'August 2026 (Current)', value: 'august_2026', monthIndex: 7, year: 2026 },
@@ -668,6 +678,28 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     }
   };
 
+  // Fetch User Activity & Audit Logs
+  const fetchAuditLogs = async () => {
+    setLoadingLogs(true);
+    try {
+      let url = `/audit-logs?limit=300`;
+      if (logFilterUser && logFilterUser !== 'All') url += `&userName=${encodeURIComponent(logFilterUser)}`;
+      if (logFilterRole && logFilterRole !== 'All') url += `&userRole=${encodeURIComponent(logFilterRole)}`;
+      if (logFilterModule && logFilterModule !== 'All') url += `&module=${encodeURIComponent(logFilterModule)}`;
+      if (logFilterAction && logFilterAction !== 'All') url += `&action=${encodeURIComponent(logFilterAction)}`;
+      if (logSearchTerm) url += `&search=${encodeURIComponent(logSearchTerm)}`;
+
+      const res = await api.get(url);
+      if (res.success && res.data) {
+        setActivityLogs(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch activity logs', err);
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
   useEffect(() => {
     fetchBrands();
     fetchTargets();
@@ -676,7 +708,9 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
 
   useEffect(() => {
     setCurrentPage(1);
-    if (viewMode === 'Payment Audit Logs') {
+    if (viewMode === 'User Activity Logs') {
+      fetchAuditLogs();
+    } else if (viewMode === 'Payment Audit Logs') {
       fetchPaymentLogs();
     } else if (viewMode === 'Targets & Goals') {
       fetchTargets();
@@ -685,7 +719,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     } else {
       fetchInfluencers();
     }
-  }, [activeCategory, timeframe, currentDate, searchTerm, viewMode, selectedPayLogType]);
+  }, [activeCategory, timeframe, currentDate, searchTerm, viewMode, selectedPayLogType, logFilterUser, logFilterRole, logFilterModule, logFilterAction, logSearchTerm]);
 
   // Target Action Handlers
   const handleOpenCreateTargetModal = (defaultType: 'Paid' | 'Barter' = 'Paid') => {
@@ -2561,6 +2595,8 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
           </div>
         </div>
       )}
+
+
 
       {/* MODAL 1: ADD / EDIT INFLUENCER COLLABORATION */}
       <Modal

@@ -279,11 +279,14 @@ router.post('/', authenticateToken, checkPermission('influencer.create'), async 
     await logActivity({
       userId: req.user?._id,
       userName: req.user?.name || 'User',
-      action: 'CREATE_INFLUENCER_RECORD',
-      module: 'Influencer Module',
-      entity: 'InfluencerTransaction',
+      userEmail: req.user?.email || '',
+      userRole: req.user?.role || 'Employee',
+      action: 'CREATE_RECORD',
+      module: category === 'Barter' ? 'Barter Ledger' : 'Paid Collaborations',
+      entity: 'Influencer',
       entityId: (newRecord._id as any).toString(),
-      newValue: { influencerName, brandName: finalBrandName, category, balance }
+      details: `Created ${newRecord.category} collaboration for ${newRecord.brandName} with creator ${newRecord.influencerName}`,
+      newValue: { influencerName: newRecord.influencerName, brandName: newRecord.brandName, category: newRecord.category, status: newRecord.status }
     });
 
     await triggerTargetSync();
@@ -308,6 +311,9 @@ router.put('/:id', authenticateToken, checkPermission('influencer.update'), asyn
     if (!record) {
       return res.status(404).json({ success: false, message: 'No record exists for this influencer' });
     }
+
+    const oldStatus = record.status;
+    const oldInfluencerName = record.influencerName;
 
     if (influencerName) record.influencerName = influencerName;
     if (influencerManager !== undefined) record.influencerManager = influencerManager;
@@ -370,14 +376,28 @@ router.put('/:id', authenticateToken, checkPermission('influencer.update'), asyn
 
     await record.save();
 
+    const isStatusChanged = status !== undefined && oldStatus !== record.status;
+    const isNameChanged = influencerName !== undefined && oldInfluencerName !== record.influencerName;
+
+    let detailText = `Updated ${record.category} collaboration details for brand ${record.brandName} (${record.influencerName})`;
+    if (isStatusChanged) {
+      detailText = `Changed status of ${record.brandName} creator (${record.influencerName}) from "${oldStatus}" to "${record.status}"`;
+    } else if (isNameChanged) {
+      detailText = `Updated creator handle for ${record.brandName} from "${oldInfluencerName}" to "${record.influencerName}"`;
+    }
+
     await logActivity({
       userId: req.user?._id,
       userName: req.user?.name || 'User',
-      action: 'UPDATE_INFLUENCER_RECORD',
-      module: 'Influencer Module',
-      entity: 'InfluencerTransaction',
+      userEmail: req.user?.email || '',
+      userRole: req.user?.role || 'Employee',
+      action: isStatusChanged ? 'UPDATE_STATUS' : 'EDIT_RECORD',
+      module: record.category === 'Barter' ? 'Barter Ledger' : 'Paid Collaborations',
+      entity: 'Influencer',
       entityId: (record._id as any).toString(),
-      newValue: { influencerName: record.influencerName, balance: record.balance }
+      oldValue: { status: oldStatus, influencerName: oldInfluencerName },
+      newValue: { status: record.status, influencerName: record.influencerName },
+      details: detailText
     });
 
     await triggerTargetSync();
@@ -399,10 +419,13 @@ router.delete('/:id', authenticateToken, checkPermission('influencer.delete'), a
     await logActivity({
       userId: req.user?._id,
       userName: req.user?.name || 'User',
-      action: 'DELETE_INFLUENCER_RECORD',
-      module: 'Influencer Module',
-      entity: 'InfluencerTransaction',
-      entityId: (record._id as any).toString()
+      userEmail: req.user?.email || '',
+      userRole: req.user?.role || 'Employee',
+      action: 'DELETE_RECORD',
+      module: record.category === 'Barter' ? 'Barter Ledger' : 'Paid Collaborations',
+      entity: 'Influencer',
+      entityId: (record._id as any).toString(),
+      details: `Deleted ${record.category} collaboration record for brand ${record.brandName} (${record.influencerName})`
     });
 
     await triggerTargetSync();

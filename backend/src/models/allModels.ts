@@ -247,28 +247,37 @@ NotificationSchema.index({ userId: 1, read: 1, createdAt: -1 });
 export interface IAuditLog extends Document {
   userId?: mongoose.Types.ObjectId;
   userName: string;
-  action: string; // e.g. "CREATE_BRAND", "VERIFY_TASK"
+  userEmail?: string;
+  userRole?: string;
+  action: string; // e.g. "USER_LOGIN", "UPDATE_STATUS", "CREATE_RECORD"
   module: string;
   entity: string;
   entityId?: string;
+  details?: string;
   oldValue?: Schema.Types.Mixed;
   newValue?: Schema.Types.Mixed;
+  ipAddress?: string;
   timestamp: Date;
 }
 
 const AuditLogSchema = new Schema<IAuditLog>({
   userId: { type: Schema.Types.ObjectId, ref: 'User' },
   userName: { type: String, required: true },
+  userEmail: { type: String, default: '' },
+  userRole: { type: String, default: 'Employee' },
   action: { type: String, required: true },
   module: { type: String, required: true },
   entity: { type: String, required: true },
   entityId: { type: String },
+  details: { type: String, default: '' },
   oldValue: { type: Schema.Types.Mixed },
   newValue: { type: Schema.Types.Mixed },
+  ipAddress: { type: String, default: '' },
   timestamp: { type: Date, default: Date.now }
 }, { timestamps: true });
 
 AuditLogSchema.index({ timestamp: -1 });
+AuditLogSchema.index({ userName: 1, action: 1 });
 
 // 12. System Settings Schema
 export interface ISetting extends Document {

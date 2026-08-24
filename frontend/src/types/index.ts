@@ -97,12 +97,16 @@ export interface AuditLogItem {
   _id: string;
   userId?: string;
   userName: string;
+  userEmail?: string;
+  userRole?: string;
   action: string;
   module: string;
   entity: string;
   entityId?: string;
+  details?: string;
   oldValue?: any;
   newValue?: any;
+  ipAddress?: string;
   timestamp: string;
 }
 
