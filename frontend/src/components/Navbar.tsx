@@ -124,7 +124,7 @@ export const Navbar: React.FC<NavbarProps> = ({ user, onLogout, activeView, setA
           <div className="h-6 w-px bg-slate-200" />
           <div>
             <h1 className="font-extrabold text-slate-900 text-base leading-none tracking-tight">
-              AD2ship Influencer Marketing
+              AD2media
             </h1>
             <p className="text-[11px] text-purple-600 font-bold mt-0.5 tracking-wide">Enterprise Work Management System v1.0</p>
           </div>

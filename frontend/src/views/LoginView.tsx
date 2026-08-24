@@ -237,11 +237,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           <div className="flex justify-center mb-4">
             <img
               src="/logo.png"
-              alt="Ad2ship Logo"
+              alt="Ad2media Logo"
               className="h-12 sm:h-14 w-auto max-w-[220px] object-contain drop-shadow-sm"
             />
           </div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">AD2ship Influencer Marketing</h1>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">AD2media</h1>
           <p className="text-xs font-bold text-slate-500 mt-1">Enterprise Passwordless Email Verification & Manager Approval</p>
         </div>
 
@@ -251,11 +251,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             <button
               type="button"
               onClick={() => { setActiveTab('signin'); setError(''); setSuccessMessage(''); }}
-              className={`flex-1 py-2.5 rounded-xl transition-all duration-200 text-center flex items-center justify-center gap-1.5 ${
-                activeTab === 'signin'
+              className={`flex-1 py-2.5 rounded-xl transition-all duration-200 text-center flex items-center justify-center gap-1.5 ${activeTab === 'signin'
                   ? 'bg-white text-purple-700 shadow-sm border border-slate-200/80 font-black'
                   : 'text-slate-500 hover:text-slate-900 font-extrabold'
-              }`}
+                }`}
             >
               <KeyRound size={15} />
               <span>Sign In</span>
@@ -263,11 +262,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             <button
               type="button"
               onClick={() => { setActiveTab('signup'); setError(''); setSuccessMessage(''); }}
-              className={`flex-1 py-2.5 rounded-xl transition-all duration-200 text-center flex items-center justify-center gap-1.5 ${
-                activeTab === 'signup'
+              className={`flex-1 py-2.5 rounded-xl transition-all duration-200 text-center flex items-center justify-center gap-1.5 ${activeTab === 'signup'
                   ? 'bg-white text-purple-700 shadow-sm border border-slate-200/80 font-black'
                   : 'text-slate-500 hover:text-slate-900 font-extrabold'
-              }`}
+                }`}
             >
               <Sparkles size={15} />
               <span>Create Account</span>
@@ -479,9 +477,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     <span className="truncate">{signupDepartment}</span>
                     <ChevronDown
                       size={16}
-                      className={`text-slate-400 pointer-events-none transition-transform duration-200 shrink-0 ${
-                        isDeptOpen ? 'rotate-180 text-purple-600' : ''
-                      }`}
+                      className={`text-slate-400 pointer-events-none transition-transform duration-200 shrink-0 ${isDeptOpen ? 'rotate-180 text-purple-600' : ''
+                        }`}
                     />
                   </button>
 
@@ -497,11 +494,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                               setSignupDepartment(dept);
                               setIsDeptOpen(false);
                             }}
-                            className={`w-full text-left px-3.5 py-2 text-xs font-semibold flex items-center justify-between transition cursor-pointer ${
-                              isSelected
+                            className={`w-full text-left px-3.5 py-2 text-xs font-semibold flex items-center justify-between transition cursor-pointer ${isSelected
                                 ? 'bg-purple-50 text-purple-700 font-extrabold'
                                 : 'text-slate-700 hover:bg-purple-50/60 hover:text-purple-600'
-                            }`}
+                              }`}
                           >
                             <span>{dept}</span>
                             {isSelected && <CheckCircle2 size={14} className="text-purple-600 shrink-0 ml-2" />}

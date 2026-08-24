@@ -30,6 +30,38 @@ function parseSheetDate(val: any): Date {
   return !isNaN(parsed.getTime()) ? parsed : new Date();
 }
 
+// Helper to parse "recieved by rahul", "done by rahul", "received by X", "paid by Y" from REMARK/ACCOUNT OWNER NAME column
+function parseAccountOwnerDetails(remark: string, inAmt: number = 0, outAmt: number = 0) {
+  let moneyReceivedBy = '';
+  let paymentDoneBy = '';
+
+  if (!remark) return { moneyReceivedBy, paymentDoneBy };
+
+  const recMatch = remark.match(/(?:recieved|received|got|in)\s+(?:by\s+)?([a-zA-Z0-9_\s.]+)/i);
+  const doneMatch = remark.match(/(?:done|paid|given|out|transferred)\s+(?:by\s+)?([a-zA-Z0-9_\s.]+)/i);
+
+  if (recMatch && recMatch[1]) {
+    moneyReceivedBy = recMatch[1].trim();
+  }
+  if (doneMatch && doneMatch[1]) {
+    paymentDoneBy = doneMatch[1].trim();
+  }
+
+  if (!moneyReceivedBy && !paymentDoneBy) {
+    const clean = remark.replace(/^(?:recieved|received|done|paid)\s+by\s+/i, '').replace(/^by\s+/i, '').trim();
+    if (clean.length > 0 && clean.length < 30) {
+      if (inAmt > 0 || remark.toLowerCase().includes('recie') || remark.toLowerCase().includes('receiv')) {
+        moneyReceivedBy = clean;
+      }
+      if (outAmt > 0 || remark.toLowerCase().includes('done') || remark.toLowerCase().includes('paid')) {
+        paymentDoneBy = clean;
+      }
+    }
+  }
+
+  return { moneyReceivedBy, paymentDoneBy };
+}
+
 // Helper to parse CSV string into array of objects
 function parseCSV(csvText: string): Record<string, string>[] {
   const lines = csvText.split(/\r?\n/).filter(line => line.trim().length > 0);
@@ -138,6 +170,11 @@ export async function processBarterRows(rows: Record<string, string>[]): Promise
     const adsCode = getCol('ADS CODE', 'Ads Code') || '';
     const approvalRaw = getCol('Approved or not', 'Approved Or Not', 'Approval Status') || 'Pending';
     const reason = getCol('Reason', 'REASON', 'Remarks') || '';
+    const remarkRaw = getCol('REMARK/ACCOUNT OWNER NAME', 'REMARK / ACCOUNT OWNER NAME', 'Account Owner Name', 'REMARK', 'Remark', 'Remarks') || '';
+    const inAmtRaw = Number(getCol('IN', 'In', 'Brand Price', 'Brand Onboarding')) || 0;
+    const outAmtRaw = Number(getCol('OUT', 'Out', 'Creator Cost', 'Influencer Price')) || 0;
+
+    const { moneyReceivedBy, paymentDoneBy } = parseAccountOwnerDetails(remarkRaw, inAmtRaw, outAmtRaw);
 
     // Clean influencer name
     const cleanInfName = finalInfName.replace(/\s*\((Barter|Paid)\)\s*/gi, '').trim() || finalInfName;
@@ -156,12 +193,14 @@ export async function processBarterRows(rows: Record<string, string>[]): Promise
 
     // Map status
     const statusRaw = getCol('STATUS', 'Status') || 'Pending';
-    let finalStatus: 'Pending' | 'Under Review' | 'Completed' | 'Settled' | 'Approved' = 'Pending';
+    let finalStatus: 'Pending' | 'In Discussion' | 'Parcel Sent' | 'Under Review' | 'Completed' | 'Settled' | 'Approved' = 'Pending';
     const lowerStat = statusRaw.toLowerCase();
     if (lowerStat.includes('completed') || lowerStat.includes('done')) finalStatus = 'Completed';
     else if (lowerStat.includes('approved')) finalStatus = 'Approved';
     else if (lowerStat.includes('settle')) finalStatus = 'Settled';
     else if (lowerStat.includes('review')) finalStatus = 'Under Review';
+    else if (lowerStat.includes('parcel') || lowerStat.includes('sent') || lowerStat.includes('dispatch')) finalStatus = 'Parcel Sent';
+    else if (lowerStat.includes('discuss') || lowerStat.includes('talk') || lowerStat.includes('connect')) finalStatus = 'In Discussion';
 
     // Unique match query per sheet row to prevent collapsing multiple deals of the same brand or shared order ID
     let existing: any = null;
@@ -197,6 +236,9 @@ export async function processBarterRows(rows: Record<string, string>[]): Promise
       if (contentLink) existing.contentLink = contentLink;
       if (adsCode) existing.adsCode = adsCode;
       if (reason) existing.reason = reason;
+      if (moneyReceivedBy) existing.moneyReceivedBy = moneyReceivedBy;
+      if (paymentDoneBy) existing.paymentDoneBy = paymentDoneBy;
+      if (remarkRaw) existing.remark = remarkRaw;
       existing.sheetRowIndex = idx;
 
       await existing.save();
@@ -227,6 +269,9 @@ export async function processBarterRows(rows: Record<string, string>[]): Promise
         approvalStatus,
         isApproved: approvalStatus === 'Approved' || finalStatus === 'Completed',
         reason,
+        moneyReceivedBy,
+        paymentDoneBy,
+        remark: remarkRaw,
         sheetRowIndex: idx,
         brandOnboardingAmt: 0,
         brandReceivedAmt: 0,

@@ -5,7 +5,7 @@ import {
   Receipt, Eye, ShoppingBag, ChevronUp, ChevronsUpDown, Target, TrendingUp,
   Award, Clock, AlertCircle, CheckCircle2, ShieldCheck, Layers, RefreshCw, Users,
   Calendar, ChevronLeft, ChevronRight, CalendarDays, Loader2, Lock, Settings, X,
-  Activity, Shield
+  Activity, Shield, Package, MessageSquare
 } from 'lucide-react';
 import { api } from '../services/api';
 import { InfluencerTransaction, Brand, PaymentLogItem, TargetItem, TeamTargetBreakdown, MemberTargetItem, AuditLogItem } from '../types';
@@ -173,18 +173,25 @@ const StatusPillDropdown: React.FC<{
   return (
     <div className="relative inline-flex items-center">
       <select
-        value={currentStatus || 'Under Review'}
+        value={currentStatus || 'Pending'}
         onChange={(e) => onSelect(e.target.value)}
         className={`appearance-none pl-3 pr-7 py-1 rounded-xl text-[11px] font-extrabold focus:outline-none cursor-pointer border shadow-2xs transition ${
           currentStatus === 'Completed' || currentStatus === 'Approved'
             ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
-            : currentStatus === 'Under Review'
-              ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200'
-              : currentStatus === 'Settled'
-                ? 'bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-200'
-                : 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200'
+            : currentStatus === 'Parcel Sent'
+              ? 'bg-indigo-100 text-indigo-900 border-indigo-300 hover:bg-indigo-200'
+              : currentStatus === 'In Discussion'
+                ? 'bg-cyan-100 text-cyan-900 border-cyan-300 hover:bg-cyan-200'
+                : currentStatus === 'Under Review'
+                  ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200'
+                  : currentStatus === 'Settled'
+                    ? 'bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-200'
+                    : 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200'
         }`}
       >
+        <option value="Pending" className="bg-white text-slate-900 font-bold py-1">🟠 Pending</option>
+        <option value="In Discussion" className="bg-white text-slate-900 font-bold py-1">💬 In Discussion</option>
+        <option value="Parcel Sent" className="bg-white text-slate-900 font-bold py-1">📦 Parcel Sent</option>
         <option value="Under Review" className="bg-white text-slate-900 font-bold py-1">🟡 Under Review</option>
         {isManagerOrAdmin ? (
           <option value="Completed" className="bg-white text-slate-900 font-bold py-1">🟢 Completed (Approve)</option>
@@ -193,7 +200,6 @@ const StatusPillDropdown: React.FC<{
             <option value="Completed" className="bg-white text-slate-900 font-bold py-1">🟢 Completed</option>
           )
         )}
-        <option value="Pending" className="bg-white text-slate-900 font-bold py-1">🟠 Pending</option>
         <option value="Settled" className="bg-white text-slate-900 font-bold py-1">🟣 Settled</option>
       </select>
       <ChevronDown size={13} className="absolute right-2.5 pointer-events-none opacity-80" />
@@ -536,6 +542,15 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
   const [connectedDate, setConnectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
   const [remark, setRemark] = useState('');
+  const [moneyReceivedBy, setMoneyReceivedBy] = useState('');
+  const [paymentDoneBy, setPaymentDoneBy] = useState('');
+
+  // View Details Modal State
+  const [selectedViewItem, setSelectedViewItem] = useState<InfluencerTransaction | null>(null);
+
+  const openViewModal = (item: InfluencerTransaction) => {
+    setSelectedViewItem(item);
+  };
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -866,6 +881,8 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     setConnectedDate(new Date().toISOString().split('T')[0]);
     setNotes('');
     setRemark('');
+    setMoneyReceivedBy('');
+    setPaymentDoneBy('');
     setShowModal(true);
   };
 
@@ -904,6 +921,8 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     setConnectedDate(item.connectedDate ? item.connectedDate.split('T')[0] : (item.transactionDate ? item.transactionDate.split('T')[0] : new Date().toISOString().split('T')[0]));
     setNotes(item.notes || '');
     setRemark(item.remark || '');
+    setMoneyReceivedBy(item.moneyReceivedBy || '');
+    setPaymentDoneBy(item.paymentDoneBy || '');
     setShowModal(true);
   };
 
@@ -943,7 +962,9 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
         transactionDate,
         connectedDate,
         notes,
-        remark
+        remark,
+        moneyReceivedBy,
+        paymentDoneBy
       };
 
       let res;
@@ -1165,8 +1186,8 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
   const totalInfluencerPaid = allPaidCollabs.reduce((acc, curr) => acc + (curr.influencerPaidAmt || curr.outAmount || 0), 0);
   const cashflowBalance = totalBrandReceived - totalInfluencerPaid;
 
-  const totalBarterViews = barterCollabs.reduce((acc, curr) => acc + (curr.viewsCount || 0), 0);
-  const totalBarterOrders = barterCollabs.reduce((acc, curr) => acc + (curr.ordersCount || 0), 0);
+  const totalBarterViews = allBarterCollabs.reduce((acc, curr) => acc + (curr.viewsCount || 0), 0);
+  const totalBarterOrders = allBarterCollabs.reduce((acc, curr) => acc + (curr.ordersCount || curr.ordersGenerated || 0), 0);
 
   // Active Target Calculations
   const activePaidTarget = targets.find(t => t.isActive && (t.targetType === 'Paid' || !t.targetType)) || targets.find(t => (t.targetType === 'Paid' || !t.targetType));
@@ -2091,6 +2112,145 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
             </div>
           )}
 
+          {/* Interactive Pipeline Stage Status Summary Cards */}
+          {(() => {
+            const listForPipeline = viewMode === 'Barter Collaborations' ? allBarterCollabs : viewMode === 'Paid Collaborations' ? allPaidCollabs : influencers;
+            const discussionCount = listForPipeline.filter(i => i.status === 'In Discussion').length;
+            const parcelSentCount = listForPipeline.filter(i => i.status === 'Parcel Sent').length;
+            const reviewCount = listForPipeline.filter(i => i.status === 'Under Review').length;
+            const completedCount = listForPipeline.filter(i => i.status === 'Completed' || i.status === 'Approved' || i.status === 'Settled').length;
+            const pendingCount = listForPipeline.filter(i => !i.status || i.status === 'Pending').length;
+
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                {/* Stage 1: In Discussion */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterStatus(filterStatus === 'In Discussion' ? '' : 'In Discussion');
+                    setCurrentPage(1);
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left transition-all duration-200 shadow-2xs hover:shadow-md flex items-center justify-between group cursor-pointer ${
+                    filterStatus === 'In Discussion'
+                      ? 'bg-cyan-600 text-white border-cyan-700 ring-2 ring-cyan-400'
+                      : 'bg-white border-slate-200 hover:border-cyan-300 hover:bg-cyan-50/40 text-slate-800'
+                  }`}
+                >
+                  <div>
+                    <p className={`text-[10px] font-black uppercase tracking-wider ${filterStatus === 'In Discussion' ? 'text-cyan-100' : 'text-cyan-800'}`}>
+                      💬 In Discussion
+                    </p>
+                    <h4 className="text-2xl font-black mt-0.5">{discussionCount}</h4>
+                    <p className={`text-[10px] font-bold ${filterStatus === 'In Discussion' ? 'text-cyan-100' : 'text-slate-400'}`}>Talking Terms</p>
+                  </div>
+                  <div className={`p-2.5 rounded-xl transition ${filterStatus === 'In Discussion' ? 'bg-white/20 text-white' : 'bg-cyan-100 text-cyan-800 group-hover:scale-105'}`}>
+                    <MessageSquare size={20} />
+                  </div>
+                </button>
+
+                {/* Stage 2: Parcel Sent */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterStatus(filterStatus === 'Parcel Sent' ? '' : 'Parcel Sent');
+                    setCurrentPage(1);
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left transition-all duration-200 shadow-2xs hover:shadow-md flex items-center justify-between group cursor-pointer ${
+                    filterStatus === 'Parcel Sent'
+                      ? 'bg-indigo-600 text-white border-indigo-700 ring-2 ring-indigo-400'
+                      : 'bg-white border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40 text-slate-800'
+                  }`}
+                >
+                  <div>
+                    <p className={`text-[10px] font-black uppercase tracking-wider ${filterStatus === 'Parcel Sent' ? 'text-indigo-100' : 'text-indigo-800'}`}>
+                      📦 Parcel Sent
+                    </p>
+                    <h4 className="text-2xl font-black mt-0.5">{parcelSentCount}</h4>
+                    <p className={`text-[10px] font-bold ${filterStatus === 'Parcel Sent' ? 'text-indigo-100' : 'text-slate-400'}`}>Dispatched Products</p>
+                  </div>
+                  <div className={`p-2.5 rounded-xl transition ${filterStatus === 'Parcel Sent' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-800 group-hover:scale-105'}`}>
+                    <Package size={20} />
+                  </div>
+                </button>
+
+                {/* Stage 3: Under Review */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterStatus(filterStatus === 'Under Review' ? '' : 'Under Review');
+                    setCurrentPage(1);
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left transition-all duration-200 shadow-2xs hover:shadow-md flex items-center justify-between group cursor-pointer ${
+                    filterStatus === 'Under Review'
+                      ? 'bg-amber-500 text-white border-amber-600 ring-2 ring-amber-400'
+                      : 'bg-white border-slate-200 hover:border-amber-300 hover:bg-amber-50/40 text-slate-800'
+                  }`}
+                >
+                  <div>
+                    <p className={`text-[10px] font-black uppercase tracking-wider ${filterStatus === 'Under Review' ? 'text-amber-100' : 'text-amber-800'}`}>
+                      🟡 Under Review
+                    </p>
+                    <h4 className="text-2xl font-black mt-0.5">{reviewCount}</h4>
+                    <p className={`text-[10px] font-bold ${filterStatus === 'Under Review' ? 'text-amber-100' : 'text-slate-400'}`}>Content Submitted</p>
+                  </div>
+                  <div className={`p-2.5 rounded-xl transition ${filterStatus === 'Under Review' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800 group-hover:scale-105'}`}>
+                    <Clock size={20} />
+                  </div>
+                </button>
+
+                {/* Stage 4: Completed / Settled */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterStatus(filterStatus === 'Completed' ? '' : 'Completed');
+                    setCurrentPage(1);
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left transition-all duration-200 shadow-2xs hover:shadow-md flex items-center justify-between group cursor-pointer ${
+                    filterStatus === 'Completed'
+                      ? 'bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-400'
+                      : 'bg-white border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/40 text-slate-800'
+                  }`}
+                >
+                  <div>
+                    <p className={`text-[10px] font-black uppercase tracking-wider ${filterStatus === 'Completed' ? 'text-emerald-100' : 'text-emerald-800'}`}>
+                      🟢 Completed
+                    </p>
+                    <h4 className="text-2xl font-black mt-0.5">{completedCount}</h4>
+                    <p className={`text-[10px] font-bold ${filterStatus === 'Completed' ? 'text-emerald-100' : 'text-slate-400'}`}>Approved & Settled</p>
+                  </div>
+                  <div className={`p-2.5 rounded-xl transition ${filterStatus === 'Completed' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-800 group-hover:scale-105'}`}>
+                    <CheckCircle2 size={20} />
+                  </div>
+                </button>
+
+                {/* Stage 5: Pending Outreach */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterStatus(filterStatus === 'Pending' ? '' : 'Pending');
+                    setCurrentPage(1);
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left transition-all duration-200 shadow-2xs hover:shadow-md flex items-center justify-between group cursor-pointer ${
+                    filterStatus === 'Pending'
+                      ? 'bg-slate-800 text-white border-slate-900 ring-2 ring-slate-600'
+                      : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-800'
+                  }`}
+                >
+                  <div>
+                    <p className={`text-[10px] font-black uppercase tracking-wider ${filterStatus === 'Pending' ? 'text-slate-300' : 'text-slate-500'}`}>
+                      🟠 Pending
+                    </p>
+                    <h4 className="text-2xl font-black mt-0.5">{pendingCount}</h4>
+                    <p className={`text-[10px] font-bold ${filterStatus === 'Pending' ? 'text-slate-300' : 'text-slate-400'}`}>Initial Stage</p>
+                  </div>
+                  <div className={`p-2.5 rounded-xl transition ${filterStatus === 'Pending' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700 group-hover:scale-105'}`}>
+                    <Layers size={20} />
+                  </div>
+                </button>
+              </div>
+            );
+          })()}
+
           {/* Dedicated Standalone Quick Filter Toolbar Card */}
           <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs mb-4 flex flex-wrap items-center justify-between gap-3 relative z-30">
             <div className="flex flex-wrap items-center gap-2.5 text-xs">
@@ -2130,8 +2290,10 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                 allLabel="All Statuses"
                 options={[
                   { label: 'Pending', value: 'Pending' },
-                  { label: 'Completed (Approved)', value: 'Completed' },
+                  { label: 'In Discussion', value: 'In Discussion' },
+                  { label: 'Parcel Sent', value: 'Parcel Sent' },
                   { label: 'Under Review', value: 'Under Review' },
+                  { label: 'Completed (Approved)', value: 'Completed' },
                   { label: 'Settled', value: 'Settled' }
                 ]}
               />
@@ -2236,12 +2398,13 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                     <SortHeader field="brandName" label="Brand" />
                     <SortHeader field="influencerName" label="Influencer" />
                     <SortHeader field="category" label="Category" align="center" />
+                    <SortHeader field="productLink" label="Product Link" />
                     
                     {/* Paid Financial Headers */}
                     {(viewMode === 'Paid Collaborations' || viewMode === 'All Collaborations') && (
                       <>
-                        <SortHeader field="brandOnboardingAmt" label="Brand Price (IN)" align="right" />
-                        <SortHeader field="influencerOnboardingAmt" label="Creator Price (OUT)" align="right" />
+                        <SortHeader field="brandOnboardingAmt" label="Brand Price (IN) / Receiver" align="right" />
+                        <SortHeader field="influencerOnboardingAmt" label="Creator Price (OUT) / Payer" align="right" />
                         {isTargetManager && (
                           <SortHeader field="ad2shipMargin" label="AD2ship Margin" align="right" />
                         )}
@@ -2265,13 +2428,13 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                 <tbody className="divide-y divide-slate-200 font-medium text-slate-800">
                   {loading ? (
                     <tr>
-                      <td colSpan={12} className="p-12 text-center">
+                      <td colSpan={14} className="p-12 text-center">
                         <InlineLoader message="Loading influencer ledger data..." />
                       </td>
                     </tr>
                   ) : paginatedInfluencers.length === 0 ? (
                     <tr>
-                      <td colSpan={12} className="p-12 text-center text-slate-400 font-semibold">
+                      <td colSpan={14} className="p-12 text-center text-slate-400 font-semibold">
                         No records match the selected filters. Click "+ Add Record" to enter new collaborations.
                       </td>
                     </tr>
@@ -2351,15 +2514,39 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                             </span>
                           </td>
 
+                          {/* Product Link Column */}
+                          <td className="p-3 border-r border-slate-100 font-semibold min-w-[120px]">
+                            {item.productLink ? (
+                              <a
+                                href={item.productLink.startsWith('http') ? item.productLink : `https://${item.productLink}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-extrabold bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 border border-blue-200 transition shadow-2xs max-w-[130px] truncate"
+                                title={item.productLink}
+                              >
+                                <ExternalLink size={12} className="shrink-0 text-blue-600" />
+                                Product Link
+                              </a>
+                            ) : (
+                              <span className="text-slate-400 font-semibold text-[11px]">—</span>
+                            )}
+                          </td>
+
                           {/* Financial Columns */}
                           {(viewMode === 'Paid Collaborations' || viewMode === 'All Collaborations') && (
                             <>
                               <td className="p-3 border-r border-slate-100 text-right font-black text-slate-900">
-                                ₹{new Intl.NumberFormat().format(item.brandOnboardingAmt || item.inAmount || 0)}
+                                <div>₹{new Intl.NumberFormat().format(item.brandOnboardingAmt || item.inAmount || 0)}</div>
+                                <div className="text-[10px] text-emerald-700 font-extrabold flex items-center justify-end gap-1 mt-0.5">
+                                  📥 {item.moneyReceivedBy || 'rahul'}
+                                </div>
                               </td>
 
                               <td className="p-3 border-r border-slate-100 text-right font-black text-slate-700">
-                                ₹{new Intl.NumberFormat().format(item.influencerOnboardingAmt || item.outAmount || 0)}
+                                <div>₹{new Intl.NumberFormat().format(item.influencerOnboardingAmt || item.outAmount || 0)}</div>
+                                <div className="text-[10px] text-rose-700 font-extrabold flex items-center justify-end gap-1 mt-0.5">
+                                  📤 {item.paymentDoneBy || 'rahul'}
+                                </div>
                               </td>
 
                               {isTargetManager && (
@@ -2441,7 +2628,14 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                             )}
                           </td>
 
-                          <td className="p-3 text-center space-x-1.5 whitespace-nowrap">
+                          <td className="p-3 text-center space-x-1 whitespace-nowrap">
+                            <button
+                              onClick={() => openViewModal(item)}
+                              className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition"
+                              title="View Record Details"
+                            >
+                              <Eye size={14} />
+                            </button>
                             <button
                               onClick={() => openEditModal(item)}
                               className="p-1.5 rounded-lg text-purple-600 hover:bg-purple-50 transition"
@@ -2761,6 +2955,8 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                   className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl outline-none font-bold bg-white text-xs text-slate-900 focus:ring-2 focus:ring-emerald-500"
                 >
                   <option value="Pending">🟠 Pending (Default)</option>
+                  <option value="In Discussion">💬 In Discussion (Talking Terms)</option>
+                  <option value="Parcel Sent">📦 Parcel Sent (Dispatched)</option>
                   <option value="Under Review">🟡 Under Review</option>
                   <option value="Approved">🟢 Approved</option>
                   <option value="Completed">🟢 Completed</option>
@@ -2953,13 +3149,13 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] text-slate-600 font-semibold mb-0.5">Actual Amount Received (IN) ₹</label>
+                    <label className="block text-[11px] text-slate-600 font-semibold mb-0.5">Money Received By (Brand Receiver)</label>
                     <input
-                      type="number"
-                      placeholder="20000"
-                      value={brandReceivedAmt}
-                      onChange={(e) => setBrandReceivedAmt(e.target.value === '' ? '' : Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg font-black text-emerald-700 bg-white text-xs"
+                      type="text"
+                      placeholder="e.g. Rahul / Account Name"
+                      value={moneyReceivedBy}
+                      onChange={(e) => setMoneyReceivedBy(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white text-xs"
                     />
                   </div>
                 </div>
@@ -2985,6 +3181,16 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                       value={influencerPaidAmt}
                       onChange={(e) => setInfluencerPaidAmt(e.target.value === '' ? '' : Number(e.target.value))}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg font-black text-pink-700 bg-white text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-600 font-semibold mb-0.5">Payment Done By (Creator Payer)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Rahul / Account Name"
+                      value={paymentDoneBy}
+                      onChange={(e) => setPaymentDoneBy(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white text-xs"
                     />
                   </div>
                 </div>
@@ -3659,6 +3865,361 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                 type="button"
                 onClick={() => setSelectedMemberForDetail(null)}
                 className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold transition shadow-xs"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* FULL DETAILS VIEW MODAL */}
+      <Modal
+        isOpen={!!selectedViewItem}
+        onClose={() => setSelectedViewItem(null)}
+        title={`Collaboration Record Details — ${selectedViewItem?.brandName || ''}`}
+        maxWidth="max-w-4xl"
+      >
+        {selectedViewItem && (
+          <div className="space-y-5 max-h-[80vh] overflow-y-auto pr-1">
+            {/* Header Banner - Light elegant shade */}
+            <div className="p-5 rounded-2xl bg-gradient-to-r from-purple-50 via-indigo-50/70 to-blue-50 border border-purple-100/80 shadow-2xs flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <h3 className="text-lg font-black text-slate-900">{selectedViewItem.brandName}</h3>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${
+                    selectedViewItem.category === 'Paid' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-blue-100 text-blue-800 border-blue-300'
+                  }`}>
+                    {selectedViewItem.category}
+                  </span>
+                </div>
+                <div className="text-xs text-slate-600 mt-1.5 flex flex-wrap items-center gap-2 font-medium">
+                  <span className="font-bold text-slate-700">Influencer:</span>
+                  <span className="font-black text-purple-900">{selectedViewItem.influencerName}</span>
+                  {selectedViewItem.influencerInstagramId && (
+                    <a
+                      href={selectedViewItem.profileLink || `https://instagram.com/${selectedViewItem.influencerInstagramId.replace(/^@/, '')}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-purple-700 hover:text-purple-900 font-extrabold hover:underline text-xs inline-flex items-center gap-1 bg-white px-2.5 py-0.5 rounded-lg border border-purple-200 shadow-2xs"
+                    >
+                      📷 {selectedViewItem.influencerInstagramId}
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className={`px-3 py-1 rounded-full text-xs font-black uppercase border ${
+                  selectedViewItem.status === 'Completed' || selectedViewItem.status === 'Approved' || selectedViewItem.status === 'Settled'
+                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                    : selectedViewItem.status === 'Pending' || selectedViewItem.status === 'Under Review'
+                    ? 'bg-amber-100 text-amber-800 border-amber-300'
+                    : 'bg-rose-100 text-rose-800 border-rose-300'
+                }`}>
+                  {selectedViewItem.status || 'Pending'}
+                </span>
+              </div>
+            </div>
+
+            {/* Grid 1: Basic Information */}
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+              <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <User size={14} className="text-purple-600" /> Basic & Assignment Information
+              </h4>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                <div>
+                  <span className="text-slate-400 font-bold block text-[10px]">Assignee (Manager)</span>
+                  <span className="font-black text-slate-800">{selectedViewItem.influencerManager || '—'}</span>
+                  {selectedViewItem.brandManagerTeam && (
+                    <span className="text-[10px] text-purple-700 font-extrabold block">Team: {selectedViewItem.brandManagerTeam}</span>
+                  )}
+                </div>
+                <div>
+                  <span className="text-slate-400 font-bold block text-[10px]">Assigned Executive</span>
+                  <span className="font-bold text-slate-700">{selectedViewItem.assignedExecutive || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-bold block text-[10px]">Phone Contact</span>
+                  <span className="font-bold text-slate-700">{selectedViewItem.phone || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-bold block text-[10px]">Transaction Date</span>
+                  <span className="font-bold text-slate-700">{selectedViewItem.transactionDate ? new Date(selectedViewItem.transactionDate).toLocaleDateString() : '—'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-bold block text-[10px]">Connected Date</span>
+                  <span className="font-bold text-slate-700">{selectedViewItem.connectedDate ? new Date(selectedViewItem.connectedDate).toLocaleDateString() : '—'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-bold block text-[10px]">Platform</span>
+                  <span className="font-bold text-slate-700">{selectedViewItem.platform || 'Instagram'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Grid 2: Product & Deliverables Details */}
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+              <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <ShoppingBag size={14} className="text-blue-600" /> Product & Deliverable Content
+              </h4>
+
+              <div className="space-y-3">
+                {/* Highlighted Product Link */}
+                <div className="p-3 bg-white rounded-xl border border-blue-200 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-blue-600 tracking-wider block">Product Link</span>
+                    {selectedViewItem.productLink ? (
+                      <span className="text-xs font-bold text-slate-800 break-all">{selectedViewItem.productLink}</span>
+                    ) : (
+                      <span className="text-xs font-medium text-slate-400 italic">No product link provided</span>
+                    )}
+                  </div>
+                  {selectedViewItem.productLink && (
+                    <a
+                      href={selectedViewItem.productLink.startsWith('http') ? selectedViewItem.productLink : `https://${selectedViewItem.productLink}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs inline-flex items-center gap-1.5 transition shadow-xs shrink-0"
+                    >
+                      <ExternalLink size={13} /> Visit Product Link
+                    </a>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                  <div>
+                    <span className="text-slate-400 font-bold block text-[10px]">Deliverable Type</span>
+                    <span className="font-extrabold text-slate-800">{selectedViewItem.videoType || 'Single Product Video'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-bold block text-[10px]">Order ID</span>
+                    <span className="font-bold text-purple-700">{selectedViewItem.orderId || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-bold block text-[10px]">Order Date</span>
+                    <span className="font-bold text-slate-700">{selectedViewItem.orderDate ? new Date(selectedViewItem.orderDate).toLocaleDateString() : '—'}</span>
+                  </div>
+                </div>
+
+                {selectedViewItem.videoDescription && (
+                  <div>
+                    <span className="text-slate-400 font-bold block text-[10px]">Video Description</span>
+                    <div className="p-2 bg-white rounded-lg border border-slate-200 text-xs font-medium text-slate-700">{selectedViewItem.videoDescription}</div>
+                  </div>
+                )}
+
+                {/* Additional Links */}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {(selectedViewItem.refVideoLink || selectedViewItem.referenceVideoLink) && (
+                    <a
+                      href={selectedViewItem.refVideoLink || selectedViewItem.referenceVideoLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-xs inline-flex items-center gap-1.5 transition"
+                    >
+                      📹 Reference Video Link
+                    </a>
+                  )}
+                  {selectedViewItem.contentLink && (
+                    <a
+                      href={selectedViewItem.contentLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-xs inline-flex items-center gap-1.5 transition"
+                    >
+                      🔗 Published Content Link
+                    </a>
+                  )}
+                  {selectedViewItem.adsCode && (
+                    <span className="px-3 py-1.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 font-bold text-xs">
+                      🏷️ Ads Code: {selectedViewItem.adsCode}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Grid 3: Financial & Performance Metrics */}
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+              <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <DollarSign size={14} className="text-emerald-600" /> Financial Breakdown & Performance Metrics
+              </h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                <div className="p-2.5 bg-white rounded-xl border border-slate-200">
+                  <span className="text-slate-400 font-bold block text-[10px]">Brand Price (IN)</span>
+                  <span className="text-sm font-black text-slate-900">₹{new Intl.NumberFormat().format(selectedViewItem.brandOnboardingAmt || selectedViewItem.inAmount || 0)}</span>
+                  {selectedViewItem.moneyReceivedBy && (
+                    <div className="text-[10px] text-emerald-700 font-extrabold mt-0.5">📥 Received by: {selectedViewItem.moneyReceivedBy}</div>
+                  )}
+                </div>
+                <div className="p-2.5 bg-white rounded-xl border border-slate-200">
+                  <span className="text-slate-400 font-bold block text-[10px]">Creator Price (OUT)</span>
+                  <span className="text-sm font-black text-slate-700">₹{new Intl.NumberFormat().format(selectedViewItem.influencerOnboardingAmt || selectedViewItem.outAmount || 0)}</span>
+                  {selectedViewItem.paymentDoneBy && (
+                    <div className="text-[10px] text-rose-700 font-extrabold mt-0.5">📤 Paid by: {selectedViewItem.paymentDoneBy}</div>
+                  )}
+                </div>
+                <div className="p-2.5 bg-emerald-50/50 rounded-xl border border-emerald-200">
+                  <span className="text-emerald-700 font-bold block text-[10px]">AD2ship Margin</span>
+                  <span className="text-sm font-black text-emerald-700">
+                    ₹{new Intl.NumberFormat().format((selectedViewItem.brandOnboardingAmt || selectedViewItem.inAmount || 0) - (selectedViewItem.influencerOnboardingAmt || selectedViewItem.outAmount || 0))}
+                  </span>
+                </div>
+                <div className="p-2.5 bg-white rounded-xl border border-slate-200">
+                  <span className="text-slate-400 font-bold block text-[10px]">Views & Orders</span>
+                  <span className="text-xs font-extrabold text-slate-800">
+                    {selectedViewItem.viewsCount || 0} views / {selectedViewItem.ordersGenerated ?? selectedViewItem.ordersCount ?? 0} orders
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Grid 4: Approval Status & Internal Remarks */}
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-4 text-xs">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <ShieldCheck size={15} className="text-indigo-600" /> Approval & Verification Audit
+                </h4>
+                <span className={`px-3 py-1 rounded-full text-xs font-black uppercase border flex items-center gap-1.5 shadow-2xs ${
+                  selectedViewItem.approvalStatus === 'Approved' || selectedViewItem.isApproved
+                    ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                    : selectedViewItem.approvalStatus === 'Not Approved'
+                    ? 'bg-rose-100 text-rose-900 border-rose-300'
+                    : 'bg-amber-100 text-amber-900 border-amber-300'
+                }`}>
+                  {selectedViewItem.approvalStatus === 'Approved' || selectedViewItem.isApproved ? (
+                    <>
+                      <CheckCircle2 size={13} className="text-emerald-700" /> Approved & Verified
+                    </>
+                  ) : selectedViewItem.approvalStatus === 'Not Approved' ? (
+                    <>
+                      <AlertCircle size={13} className="text-rose-700" /> Not Approved
+                    </>
+                  ) : (
+                    <>
+                      <Clock size={13} className="text-amber-700 animate-pulse" /> Pending Approval Review
+                    </>
+                  )}
+                </span>
+              </div>
+
+              {/* Status & Manager Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* Card 1: Approval Status */}
+                <div className={`p-3 rounded-xl border flex items-center gap-3 ${
+                  selectedViewItem.approvalStatus === 'Approved' || selectedViewItem.isApproved
+                    ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
+                    : selectedViewItem.approvalStatus === 'Not Approved'
+                    ? 'bg-rose-50/70 border-rose-200 text-rose-900'
+                    : 'bg-amber-50/70 border-amber-200 text-amber-900'
+                }`}>
+                  <div className={`p-2 rounded-lg ${
+                    selectedViewItem.approvalStatus === 'Approved' || selectedViewItem.isApproved
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : selectedViewItem.approvalStatus === 'Not Approved'
+                      ? 'bg-rose-100 text-rose-700'
+                      : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {selectedViewItem.approvalStatus === 'Approved' || selectedViewItem.isApproved ? <ShieldCheck size={18} /> : selectedViewItem.approvalStatus === 'Not Approved' ? <AlertCircle size={18} /> : <Clock size={18} />}
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider block">Approval Status</span>
+                    <span className="font-black text-xs">
+                      {selectedViewItem.approvalStatus || (selectedViewItem.isApproved ? 'Approved' : 'Pending Verification')}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Card 2: Workflow Stage */}
+                <div className="p-3 bg-white rounded-xl border border-slate-200 flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-purple-100 text-purple-700">
+                    <Activity size={18} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Workflow Status</span>
+                    <span className={`font-extrabold text-xs px-2.5 py-0.5 rounded-full inline-block mt-0.5 border ${
+                      selectedViewItem.status === 'Parcel Sent'
+                        ? 'bg-indigo-100 text-indigo-900 border-indigo-300'
+                        : selectedViewItem.status === 'In Discussion'
+                        ? 'bg-cyan-100 text-cyan-900 border-cyan-300'
+                        : selectedViewItem.status === 'Completed' || selectedViewItem.status === 'Approved'
+                        ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                        : selectedViewItem.status === 'Settled'
+                        ? 'bg-purple-100 text-purple-900 border-purple-300'
+                        : selectedViewItem.status === 'Under Review'
+                        ? 'bg-amber-100 text-amber-900 border-amber-300'
+                        : 'bg-slate-100 text-slate-800 border-slate-300'
+                    }`}>
+                      {selectedViewItem.status === 'Parcel Sent' ? '📦 Parcel Sent' : selectedViewItem.status === 'In Discussion' ? '💬 In Discussion' : selectedViewItem.status || 'Pending'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Card 3: Manager / Team */}
+                <div className="p-3 bg-white rounded-xl border border-slate-200 flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-blue-100 text-blue-700">
+                    <User size={18} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Managed By</span>
+                    <span className="font-extrabold text-xs text-slate-900">{selectedViewItem.influencerManager || '—'}</span>
+                    {selectedViewItem.brandManagerTeam && (
+                      <span className="text-[10px] text-purple-700 font-extrabold block">Team: {selectedViewItem.brandManagerTeam}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Rejection / Disapproval Alert Box */}
+              {selectedViewItem.reason && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl space-y-1">
+                  <span className="text-[10px] font-black uppercase text-rose-700 flex items-center gap-1">
+                    <AlertCircle size={12} /> Disapproval / Rejection Reason
+                  </span>
+                  <div className="font-bold text-rose-900 text-xs">{selectedViewItem.reason}</div>
+                </div>
+              )}
+
+              {/* Remarks & Internal Notes */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Remarks</span>
+                  {selectedViewItem.remark ? (
+                    <p className="font-medium text-slate-700 text-xs">{selectedViewItem.remark}</p>
+                  ) : (
+                    <p className="font-medium text-slate-400 italic text-xs">No remarks added</p>
+                  )}
+                </div>
+
+                <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Internal Notes</span>
+                  {selectedViewItem.notes ? (
+                    <p className="font-medium text-slate-700 text-xs">{selectedViewItem.notes}</p>
+                  ) : (
+                    <p className="font-medium text-slate-400 italic text-xs">No internal notes added</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  const itemToEdit = selectedViewItem;
+                  setSelectedViewItem(null);
+                  openEditModal(itemToEdit);
+                }}
+                className="px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded-xl font-extrabold text-xs transition inline-flex items-center gap-1.5"
+              >
+                <Edit2 size={13} /> Edit Record
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedViewItem(null)}
+                className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-xs transition shadow-xs"
               >
                 Close
               </button>

@@ -372,7 +372,7 @@ export interface IInfluencer extends Document {
   orderId?: string;
   orderDate?: Date;
   platform: string;
-  status: 'Pending' | 'Under Review' | 'Completed' | 'Settled' | 'Approved';
+  status: 'Pending' | 'In Discussion' | 'Parcel Sent' | 'Under Review' | 'Completed' | 'Settled' | 'Approved';
   contentLink?: string;
   adsCode?: string;
   viewsCount?: number;
@@ -384,6 +384,8 @@ export interface IInfluencer extends Document {
   reason?: string;
   notes?: string;
   remark?: string;
+  moneyReceivedBy?: string;
+  paymentDoneBy?: string;
   sheetRowIndex?: number;
   createdBy?: mongoose.Types.ObjectId;
 }
@@ -413,8 +415,8 @@ const InfluencerSchema = new Schema<IInfluencer>({
   ad2shipMargin: { type: Number, default: 0 },
   inAmount: { type: Number, default: 0 },
   outAmount: { type: Number, default: 0 },
-  balance: { type: Number, default: 0 },
-  finalPaymentReceived: { type: Boolean, default: false },
+  moneyReceivedBy: { type: String, default: '' },
+  paymentDoneBy: { type: String, default: '' },
 
   // Deliverables & Content
   productLink: { type: String, default: '' },
@@ -424,7 +426,7 @@ const InfluencerSchema = new Schema<IInfluencer>({
   orderId: { type: String, default: '' },
   orderDate: { type: Date },
   platform: { type: String, default: 'Instagram' },
-  status: { type: String, enum: ['Pending', 'Under Review', 'Completed', 'Settled', 'Approved'], default: 'Pending' },
+  status: { type: String, enum: ['Pending', 'In Discussion', 'Parcel Sent', 'Under Review', 'Completed', 'Settled', 'Approved'], default: 'Pending' },
   contentLink: { type: String, default: '' },
   adsCode: { type: String, default: '' },
   viewsCount: { type: Number, default: 0 },
