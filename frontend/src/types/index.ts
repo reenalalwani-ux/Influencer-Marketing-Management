@@ -346,3 +346,60 @@ export interface ContentCalendarItem {
   createdAt?: string;
   updatedAt?: string;
 }
+
+export interface InfluencerDirectoryItem {
+  _id?: string;
+  instagramHandle: string;
+  name: string;
+  avatar?: string;
+  category: string;
+  nicheTags?: string[];
+  followersCount: number;
+  followingCount?: number;
+  postsCount?: number;
+  engagementRate: number;
+  avgLikes?: number;
+  avgComments?: number;
+  bio?: string;
+  location?: string;
+  email?: string;
+  phone?: string;
+  profileLink?: string;
+  isVerified?: boolean;
+  status: 'Available' | 'Contacted' | 'In Discussion' | 'Blacklisted' | 'Preferred';
+  rating?: number;
+  notes?: string;
+  source?: 'Manual' | 'API Discovery' | 'Past Collab' | 'Sheet Sync';
+  externalId?: string;
+  pastCollabsCount?: number;
+  createdBy?: any;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface DiscoveredInfluencer {
+  instagramHandle: string;
+  name: string;
+  avatar: string;
+  category: string;
+  nicheTags: string[];
+  followersCount: number;
+  followingCount: number;
+  postsCount: number;
+  engagementRate: number;
+  avgLikes: number;
+  avgComments: number;
+  bio: string;
+  location: string;
+  email: string;
+  phone: string;
+  profileLink: string;
+  isVerified: boolean;
+  estRatePerPost?: string;
+  recentPosts?: Array<{ image: string; likes: number; comments: number }>;
+  isSavedInDb?: boolean;
+  dbId?: string | null;
+  dbStatus?: string | null;
+  dbRating?: number | null;
+}
+

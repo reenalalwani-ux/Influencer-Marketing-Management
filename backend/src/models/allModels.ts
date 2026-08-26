@@ -544,6 +544,74 @@ export const GoogleSheetConfigSchema = new Schema<IGoogleSheetConfig>({
   updatedBy: { type: Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
+// 15. Saved Influencer Directory Schema
+export interface IInfluencerDirectory extends Document {
+  instagramHandle: string;
+  name: string;
+  avatar?: string;
+  category: string;
+  nicheTags?: string[];
+  followersCount: number;
+  followingCount?: number;
+  postsCount?: number;
+  engagementRate: number;
+  avgLikes?: number;
+  avgComments?: number;
+  bio?: string;
+  location?: string;
+  email?: string;
+  phone?: string;
+  profileLink?: string;
+  isVerified?: boolean;
+  status: 'Available' | 'Contacted' | 'In Discussion' | 'Blacklisted' | 'Preferred';
+  rating?: number;
+  notes?: string;
+  source?: 'Manual' | 'API Discovery' | 'Past Collab' | 'Sheet Sync';
+  externalId?: string;
+  pastCollabsCount?: number;
+  createdBy?: mongoose.Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const InfluencerDirectorySchema = new Schema<IInfluencerDirectory>({
+  instagramHandle: { type: String, required: true, unique: true },
+  name: { type: String, required: true },
+  avatar: { type: String, default: '' },
+  category: { type: String, required: true, default: 'Fashion' },
+  nicheTags: [{ type: String }],
+  followersCount: { type: Number, default: 0 },
+  followingCount: { type: Number, default: 0 },
+  postsCount: { type: Number, default: 0 },
+  engagementRate: { type: Number, default: 0 },
+  avgLikes: { type: Number, default: 0 },
+  avgComments: { type: Number, default: 0 },
+  bio: { type: String, default: '' },
+  location: { type: String, default: 'India' },
+  email: { type: String, default: '' },
+  phone: { type: String, default: '' },
+  profileLink: { type: String, default: '' },
+  isVerified: { type: Boolean, default: false },
+  status: { 
+    type: String, 
+    enum: ['Available', 'Contacted', 'In Discussion', 'Blacklisted', 'Preferred'], 
+    default: 'Available' 
+  },
+  rating: { type: Number, default: 5 },
+  notes: { type: String, default: '' },
+  source: { 
+    type: String, 
+    enum: ['Manual', 'API Discovery', 'Past Collab', 'Sheet Sync'], 
+    default: 'Manual' 
+  },
+  externalId: { type: String, default: '' },
+  pastCollabsCount: { type: Number, default: 0 },
+  createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
+}, { timestamps: true });
+
+InfluencerDirectorySchema.index({ category: 1, followersCount: -1 });
+InfluencerDirectorySchema.index({ name: 'text', instagramHandle: 'text', bio: 'text' });
+
 export const Permission = mongoose.model<IPermission>('Permission', PermissionSchema);
 export const Role = mongoose.model<IRole>('Role', RoleSchema);
 export const User = mongoose.model<IUser>('User', UserSchema);
@@ -559,6 +627,8 @@ export const Influencer = mongoose.model<IInfluencer>('Influencer', InfluencerSc
 export const PaymentLog = mongoose.model<IPaymentLog>('PaymentLog', PaymentLogSchema);
 export const ContentCalendar = mongoose.model<IContentCalendar>('ContentCalendar', ContentCalendarSchema);
 export const GoogleSheetConfig = mongoose.model<IGoogleSheetConfig>('GoogleSheetConfig', GoogleSheetConfigSchema);
+export const InfluencerDirectory = mongoose.model<IInfluencerDirectory>('InfluencerDirectory', InfluencerDirectorySchema);
+
 
 
 

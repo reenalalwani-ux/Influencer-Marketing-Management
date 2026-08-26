@@ -1,11 +1,38 @@
 import { Router, Response } from 'express';
-import { Influencer, Brand, PaymentLog, Employee, EmployeeBrand, Target } from '../models/allModels';
+import { Influencer, Brand, PaymentLog, Employee, EmployeeBrand, Target, InfluencerDirectory } from '../models/allModels';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 import { logActivity } from '../middleware/auditLog';
 import { getEmployeeForAuthUser } from '../utils/employeeHelper';
 
 const router = Router();
+
+// Helper to sanitize Instagram handle & profile URL
+const cleanInstagramHandleAndLink = (inputHandle?: string, inputLink?: string) => {
+  let raw = (inputHandle || inputLink || '').trim();
+  if (!raw) return { handle: '', link: '' };
+
+  // If it's a full Instagram URL e.g. https://www.instagram.com/jaipurfame_creator/?igsh=...
+  if (raw.includes('instagram.com/')) {
+    const cleanUrl = raw.split('?')[0].split('#')[0];
+    const parts = cleanUrl.split('/').filter(Boolean);
+    const handleCandidate = parts.pop() || '';
+    if (handleCandidate && handleCandidate !== 'instagram.com' && handleCandidate !== 'www.instagram.com') {
+      const cleanHandle = handleCandidate.replace(/^@/, '').replace(/\s+/g, '').trim();
+      return {
+        handle: `@${cleanHandle}`,
+        link: `https://instagram.com/${cleanHandle}`
+      };
+    }
+  }
+
+  // Otherwise, handle string
+  const cleanHandle = raw.replace(/^@/, '').replace(/\s+/g, '').trim();
+  return {
+    handle: cleanHandle ? `@${cleanHandle}` : '',
+    link: cleanHandle ? `https://instagram.com/${cleanHandle}` : (inputLink || '')
+  };
+};
 
 // Helper to keep active targets in sync with transactions
 const triggerTargetSync = async () => {
@@ -318,8 +345,32 @@ router.put('/:id', authenticateToken, checkPermission('influencer.update'), asyn
     if (brandId) record.brandId = brandId;
     if (brandName) record.brandName = brandName;
     if (phone !== undefined) record.phone = phone;
-    if (profileLink !== undefined) record.profileLink = profileLink;
-    if (influencerInstagramId !== undefined) record.influencerInstagramId = influencerInstagramId;
+
+    if (influencerInstagramId !== undefined || profileLink !== undefined) {
+      const { handle, link } = cleanInstagramHandleAndLink(influencerInstagramId, profileLink);
+      if (handle) record.influencerInstagramId = handle;
+      if (link) record.profileLink = link;
+
+      // Sync InfluencerDirectory entry if exists
+      try {
+        const dirDoc = await InfluencerDirectory.findOne({
+          $or: [
+            { name: new RegExp(`^${(influencerName || oldInfluencerName).trim()}$`, 'i') },
+            { instagramHandle: new RegExp(`^@?${(record.influencerInstagramId || '').replace('@', '')}$`, 'i') }
+          ]
+        });
+        if (dirDoc) {
+          if (handle) dirDoc.instagramHandle = handle;
+          if (link) dirDoc.profileLink = link;
+          if (phone !== undefined) dirDoc.phone = phone;
+          if (influencerName) dirDoc.name = influencerName;
+          await dirDoc.save();
+        }
+      } catch (dirErr) {
+        console.error('[InfluencerUpdate] Directory sync error:', dirErr);
+      }
+    }
+
     if (category) record.category = category;
 
     if (brandOnboardingAmt !== undefined) record.brandOnboardingAmt = Number(brandOnboardingAmt) || 0;

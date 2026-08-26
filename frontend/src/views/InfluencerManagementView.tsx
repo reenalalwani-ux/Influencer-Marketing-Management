@@ -935,11 +935,13 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
 
       const payload = {
         influencerManager,
+        brandManagerTeam,
         influencerName,
+        influencerInstagramId,
         brandId: selectedBrandId || undefined,
         brandName: bName,
         phone,
-        profileLink,
+        profileLink: profileLink || influencerInstagramId,
         category,
         brandOnboardingAmt: Number(brandOnboardingAmt) || 0,
         brandReceivedAmt: Number(brandReceivedAmt) || 0,

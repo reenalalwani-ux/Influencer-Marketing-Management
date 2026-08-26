@@ -20,6 +20,7 @@ import { EmployeePerformanceView } from './views/EmployeePerformanceView';
 import { AuditLogView } from './views/AuditLogView';
 import { ReportsView } from './views/ReportsView';
 import { SettingsView } from './views/SettingsView';
+import { InfluencerDirectoryView } from './views/InfluencerDirectoryView';
 import { URLSubmissionModal } from './components/URLSubmissionModal';
 import { PendingApprovalModal } from './components/PendingApprovalModal';
 
@@ -197,6 +198,12 @@ export const App: React.FC = () => {
               currentUser={user}
               initialTab="paid"
               onTargetUpdated={() => setTargetRefreshCount(prev => prev + 1)}
+            />
+          )}
+          {activeView === 'influencers-directory' && (
+            <InfluencerDirectoryView
+              userRole={user.role}
+              currentUser={user}
             />
           )}
           {activeView === 'employee-brands' && (

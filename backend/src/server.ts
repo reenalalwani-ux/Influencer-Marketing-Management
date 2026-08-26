@@ -31,8 +31,10 @@ import settingsRoutes from './routes/settingsRoutes';
 import dbRoutes from './routes/dbRoutes';
 import targetRoutes from './routes/targetRoutes';
 import influencerRoutes from './routes/influencerRoutes';
+import influencerDirectoryRoutes from './routes/influencerDirectoryRoutes';
 import contentCalendarRoutes from './routes/contentCalendarRoutes';
 import syncRoutes from './routes/syncRoutes';
+import instagramRoutes from './routes/instagramRoutes';
 import { syncBarterFromGoogleSheet } from './services/googleSheetSyncService';
 
 const app = express();
@@ -88,9 +90,14 @@ app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/settings', settingsRoutes);
 app.use('/api/v1/targets', targetRoutes);
 app.use('/api/v1/influencers', influencerRoutes);
+app.use('/api/v1/influencer-directory', influencerDirectoryRoutes);
 app.use('/api/v1/content-calendar', contentCalendarRoutes);
 app.use('/api/v1/sync', syncRoutes);
 app.use('/api/v1/db', dbRoutes);
+
+// Instagram instagrapi endpoints
+app.use('/api/instagram', instagramRoutes);
+app.use('/api/v1/instagram', instagramRoutes);
 
 // Start server and initialize DB
 const startServer = async () => {
