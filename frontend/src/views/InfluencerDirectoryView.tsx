@@ -354,10 +354,10 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
 
   // Helper to ensure creator name is never a raw URL string
   const getCleanCreatorName = (name: string, handle?: string) => {
-    if (!name || name.startsWith('http') || name.includes('instagram.com')) {
+    if (!name || name.startsWith('http') || name.toLowerCase().includes('instagram.com') || name.toLowerCase().includes('reel')) {
       const raw = handle ? handle.replace(/^@/, '') : (name ? name.split('?')[0].split('/').filter(Boolean).pop() : 'Creator');
       const clean = (raw || 'Creator').replace(/[\-_.]/g, ' ').replace(/\s+/g, ' ').trim();
-      return clean.charAt(0).toUpperCase() + clean.slice(1);
+      return clean ? (clean.charAt(0).toUpperCase() + clean.slice(1)) : 'Creator';
     }
     return name;
   };
