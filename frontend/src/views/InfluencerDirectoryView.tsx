@@ -347,8 +347,13 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
     if (avatarUrl && avatarUrl.trim() && avatarUrl.startsWith('http') && !avatarUrl.includes('photo-1534528741775-53994a69daeb')) {
       return avatarUrl.trim();
     }
-    // Fallback: ui-avatars initials avatar
-    const label = name || handle?.replace(/^@/, '') || 'Creator';
+    // Fallback 1: unavatar.io live Instagram proxy
+    const cleanHandle = (handle || '').replace(/^@/, '').replace(/\s+/g, '').trim();
+    if (cleanHandle) {
+      return `https://unavatar.io/instagram/${cleanHandle}`;
+    }
+    // Fallback 2: ui-avatars initials avatar
+    const label = name || cleanHandle || 'Creator';
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(label)}&background=7c3aed&color=fff&size=200&bold=true`;
   };
 
@@ -611,13 +616,14 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
                         <img
                           src={getCreatorAvatar(item.avatar, item.instagramHandle, item.name)}
                           alt={item.name}
+                          referrerPolicy="no-referrer"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
                             const cleanHandle = (item.instagramHandle || '').replace(/^@/, '').replace(/\s+/g, '').trim();
                             if (!target.src.includes('unavatar.io') && cleanHandle) {
                               target.src = `https://unavatar.io/instagram/${cleanHandle}`;
                             } else {
-                              target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || cleanHandle || 'Creator')}&background=7c3aed&color=fff`;
+                              target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(getCleanCreatorName(item.name, item.instagramHandle))}&background=7c3aed&color=fff&bold=true`;
                             }
                           }}
                           style={{ width: '56px', height: '56px' }}
@@ -980,6 +986,12 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
                         <img
                           src={creator.avatar}
                           alt={creator.name}
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            const cleanHandle = (creator.instagramHandle || '').replace(/^@/, '').replace(/\s+/g, '').trim();
+                            target.src = `https://unavatar.io/instagram/${cleanHandle}`;
+                          }}
                           className="w-14 h-14 rounded-2xl object-cover border-2 border-white shadow-md bg-slate-200"
                         />
                         {creator.isVerified && (
