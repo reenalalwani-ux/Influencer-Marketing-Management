@@ -3,6 +3,7 @@ import { InfluencerDirectory, Influencer } from '../models/allModels';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { logActivity } from '../middleware/auditLog';
 import { scrapeInstagramProfile } from '../services/instagramMetadataScraper';
+import { fetchInstagramProfileData } from '../services/modashService';
 
 const router = Router();
 
@@ -296,7 +297,7 @@ router.post('/sync-live-instagram', authenticateToken, async (req: AuthRequest, 
             const cleanHandle = doc.instagramHandle.replace('@', '').trim();
             if (!cleanHandle) return;
 
-            const profile = await scrapeInstagramProfile(cleanHandle);
+            const profile = await fetchInstagramProfileData(cleanHandle);
             if (profile && profile.followersCount > 0) {
               doc.followersCount = profile.followersCount;
               doc.followingCount = profile.followingCount || doc.followingCount;
@@ -314,6 +315,10 @@ router.post('/sync-live-instagram', authenticateToken, async (req: AuthRequest, 
               if (profile.isVerified) {
                 doc.isVerified = true;
               }
+
+              (doc as any).instagramDataSyncedAt = new Date();
+              (doc as any).instagramSyncStatus = 'synced';
+              (doc as any).instagramSyncError = '';
 
               await doc.save();
               updatedCount++;
@@ -348,6 +353,79 @@ router.post('/sync-live-instagram', authenticateToken, async (req: AuthRequest, 
   } catch (err: any) {
     console.error('Error syncing Instagram data:', err);
     res.status(500).json({ success: false, message: err.message || 'Failed to sync Instagram data' });
+  }
+});
+
+// POST /api/v1/influencer-directory/sync/:id
+// Single Influencer Sync (Fetches Modash / Instagram profile metrics for one existing record)
+router.post('/sync/:id', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const doc = await InfluencerDirectory.findById(id);
+    if (!doc) {
+      return res.status(404).json({ success: false, message: 'Influencer not found' });
+    }
+
+    const cleanHandle = doc.instagramHandle.replace(/^@/, '').trim();
+    if (!cleanHandle) {
+      return res.status(400).json({ success: false, message: 'Invalid Instagram handle' });
+    }
+
+    try {
+      const profile = await fetchInstagramProfileData(cleanHandle);
+      if (profile) {
+        if (profile.followersCount > 0) doc.followersCount = profile.followersCount;
+        if (profile.followingCount > 0) doc.followingCount = profile.followingCount;
+        if (profile.postsCount > 0) doc.postsCount = profile.postsCount;
+        if (profile.engagementRate > 0) doc.engagementRate = profile.engagementRate;
+        if (profile.avgLikes > 0) doc.avgLikes = profile.avgLikes;
+        if (profile.avgComments > 0) doc.avgComments = profile.avgComments;
+        if (profile.biography) doc.bio = profile.biography;
+
+        if (profile.fullName && profile.fullName !== cleanHandle && (!doc.name || doc.name.startsWith('http') || doc.name.includes('instagram.com'))) {
+          doc.name = profile.fullName;
+        }
+        if (profile.avatar && profile.avatar.startsWith('http')) {
+          doc.avatar = profile.avatar;
+        }
+        if (profile.isVerified) {
+          doc.isVerified = true;
+        }
+
+        (doc as any).instagramDataSyncedAt = new Date();
+        (doc as any).instagramSyncStatus = 'synced';
+        (doc as any).instagramSyncError = '';
+
+        await doc.save();
+
+        await logActivity({
+          userId: req.user?._id,
+          userName: req.user?.name || 'System User',
+          userRole: req.user?.role,
+          action: 'SYNC_SINGLE_INFLUENCER',
+          module: 'InfluencerDirectory',
+          entity: 'InfluencerDirectory',
+          entityId: id,
+          details: `Enriched Instagram profile data for @${cleanHandle}`
+        });
+
+        return res.json({
+          success: true,
+          message: `✅ Synced Instagram data for @${cleanHandle}!`,
+          influencer: doc
+        });
+      }
+    } catch (syncErr: any) {
+      (doc as any).instagramSyncStatus = 'failed';
+      (doc as any).instagramSyncError = syncErr.message || 'Sync failed';
+      await doc.save().catch(() => {});
+      return res.status(500).json({ success: false, message: `Failed to sync @${cleanHandle}: ${syncErr.message}` });
+    }
+
+    res.status(400).json({ success: false, message: 'Could not fetch Instagram profile data' });
+  } catch (err: any) {
+    console.error('Error syncing single influencer:', err);
+    res.status(500).json({ success: false, message: err.message || 'Failed to sync influencer' });
   }
 });
 
