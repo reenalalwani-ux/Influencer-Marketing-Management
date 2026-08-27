@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Users, Search, Filter, Plus, ExternalLink, Instagram, Phone, Mail,
   Star, Award, TrendingUp, Sparkles, CheckCircle2, Bookmark, Check,
-  Trash2, Edit2, ShieldCheck, MapPin, MessageSquare, Layers, Eye, RefreshCw,
+  Trash2, Edit2, ShieldCheck, MapPin, MessageSquare, Layers, Eye, RefreshCw, Briefcase,
   Heart, MessageCircle, BarChart2, Globe, SlidersHorizontal, UserCheck, AlertCircle, Grid, Table as TableIcon
 } from 'lucide-react';
 import { api } from '../services/api';
@@ -277,6 +277,46 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
       }
     } catch (err: any) {
       showToast(`Error deleting: ${err.message}`);
+    }
+  };
+
+  // Single Influencer Instagram Sync Handler
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+
+  const handleSyncSingleInfluencer = async (id: string, handle: string) => {
+    try {
+      setSyncingId(id);
+      showToast(`🔄 Syncing live Instagram data for ${handle}...`);
+      const res = await api.post(`/influencer-directory/sync/${id}`, {});
+      if (res.success) {
+        showToast(`✅ Synced live Instagram profile data for ${handle}!`);
+        fetchDirectory();
+      }
+    } catch (err: any) {
+      showToast(`Error syncing ${handle}: ${err.message || 'Sync failed'}`);
+    } finally {
+      setSyncingId(null);
+    }
+  };
+
+  // Brand Collabs History Modal State
+  const [isBrandModalOpen, setIsBrandModalOpen] = useState(false);
+  const [selectedBrandHistory, setSelectedBrandHistory] = useState<any>(null);
+  const [loadingBrandHistory, setLoadingBrandHistory] = useState(false);
+
+  const openBrandHistoryModal = async (item: InfluencerDirectoryItem) => {
+    try {
+      setIsBrandModalOpen(true);
+      setLoadingBrandHistory(true);
+      setSelectedBrandHistory(null);
+      const res = await api.get(`/influencer-directory/${item._id}/brands`);
+      if (res.success) {
+        setSelectedBrandHistory(res);
+      }
+    } catch (err: any) {
+      showToast(`Error fetching brand history: ${err.message || 'Failed to load'}`);
+    } finally {
+      setLoadingBrandHistory(false);
     }
   };
 
@@ -676,15 +716,23 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
                       </p>
                     )}
 
-                    {/* Stats Metrics Grid */}
-                    <div className="grid grid-cols-2 gap-2 mt-2.5 p-2 rounded-xl bg-slate-50/80 border border-slate-100">
-                      <div>
-                        <div className="text-[9px] text-slate-400 font-bold uppercase">Followers</div>
-                        <div className="text-xs font-black text-slate-800">{formatNumber(item.followersCount)}</div>
+                    {/* Brands Worked With Summary */}
+                    <div
+                      onClick={() => openBrandHistoryModal(item)}
+                      className="mt-2.5 p-2.5 rounded-xl bg-gradient-to-r from-purple-50/80 to-indigo-50/80 border border-purple-100 hover:border-purple-300 transition-all cursor-pointer group/brand"
+                    >
+                      <div className="flex items-center justify-between gap-1 text-[9px] font-extrabold uppercase text-purple-700 tracking-wider">
+                        <span className="flex items-center gap-1">
+                          <Briefcase size={11} className="text-purple-600 shrink-0" /> Brands Worked With
+                        </span>
+                        <span className="bg-purple-200/80 text-purple-900 px-1.5 py-0.2 rounded-full font-black text-[9px]">
+                          {item.brandsWorkedWith?.length || 0} Brands
+                        </span>
                       </div>
-                      <div>
-                        <div className="text-[9px] text-slate-400 font-bold uppercase">Engagement</div>
-                        <div className="text-xs font-black text-emerald-600">{item.engagementRate}%</div>
+                      <div className="text-xs font-bold text-slate-800 mt-1 line-clamp-1 group-hover/brand:text-purple-900 transition-colors">
+                        {item.brandsWorkedWith && item.brandsWorkedWith.length > 0
+                          ? item.brandsWorkedWith.join(', ')
+                          : 'Click to view collaboration details'}
                       </div>
                     </div>
 
@@ -1271,6 +1319,101 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
           </form>
         </Modal>
       )}
+      {/* Brands Worked With & Collaboration History Modal */}
+      <Modal
+        isOpen={isBrandModalOpen}
+        onClose={() => setIsBrandModalOpen(false)}
+        title="Influencer Brand Collaborations History"
+        maxWidth="max-w-3xl"
+      >
+        {loadingBrandHistory ? (
+          <div className="py-12 text-center text-slate-500 font-semibold flex items-center justify-center gap-2">
+            <RefreshCw className="animate-spin text-purple-600" size={20} /> Loading brand collaboration history...
+          </div>
+        ) : selectedBrandHistory ? (
+          <div className="space-y-5">
+            {/* Influencer Summary Header */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-50 via-indigo-50 to-slate-50 border border-purple-200/80 text-slate-900 flex items-center justify-between gap-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <img
+                  src={getCreatorAvatar(selectedBrandHistory.influencer?.avatar, selectedBrandHistory.influencer?.instagramHandle, selectedBrandHistory.influencer?.name)}
+                  alt={selectedBrandHistory.influencer?.name}
+                  className="w-14 h-14 rounded-xl object-cover border-2 border-purple-200 shadow-sm bg-purple-100"
+                />
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base leading-snug">{selectedBrandHistory.influencer?.name}</h3>
+                  <div className="text-xs text-slate-600 font-medium flex items-center gap-1.5 mt-0.5">
+                    <span className="font-bold text-purple-700">{selectedBrandHistory.influencer?.instagramHandle}</span>
+                    <span>•</span>
+                    <span className="bg-purple-100 text-purple-900 px-2 py-0.5 rounded-full text-[10px] font-bold">{selectedBrandHistory.influencer?.category || 'Fashion'}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 text-right">
+                <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs">
+                  <div className="text-[10px] uppercase font-extrabold text-slate-500 tracking-wider">Total Collabs</div>
+                  <div className="text-base font-black text-amber-600">{selectedBrandHistory.totalCollabs} Deals</div>
+                </div>
+                <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs">
+                  <div className="text-[10px] uppercase font-extrabold text-slate-500 tracking-wider">Unique Brands</div>
+                  <div className="text-base font-black text-emerald-600">{selectedBrandHistory.uniqueBrandsCount} Brands</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Brands List Cards */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-black uppercase text-slate-600 tracking-wider flex items-center gap-1.5">
+                <Briefcase size={14} className="text-purple-600" /> Brands Collaborated With ({selectedBrandHistory.uniqueBrandsCount})
+              </h4>
+
+              {selectedBrandHistory.brands && selectedBrandHistory.brands.length > 0 ? (
+                selectedBrandHistory.brands.map((b: any, idx: number) => (
+                  <div key={idx} className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-white hover:border-purple-200 hover:shadow-sm transition-all">
+                    <div className="flex items-center justify-between gap-2 border-b border-slate-200/80 pb-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-8 h-8 rounded-lg bg-purple-600 text-white font-black text-sm flex items-center justify-center shadow-xs">
+                          {b.brandName.charAt(0).toUpperCase()}
+                        </span>
+                        <div>
+                          <h5 className="font-extrabold text-slate-900 text-sm">{b.brandName}</h5>
+                          <div className="text-[10px] font-semibold text-slate-500">Worked on {b.totalDeals} collaboration(s)</div>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-lg bg-purple-100 text-purple-900 text-xs font-black">
+                        {b.totalDeals} Deals
+                      </span>
+                    </div>
+
+                    {/* Specific Deals */}
+                    <div className="space-y-1.5 pt-1">
+                      {b.deals.map((deal: any, dIdx: number) => (
+                        <div key={dIdx} className="text-xs flex items-center justify-between p-2 rounded-lg bg-white border border-slate-100 text-slate-700">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${deal.category === 'Paid' ? 'bg-amber-100 text-amber-900' : 'bg-emerald-100 text-emerald-900'}`}>
+                              {deal.category || 'Barter'}
+                            </span>
+                            <span className="font-semibold text-slate-800">{deal.videoType || 'Single Product Video'}</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                            {deal.viewsCount > 0 && <span>👁️ {deal.viewsCount.toLocaleString()} views</span>}
+                            {deal.ordersGenerated > 0 && <span className="font-bold text-purple-700">📦 {deal.ordersGenerated} orders</span>}
+                            <span className="font-medium text-slate-400">{new Date(deal.createdAt).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="py-8 text-center text-slate-500 text-sm font-medium">
+                  No past brand collaboration records found for this influencer.
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 };

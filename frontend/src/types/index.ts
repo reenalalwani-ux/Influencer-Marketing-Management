@@ -372,6 +372,11 @@ export interface InfluencerDirectoryItem {
   source?: 'Manual' | 'API Discovery' | 'Past Collab' | 'Sheet Sync';
   externalId?: string;
   pastCollabsCount?: number;
+  brandsWorkedWith?: string[];
+  brandsCount?: number;
+  instagramDataSyncedAt?: string;
+  instagramSyncStatus?: 'synced' | 'failed' | 'pending';
+  instagramSyncError?: string;
   createdBy?: any;
   createdAt?: string;
   updatedAt?: string;
