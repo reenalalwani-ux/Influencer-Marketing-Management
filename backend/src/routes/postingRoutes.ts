@@ -236,8 +236,8 @@ router.post('/matrix/toggle', authenticateToken, checkPermission('posting.update
 
     const now = new Date();
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    if (date > todayStr) {
-      return res.status(400).json({ success: false, message: 'Cannot mark postings for future dates' });
+    if (date !== todayStr) {
+      return res.status(400).json({ success: false, message: 'Posting matrix checkboxes can ONLY be marked for the present date (Today)' });
     }
 
     const scheduledDate = new Date(date);

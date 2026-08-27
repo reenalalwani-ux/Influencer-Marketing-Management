@@ -356,21 +356,19 @@ export const PostingCalendarView: React.FC<PostingCalendarViewProps> = ({ curren
                       {matrixDates.map((d) => {
                         const now = new Date();
                         const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-                        const isFuture = d.dateStr > todayStr;
+                        const isToday = d.dateStr === todayStr;
 
                         return (
                           <th
                             key={d.dateStr}
                             className={`px-2 py-2 text-center min-w-[55px] border-b border-r border-slate-700 font-extrabold ${
-                              d.isToday
-                                ? 'bg-purple-600 text-white font-extrabold shadow-sm'
-                                : isFuture
-                                ? 'bg-slate-900/90 text-slate-500 opacity-60'
-                                : 'bg-slate-800 text-slate-200'
+                              isToday
+                                ? 'bg-purple-600 text-white font-extrabold shadow-md ring-2 ring-purple-300 z-10'
+                                : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
                             }`}
                           >
-                            <div className="text-[10px] font-mono opacity-80">{d.monthDayStr}</div>
-                            <div className="text-[9px] uppercase font-semibold">{d.dayName}</div>
+                            <div className="text-[10px] font-mono font-bold text-slate-100">{d.monthDayStr}</div>
+                            <div className="text-[9px] uppercase font-bold text-slate-300">{d.dayName}</div>
                           </th>
                         );
                       })}
@@ -413,31 +411,38 @@ export const PostingCalendarView: React.FC<PostingCalendarViewProps> = ({ curren
                               const isBusy = togglingCell === cellKey;
                               const now = new Date();
                               const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                              const isEditable = d.dateStr === todayStr;
                               const isFuture = d.dateStr > todayStr;
 
                               return (
                                 <td
                                   key={d.dateStr}
-                                  onClick={() => !isFuture && togglePostingCell(brand._id, d.dateStr, isPosted)}
-                                  title={isFuture ? `Future Date (${d.monthDayStr}) - Disabled` : `Toggle posting for ${d.monthDayStr}`}
+                                  onClick={() => isEditable && togglePostingCell(brand._id, d.dateStr, isPosted)}
+                                  title={
+                                    isEditable
+                                      ? `Click to toggle posting status for Today (${d.monthDayStr})`
+                                      : isFuture
+                                      ? `Future Date (${d.monthDayStr}) - Disabled`
+                                      : `Past Date (${d.monthDayStr}) - Blocked`
+                                  }
                                   className={`px-1 py-2 text-center border-r border-slate-200 select-none transition ${
-                                    isFuture
-                                      ? 'bg-slate-100/70 cursor-not-allowed opacity-40'
-                                      : 'cursor-pointer ' + (d.isToday ? 'bg-purple-50/60' : isPosted ? 'bg-emerald-50/60 hover:bg-emerald-100/80' : 'hover:bg-purple-50')
+                                    isEditable
+                                      ? 'cursor-pointer bg-purple-50/90 hover:bg-purple-100 shadow-2xs font-extrabold ring-2 ring-purple-400/80 z-10'
+                                      : 'bg-slate-50/80 cursor-not-allowed'
                                   }`}
                                 >
                                   <div className="flex items-center justify-center">
                                     {isBusy ? (
                                       <div className="w-5 h-5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
                                     ) : isPosted ? (
-                                      <div className="w-5 h-5 rounded-md bg-emerald-600 text-white flex items-center justify-center shadow-xs">
+                                      <div className={`w-5 h-5 rounded-md text-white flex items-center justify-center shadow-xs ${isEditable ? 'bg-emerald-600 ring-2 ring-emerald-400' : 'bg-emerald-600/90 border border-emerald-700/40'}`}>
                                         <Check size={14} strokeWidth={3.5} />
                                       </div>
-                                    ) : isFuture ? (
-                                      <div className="w-5 h-5 rounded-md border border-slate-200 bg-slate-200/50 cursor-not-allowed">
+                                    ) : !isEditable ? (
+                                      <div className="w-5 h-5 rounded-md border-2 border-slate-300 bg-slate-100/90 shadow-2xs cursor-not-allowed">
                                       </div>
                                     ) : (
-                                      <div className="w-5 h-5 rounded-md border-2 border-slate-300 bg-white hover:border-purple-500 transition">
+                                      <div className="w-5 h-5 rounded-md border-2 border-purple-600 bg-white hover:bg-purple-100 cursor-pointer shadow-sm transition">
                                       </div>
                                     )}
                                   </div>
