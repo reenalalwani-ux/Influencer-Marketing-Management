@@ -505,25 +505,107 @@ export const PostingCalendarView: React.FC<PostingCalendarViewProps> = ({ curren
                           )}
                         </div>
 
-                        <div className="space-y-1 overflow-y-auto max-h-24 pr-0.5">
-                          {dayTasks.map((t) => (
-                            <div
-                              key={t._id}
-                              className={`p-1 rounded text-[10px] font-bold border leading-tight ${t.status === 'Verified' ? 'badge-verified' :
-                                  t.status === 'Submitted' ? 'badge-submitted' : 'badge-pending'
-                                }`}
-                              title={`${t.scheduledTime} - ${t.title} (${t.platform})`}
-                            >
-                              <div className="font-extrabold">{t.scheduledTime}</div>
-                              <div className="truncate">{t.title}</div>
-                            </div>
-                          ))}
+                        <div className="space-y-2 overflow-y-auto max-h-32 pr-0.5 scrollbar-thin">
+                          {(() => {
+                            // Group dayTasks by Employee / Member Name
+                            const groupedByMember: Record<string, TaskItem[]> = {};
+                            dayTasks.forEach((t) => {
+                              const empName = typeof t.employeeId === 'object' ? t.employeeId?.name || 'Staff' : 'Staff';
+                              if (!groupedByMember[empName]) groupedByMember[empName] = [];
+                              groupedByMember[empName].push(t);
+                            });
+
+                            return Object.entries(groupedByMember).map(([empName, memberTasks]) => (
+                              <div key={empName} className="space-y-1 p-1.5 rounded-lg bg-purple-50/50 border border-purple-100">
+                                <div className="text-[9px] font-extrabold text-purple-700 uppercase tracking-wider flex items-center justify-between px-0.5">
+                                  <span className="flex items-center gap-1 truncate">
+                                    <UserIcon size={9} className="shrink-0 text-purple-600" /> {empName}
+                                  </span>
+                                  <span className="text-[8px] bg-purple-200/80 text-purple-900 px-1 rounded-full font-black">
+                                    {memberTasks.length}
+                                  </span>
+                                </div>
+                                {memberTasks.map((t) => (
+                                  <div
+                                    key={t._id}
+                                    className={`p-1 rounded text-[10px] font-bold border leading-tight ${
+                                      t.status === 'Verified' ? 'badge-verified' :
+                                      t.status === 'Submitted' ? 'badge-submitted' : 'badge-pending'
+                                    }`}
+                                    title={`${empName} • ${t.scheduledTime} - ${t.title} (${t.platform})`}
+                                  >
+                                    <div className="flex items-center justify-between text-[8px] text-slate-500 font-extrabold">
+                                      <span>{t.scheduledTime}</span>
+                                      <span className="uppercase">{t.platform}</span>
+                                    </div>
+                                    <div className="truncate text-slate-800 font-bold">{t.title}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            ));
+                          })()}
                         </div>
                       </div>
                     );
                   })}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Daily & Weekly Grouped Views */}
+          {(viewMode === 'Daily' || viewMode === 'Weekly') && (
+            <div className="space-y-4">
+              <h3 className="text-xs font-extrabold uppercase text-slate-700 tracking-wider flex items-center gap-2 border-b border-slate-200 pb-2">
+                <UserIcon size={14} className="text-purple-600" /> {viewMode} Calendar Tasks Grouped by Staff Member ({tasks.length} total)
+              </h3>
+              {tasks.length === 0 ? (
+                <div className="py-8 text-center text-slate-500 text-xs font-semibold">
+                  No posting calendar tasks found for this period.
+                </div>
+              ) : (
+                Object.entries(
+                  tasks.reduce((acc: Record<string, TaskItem[]>, t) => {
+                    const empName = typeof t.employeeId === 'object' ? t.employeeId?.name || 'Staff Member' : 'Staff Member';
+                    if (!acc[empName]) acc[empName] = [];
+                    acc[empName].push(t);
+                    return acc;
+                  }, {})
+                ).map(([empName, memberTasks]) => (
+                  <div key={empName} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-8 h-8 rounded-xl bg-purple-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                          {empName.charAt(0).toUpperCase()}
+                        </span>
+                        <div>
+                          <h4 className="font-extrabold text-slate-900 text-sm">{empName}</h4>
+                          <p className="text-[10px] text-slate-500 font-semibold">Staff Member Schedule</p>
+                        </div>
+                      </div>
+                      <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-900 text-xs font-black">
+                        {memberTasks.length} Tasks
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-1">
+                      {memberTasks.map((t) => (
+                        <div key={t._id} className="p-3 rounded-xl bg-white border border-slate-200/80 shadow-2xs space-y-1 hover:border-purple-200 transition-all">
+                          <div className="flex items-center justify-between text-xs font-extrabold">
+                            <span className="text-purple-700">{t.scheduledTime}</span>
+                            <span className="px-1.5 py-0.5 rounded text-[9px] uppercase bg-purple-50 text-purple-800 font-bold border border-purple-100">{t.platform}</span>
+                          </div>
+                          <div className="font-bold text-slate-900 text-xs truncate">{t.title}</div>
+                          {t.description && <div className="text-[10px] text-slate-500 truncate">{t.description}</div>}
+                          <div className="pt-1 text-[9px] font-semibold text-slate-400">
+                            Scheduled: {new Date(t.scheduledDate).toLocaleDateString()}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           )}
         </div>
