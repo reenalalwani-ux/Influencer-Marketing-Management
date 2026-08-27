@@ -241,7 +241,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       const liveCount = countMap.get(cleanKey) || 0;
       const pastCollabs = Math.max(item.pastCollabsCount || 0, liveCount);
 
-      // Clean name if it starts with http or contains instagram.com
+      // Clean display name if raw URL string stored previously
       let cleanName = item.name || cleanKey;
       if (!cleanName || cleanName.startsWith('http') || cleanName.toLowerCase().includes('instagram.com') || cleanName.toLowerCase().includes('reel')) {
         const raw = item.instagramHandle ? item.instagramHandle.replace(/^@/, '') : cleanKey;
@@ -250,30 +250,15 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
         cleanName = formatted ? (formatted.charAt(0).toUpperCase() + formatted.slice(1)) : 'Creator';
       }
 
-      // Ensure Followers & Engagement metrics are populated cleanly
-      let followers = item.followersCount || 0;
-      let engagement = item.engagementRate || 0;
-
-      if (!followers || followers === 0) {
-        const base = 12500 + ((cleanKey.length * 97) % 18000) + (pastCollabs * 650);
-        followers = Math.round(base);
-      }
-
-      if (!engagement || engagement === 0) {
-        engagement = parseFloat((4.2 + ((cleanKey.length % 5) * 0.8)).toFixed(1));
-      }
-
-      // Use stored avatar if real URL, else clean initials avatar
-      const avatar = (item.avatar && item.avatar.startsWith('http') && !item.avatar.includes('ui-avatars'))
-        ? item.avatar
-        : getInitialsAvatar(cleanName, cleanKey);
+      // Clean Instagram profile URL without tracking params
+      const profileLink = `https://www.instagram.com/${cleanKey}/`;
 
       return {
         ...item,
         name: cleanName,
-        avatar,
-        followersCount: followers,
-        engagementRate: engagement,
+        profileLink,
+        followersCount: item.followersCount || 0,
+        engagementRate: item.engagementRate || 0,
         pastCollabsCount: pastCollabs
       };
     });
@@ -450,28 +435,53 @@ router.post('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       return res.json({ success: true, message: `Influencer @${cleanHandle} updated!`, influencer: existing });
     }
 
+    // Automatically fetch live Instagram metadata if followers/avatar are missing
+    let liveProfile: any = null;
+    try {
+      liveProfile = await scrapeInstagramProfile(cleanHandle);
+    } catch (scrapeErr) {
+      console.warn(`[Create Influencer] Could not scrape IG profile for @${cleanHandle}:`, scrapeErr);
+    }
+
+    const finalName = (liveProfile && liveProfile.fullName && liveProfile.fullName !== cleanHandle)
+      ? liveProfile.fullName
+      : name.trim();
+
+    const finalAvatar = (liveProfile && liveProfile.avatar && liveProfile.avatar.startsWith('http'))
+      ? liveProfile.avatar
+      : (avatar || getInitialsAvatar(name.trim(), cleanHandle));
+
+    const finalFollowers = (liveProfile && liveProfile.followersCount > 0)
+      ? liveProfile.followersCount
+      : (Number(followersCount) || 0);
+
+    const finalEngagement = (liveProfile && liveProfile.engagementRate > 0)
+      ? liveProfile.engagementRate
+      : (Number(engagementRate) || 0);
+
     const newInfluencer = new InfluencerDirectory({
       instagramHandle: `@${cleanHandle}`,
-      name: name.trim(),
-      avatar: avatar || getInitialsAvatar(name.trim(), cleanHandle),
+      name: finalName,
+      avatar: finalAvatar,
       category: category || 'Fashion',
       nicheTags: nicheTags || [category || 'Fashion'],
-      followersCount: Number(followersCount) || 0,
-      followingCount: Number(followingCount) || 0,
-      postsCount: Number(postsCount) || 0,
-      engagementRate: Number(engagementRate) || 0,
-      avgLikes: Number(avgLikes) || 0,
-      avgComments: Number(avgComments) || 0,
-      bio: bio || '',
+      followersCount: finalFollowers,
+      followingCount: liveProfile?.followingCount || Number(followingCount) || 0,
+      postsCount: liveProfile?.postsCount || Number(postsCount) || 0,
+      engagementRate: finalEngagement,
+      avgLikes: liveProfile?.avgLikes || Number(avgLikes) || 0,
+      avgComments: liveProfile?.avgComments || Number(avgComments) || 0,
+      bio: liveProfile?.biography || bio || '',
       location: location || 'India',
       email: email || '',
       phone: phone || '',
-      profileLink: profileLink || `https://instagram.com/${cleanHandle}`,
-      isVerified: Boolean(isVerified),
+      profileLink: `https://www.instagram.com/${cleanHandle}/`,
+      isVerified: liveProfile?.isVerified || Boolean(isVerified),
       status: status || 'Available',
       rating: Number(rating) || 5,
       notes: notes || '',
-      source: source || 'Manual',
+      source: source || 'Manual Add',
+      modashUserId,
       createdBy: req.user?._id
     });
 

@@ -313,13 +313,15 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
     return num.toLocaleString();
   };
 
-  // Helper to ensure Instagram profile URLs never contain spaces or %20
+  // Helper to ensure Instagram profile URLs are clean and open directly without login redirects
   const getCleanInstagramUrl = (handle?: string, link?: string) => {
-    if (link && link.trim() && link.startsWith('http') && !link.includes(' ') && !link.includes('%20')) {
-      return link.trim();
+    let clean = (handle || '').replace(/^@/, '').replace(/\s+/g, '').replace(/%20/g, '').trim();
+    if (!clean && link) {
+      const parts = link.split('?')[0].split('/').filter(Boolean);
+      clean = parts.pop() || '';
     }
-    const clean = (handle || '').replace(/^@/, '').replace(/\s+/g, '').replace(/%20/g, '').trim();
-    return `https://instagram.com/${clean}`;
+    clean = clean.split('?')[0].trim();
+    return `https://www.instagram.com/${clean}/`;
   };
 
   // Helper to get unique diverse avatar for creators
