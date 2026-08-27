@@ -295,30 +295,74 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/v1/influencer-directory/sync-live-instagram
-// UI-ready mode: Awaiting third-party API selection (Modash / RapidAPI)
+// Syncs all creators in the DB with real followers, names, and avatars directly from Instagram
 router.post('/sync-live-instagram', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
-    const totalCount = await InfluencerDirectory.countDocuments();
+    const allItems = await InfluencerDirectory.find({});
+    let updatedCount = 0;
+    const batchSize = 4;
+
+    for (let i = 0; i < allItems.length; i += batchSize) {
+      const batch = allItems.slice(i, i + batchSize);
+
+      await Promise.allSettled(
+        batch.map(async (doc) => {
+          try {
+            const cleanHandle = doc.instagramHandle.replace('@', '').trim();
+            if (!cleanHandle) return;
+
+            const profile = await scrapeInstagramProfile(cleanHandle);
+            if (profile && profile.followersCount > 0) {
+              doc.followersCount = profile.followersCount;
+              doc.followingCount = profile.followingCount || doc.followingCount;
+              doc.postsCount = profile.postsCount || doc.postsCount;
+              doc.engagementRate = profile.engagementRate || doc.engagementRate;
+              doc.avgLikes = profile.avgLikes || doc.avgLikes;
+              doc.avgComments = profile.avgComments || doc.avgComments;
+
+              if (profile.fullName && profile.fullName !== cleanHandle) {
+                doc.name = profile.fullName;
+              }
+              if (profile.avatar && profile.avatar.startsWith('http')) {
+                doc.avatar = profile.avatar;
+              }
+              if (profile.isVerified) {
+                doc.isVerified = true;
+              }
+
+              await doc.save();
+              updatedCount++;
+            }
+          } catch (itemErr: any) {
+            console.error(`[IG Scraper Sync] Error for @${doc.instagramHandle}:`, itemErr.message);
+          }
+        })
+      );
+
+      if (i + batchSize < allItems.length) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
 
     await logActivity({
       userId: req.user?._id,
       userName: req.user?.name || 'System User',
       userRole: req.user?.role,
-      action: 'SYNC_LIVE_INSTAGRAM_UI',
+      action: 'SYNC_LIVE_INSTAGRAM',
       module: 'InfluencerDirectory',
       entity: 'InfluencerDirectory',
       entityId: 'ALL',
-      details: `Live IG Sync UI action triggered for ${totalCount} database creators`
+      details: `Synced live Instagram metadata (followers, names, avatars) for ${updatedCount} creators`
     });
 
     res.json({
       success: true,
-      message: `⚡ Live IG Sync UI ready! Awaiting third-party API integration (Modash / RapidAPI).`,
-      updatedCount: totalCount
+      message: `✅ Successfully fetched live Instagram data for ${updatedCount} creator(s)!`,
+      updatedCount
     });
   } catch (err: any) {
     console.error('Error syncing Instagram data:', err);
-    res.status(500).json({ success: false, message: err.message || 'Failed to trigger sync' });
+    res.status(500).json({ success: false, message: err.message || 'Failed to sync Instagram data' });
   }
 });
 

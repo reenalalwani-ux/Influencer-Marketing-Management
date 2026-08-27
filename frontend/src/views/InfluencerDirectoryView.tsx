@@ -343,19 +343,18 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
   ];
 
   const getCreatorAvatar = (avatarUrl?: string, handle?: string, name?: string) => {
-    // If valid working HTTP image URL (that is not an expired Instagram scontent link or ui-avatars)
-    if (avatarUrl && avatarUrl.trim() && avatarUrl.startsWith('http') && !avatarUrl.includes('scontent.cdninstagram.com') && !avatarUrl.includes('ui-avatars')) {
+    // 1. Use real avatar URL if stored in DB (including Instagram scontent links)
+    if (avatarUrl && avatarUrl.trim() && avatarUrl.startsWith('http') && !avatarUrl.includes('ui-avatars')) {
       return avatarUrl.trim();
     }
-    // Fallback: Pick a beautiful unique profile portrait photo from DIVERSE_AVATARS based on handle hash
-    const key = (handle || name || 'creator').toLowerCase();
-    let hash = 0;
-    for (let i = 0; i < key.length; i++) {
-      hash = (hash << 5) - hash + key.charCodeAt(i);
-      hash |= 0;
+    // 2. Live unavatar Instagram profile picture proxy
+    const cleanHandle = (handle || '').replace(/^@/, '').replace(/\s+/g, '').trim();
+    if (cleanHandle) {
+      return `https://unavatar.io/instagram/${cleanHandle}`;
     }
-    const idx = Math.abs(hash) % DIVERSE_AVATARS.length;
-    return DIVERSE_AVATARS[idx];
+    // 3. Fallback: ui-avatars initials avatar
+    const label = name || cleanHandle || 'Creator';
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(label)}&background=7c3aed&color=fff&size=200&bold=true`;
   };
 
   // Helper to ensure creator name is never a raw URL string
@@ -620,14 +619,12 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
                           referrerPolicy="no-referrer"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
-                            const key = (item.instagramHandle || item.name || 'creator').toLowerCase();
-                            let hash = 0;
-                            for (let i = 0; i < key.length; i++) {
-                              hash = (hash << 5) - hash + key.charCodeAt(i);
-                              hash |= 0;
+                            const cleanHandle = (item.instagramHandle || '').replace(/^@/, '').replace(/\s+/g, '').trim();
+                            if (!target.src.includes('unavatar.io') && cleanHandle) {
+                              target.src = `https://unavatar.io/instagram/${cleanHandle}`;
+                            } else {
+                              target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(getCleanCreatorName(item.name, item.instagramHandle))}&background=7c3aed&color=fff&bold=true`;
                             }
-                            const idx = Math.abs(hash) % DIVERSE_AVATARS.length;
-                            target.src = DIVERSE_AVATARS[idx];
                           }}
                           style={{ width: '56px', height: '56px' }}
                           className="rounded-xl border-2 border-white object-cover shadow-sm bg-slate-100 shrink-0"
