@@ -67,7 +67,7 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
   const fetchData = async () => {
     try {
       const [tRes, eRes, bRes, aRes] = await Promise.all([
-        api.get('/tasks'),
+        api.get('/tasks?excludeMatrix=true'),
         api.get('/employees'),
         api.get('/brands'),
         api.get('/employee-brands?status=Active')
@@ -361,18 +361,27 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
     }
   };
 
-  // Separate Main Tasks and Standalone/Sub Tasks
-  const mainTasks = tasks.filter(t => t.isMainTask);
+  // Separate Main Tasks and Standalone/Sub Tasks (Excludes Posting Calendar Sheet Matrix Tasks)
+  const nonMatrixTasks = tasks.filter(t => {
+    const isMatrixTask = (
+      (t.taskId && t.taskId.startsWith('TSK-MTRX')) ||
+      (t.description && t.description.toLowerCase().includes('posting calendar')) ||
+      (t.title && t.title.toLowerCase().startsWith('daily posting -'))
+    );
+    return !isMatrixTask;
+  });
+
+  const mainTasks = nonMatrixTasks.filter(t => t.isMainTask);
   const mainTaskIds = new Set(mainTasks.map(m => m._id));
 
   const getSubTasksForMain = (mainTaskId: string) => {
-    return tasks.filter(t => {
+    return nonMatrixTasks.filter(t => {
       const pId = typeof t.parentTaskId === 'object' ? t.parentTaskId?._id : t.parentTaskId;
       return pId === mainTaskId;
     });
   };
 
-  const standaloneTasks = tasks.filter(t => {
+  const standaloneTasks = nonMatrixTasks.filter(t => {
     if (t.isMainTask) return false;
     const pId = typeof t.parentTaskId === 'object' ? t.parentTaskId?._id : t.parentTaskId;
     return !pId || !mainTaskIds.has(pId);

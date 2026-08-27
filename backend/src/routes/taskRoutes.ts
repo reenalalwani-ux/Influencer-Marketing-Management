@@ -21,7 +21,7 @@ export const detectPlatform = (url: string): string => {
 
 // GET /api/v1/tasks
 router.get('/', authenticateToken, checkPermission('task.view'), async (req: AuthRequest, res: Response) => {
-  const { employeeId, brandId, status, platform, date, verificationStatus } = req.query;
+  const { employeeId, brandId, status, platform, date, verificationStatus, excludeMatrix } = req.query;
   const filter: any = {};
 
   if (employeeId) filter.employeeId = employeeId;
@@ -29,6 +29,11 @@ router.get('/', authenticateToken, checkPermission('task.view'), async (req: Aut
   if (status) filter.status = status;
   if (platform) filter.platform = platform;
   if (verificationStatus) filter.verificationStatus = verificationStatus;
+
+  if (excludeMatrix === 'true') {
+    filter.taskId = { $not: /^TSK-MTRX-\d+$/ };
+    filter.description = { $not: /Posting Calendar/i };
+  }
 
   if (date) {
     const targetDate = new Date(date as string);
