@@ -10,6 +10,10 @@ interface PostingCalendarViewProps {
 
 export const PostingCalendarView: React.FC<PostingCalendarViewProps> = ({ currentUser }) => {
   const isEmployeeRole = currentUser?.role === 'Employee';
+
+  // Roles that are allowed to edit / backfill past dates on the matrix
+  const PAST_DATE_ROLES = ['Super Admin', 'Admin', 'Marketing Manager', 'Assistant Manager', 'Assistant Marketing Manager'];
+  const canEditPastDates = PAST_DATE_ROLES.includes(currentUser?.role);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'Sheet Matrix' | 'Monthly' | 'Weekly' | 'Daily'>('Monthly');
   const [tasks, setTasks] = useState<TaskItem[]>([]);
@@ -411,23 +415,31 @@ export const PostingCalendarView: React.FC<PostingCalendarViewProps> = ({ curren
                               const isBusy = togglingCell === cellKey;
                               const now = new Date();
                               const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-                              const isEditable = d.dateStr === todayStr;
+                              const isToday = d.dateStr === todayStr;
+                              const isPast  = d.dateStr < todayStr;
                               const isFuture = d.dateStr > todayStr;
+
+                              // Editable: today for everyone, past dates only for privileged roles
+                              const isEditable = isToday || (isPast && canEditPastDates);
 
                               return (
                                 <td
                                   key={d.dateStr}
                                   onClick={() => isEditable && togglePostingCell(brand._id, d.dateStr, isPosted)}
                                   title={
-                                    isEditable
-                                      ? `Click to toggle posting status for Today (${d.monthDayStr})`
+                                    isToday
+                                      ? `Click to toggle posting for Today (${d.monthDayStr})`
                                       : isFuture
-                                      ? `Future Date (${d.monthDayStr}) - Disabled`
-                                      : `Past Date (${d.monthDayStr}) - Blocked`
+                                      ? `Future date (${d.monthDayStr}) — not yet available`
+                                      : isPast && canEditPastDates
+                                      ? `Past date (${d.monthDayStr}) — click to backfill`
+                                      : `Past date (${d.monthDayStr}) — only managers can edit past dates`
                                   }
                                   className={`px-1 py-2 text-center border-r border-slate-200 select-none transition ${
-                                    isEditable
+                                    isToday
                                       ? 'cursor-pointer bg-purple-50/90 hover:bg-purple-100 shadow-2xs font-extrabold ring-2 ring-purple-400/80 z-10'
+                                      : isPast && canEditPastDates
+                                      ? 'cursor-pointer hover:bg-purple-50/60 bg-white'
                                       : 'bg-slate-50/80 cursor-not-allowed'
                                   }`}
                                 >
@@ -435,15 +447,24 @@ export const PostingCalendarView: React.FC<PostingCalendarViewProps> = ({ curren
                                     {isBusy ? (
                                       <div className="w-5 h-5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
                                     ) : isPosted ? (
-                                      <div className={`w-5 h-5 rounded-md text-white flex items-center justify-center shadow-xs ${isEditable ? 'bg-emerald-600 ring-2 ring-emerald-400' : 'bg-emerald-600/90 border border-emerald-700/40'}`}>
+                                      <div className={`w-5 h-5 rounded-md text-white flex items-center justify-center shadow-xs ${
+                                        isToday
+                                          ? 'bg-emerald-600 ring-2 ring-emerald-400'
+                                          : isPast && canEditPastDates
+                                          ? 'bg-emerald-600/90 ring-1 ring-emerald-400/60'
+                                          : 'bg-emerald-600/90 border border-emerald-700/40'
+                                      }`}>
                                         <Check size={14} strokeWidth={3.5} />
                                       </div>
+                                    ) : isPast && canEditPastDates ? (
+                                      // Past date — editable for managers
+                                      <div className="w-5 h-5 rounded-md border-2 border-slate-400 bg-white hover:bg-purple-50 cursor-pointer shadow-sm transition"></div>
                                     ) : !isEditable ? (
-                                      <div className="w-5 h-5 rounded-md border-2 border-slate-300 bg-slate-100/90 shadow-2xs cursor-not-allowed">
-                                      </div>
+                                      // Locked cell (future or past-for-employee)
+                                      <div className="w-5 h-5 rounded-md border-2 border-slate-300 bg-slate-100/90 shadow-2xs cursor-not-allowed"></div>
                                     ) : (
-                                      <div className="w-5 h-5 rounded-md border-2 border-purple-600 bg-white hover:bg-purple-100 cursor-pointer shadow-sm transition">
-                                      </div>
+                                      // Today — editable for all
+                                      <div className="w-5 h-5 rounded-md border-2 border-purple-600 bg-white hover:bg-purple-100 cursor-pointer shadow-sm transition"></div>
                                     )}
                                   </div>
                                 </td>
