@@ -5,14 +5,28 @@ const getHeaders = () => ({
   // No Authorization header needed — HttpOnly cookie is sent automatically by the browser
 });
 
+/**
+ * Dispatches a global 'session:expired' event so App.tsx can redirect to the
+ * login page when any API call returns 401 (token expired after 24 h, or the
+ * token was replaced because another user logged in on the same account).
+ */
+const dispatchSessionExpired = () => {
+  window.dispatchEvent(new CustomEvent('session:expired'));
+};
+
 const parseJsonResponse = async (res: Response) => {
   const contentType = res.headers.get('content-type');
   if (contentType && contentType.includes('application/json')) {
     const data = await res.json();
     if (!res.ok) {
+      // 401 → session expired or invalidated by a new login on another device
+      if (res.status === 401) {
+        dispatchSessionExpired();
+      }
       // Attach status field so catch blocks can inspect it (e.g. 'Pending Approval')
       const err: any = new Error(data.message || 'API request failed');
       err.status = data.status;
+      err.httpStatus = res.status;
       err.data = data;
       throw err;
     }

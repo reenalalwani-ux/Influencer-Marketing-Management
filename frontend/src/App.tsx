@@ -31,6 +31,13 @@ export const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [targetRefreshCount, setTargetRefreshCount] = useState(0);
+  const [showSessionModal, setShowSessionModal] = useState(false);
+  const [sessionModalMsg, setSessionModalMsg] = useState('Your session has expired. Please sign in again.');
+  const sessionModalShownRef = useRef(false);
+  // Tracks whether a real authenticated session is active.
+  // forceLogout is a no-op when this is false, so a 401 on the login page
+  // (e.g. the initial checkAuth call when no session exists) never queues a modal.
+  const isLoggedInRef = useRef(false);
 
   // Check if current hash is a public share route, e.g. #/share/token
   const getShareTokenFromHash = () => {
@@ -100,9 +107,11 @@ export const App: React.FC = () => {
     try {
       const res = await api.get('/auth/me');
       if (res.success) {
+        isLoggedInRef.current = true;  // Real session confirmed — enable forceLogout
         setUser(res.user);
       }
     } catch (err) {
+      // Silently ignore — 401 here just means no active session on this device
       console.error('Session check:', err);
     } finally {
       clearTimeout(timeoutId);
@@ -114,12 +123,90 @@ export const App: React.FC = () => {
     checkAuth();
   }, []);
 
-  const handleLoginSuccess = (userData: User, token: string) => {
+  // ─── Shared session-validity checker ────────────────────────────────────────
+  const checkSessionValidity = async () => {
+    try {
+      const res = await api.get('/auth/me');
+      if (!res.success) {
+        forceLogout('Your session was ended because you logged in from another device.');
+      }
+    } catch (err: any) {
+      if (err.httpStatus === 401 || err.httpStatus === 403) {
+        forceLogout('Your session was ended because you logged in from another device.');
+      }
+    }
+  };
+
+  // ─── 1. Periodic poll every 15 seconds (background safety net) ──────────────
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(checkSessionValidity, 15 * 1000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  // ─── 2. Instant check when user switches back to this tab/window ────────────
+  // Browser timers are throttled in background tabs, so the 15s poll may be
+  // delayed. This fires an immediate check the moment the tab becomes visible,
+  // giving a ~1-second response time instead of waiting for the next poll tick.
+  useEffect(() => {
+    if (!user) return;
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkSessionValidity();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, [user]);
+
+  // ─── 3. Listen for global 'session:expired' event fired by api.ts ───────────
+  // Handles 401s from any active API call (not just the poll).
+  useEffect(() => {
+    const onSessionExpired = () => {
+      forceLogout('Your session has expired or was ended by another login. Please sign in again.');
+    };
+    window.addEventListener('session:expired', onSessionExpired);
+    return () => window.removeEventListener('session:expired', onSessionExpired);
+  }, []);
+
+  /**
+   * Shows the session-expired modal ON TOP of the current page.
+   * GUARD: only runs when isLoggedInRef.current is true (real session active).
+   * This prevents the modal from being queued by a 401 on the login page
+   * (e.g. initial checkAuth when no session exists on this device).
+   */
+  const forceLogout = async (message: string) => {
+    if (!isLoggedInRef.current) return;       // No active session — ignore silently
+    if (sessionModalShownRef.current) return; // Already showing — avoid duplicates
+    sessionModalShownRef.current = true;
+    isLoggedInRef.current = false;            // Prevent re-entry
+    try {
+      await api.post('/auth/logout', {});
+    } catch (_) { /* best-effort */ }
+    setSessionModalMsg(message);
+    setShowSessionModal(true);
+  };
+
+  /** Called when user clicks "Sign In Again" inside the session-expired modal */
+  const handleSessionModalConfirm = () => {
+    setShowSessionModal(false);
+    sessionModalShownRef.current = false;
+    isLoggedInRef.current = false;
+    setUser(null);
+    window.location.hash = '';
+  };
+
+  const handleLoginSuccess = (userData: User, _token: string) => {
+    // Clear any stale modal state that may have been set before login
+    setShowSessionModal(false);
+    sessionModalShownRef.current = false;
+    isLoggedInRef.current = true;  // Real session now active
     setUser(userData);
     handleNavigate('dashboard');
   };
 
   const handleLogout = async () => {
+    isLoggedInRef.current = false;
     try {
       await api.post('/auth/logout', {});  // Clears HttpOnly cookie server-side
     } catch (err) {
@@ -259,6 +346,98 @@ export const App: React.FC = () => {
             }
           }}
         />
+      )}
+
+      {/* ── Session Expired Modal ─────────────────────────────────────────── */}
+      {showSessionModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(6px)',
+            animation: 'fadeIn 0.25s ease'
+          }}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '20px',
+              padding: '40px 36px 32px',
+              maxWidth: '420px',
+              width: '90%',
+              boxShadow: '0 25px 60px -10px rgba(79, 70, 229, 0.35), 0 0 0 1px rgba(124,58,237,0.08)',
+              textAlign: 'center',
+              animation: 'modalSlideUp 0.3s cubic-bezier(0.34,1.56,0.64,1)'
+            }}
+          >
+            {/* Icon */}
+            <div
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 20px',
+                fontSize: 32
+              }}
+            >
+              🔒
+            </div>
+
+            <h2
+              style={{
+                fontSize: '20px',
+                fontWeight: 800,
+                color: '#0f172a',
+                marginBottom: 10,
+                letterSpacing: '-0.02em'
+              }}
+            >
+              Session Expired
+            </h2>
+
+            <p
+              style={{
+                fontSize: '14px',
+                color: '#64748b',
+                lineHeight: 1.6,
+                marginBottom: 28
+              }}
+            >
+              {sessionModalMsg}
+            </p>
+
+            <button
+              onClick={handleSessionModalConfirm}
+              style={{
+                width: '100%',
+                padding: '13px 24px',
+                borderRadius: '12px',
+                border: 'none',
+                cursor: 'pointer',
+                background: 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)',
+                color: '#fff',
+                fontSize: '15px',
+                fontWeight: 700,
+                letterSpacing: '0.01em',
+                boxShadow: '0 4px 15px -2px rgba(124,58,237,0.4)',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-1px)')}
+              onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
+            >
+              Sign In Again
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
