@@ -236,7 +236,11 @@ router.post('/matrix/toggle', authenticateToken, checkPermission('posting.update
 
     const now = new Date();
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    if (date !== todayStr) {
+    const userRole = req.user?.role || '';
+    const PAST_DATE_ROLES = ['Super Admin', 'Admin', 'Marketing Manager', 'Manager', 'Assistant Manager', 'Assistant Marketing Manager', 'Team Leader'];
+    const canEditPastDates = PAST_DATE_ROLES.includes(userRole) || (!!userRole && userRole.toLowerCase().includes('assistant'));
+
+    if (date !== todayStr && !canEditPastDates) {
       return res.status(400).json({ success: false, message: 'Posting matrix checkboxes can ONLY be marked for the present date (Today)' });
     }
 

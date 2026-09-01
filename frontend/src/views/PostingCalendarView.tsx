@@ -12,8 +12,8 @@ export const PostingCalendarView: React.FC<PostingCalendarViewProps> = ({ curren
   const isEmployeeRole = currentUser?.role === 'Employee';
 
   // Roles that are allowed to edit / backfill past dates on the matrix
-  const PAST_DATE_ROLES = ['Super Admin', 'Admin', 'Marketing Manager', 'Assistant Manager', 'Assistant Marketing Manager'];
-  const canEditPastDates = PAST_DATE_ROLES.includes(currentUser?.role);
+  const PAST_DATE_ROLES = ['Super Admin', 'Admin', 'Marketing Manager', 'Manager', 'Assistant Manager', 'Assistant Marketing Manager', 'Team Leader'];
+  const canEditPastDates = PAST_DATE_ROLES.includes(currentUser?.role) || (!!currentUser?.role && currentUser.role.toLowerCase().includes('assistant'));
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'Sheet Matrix' | 'Monthly' | 'Weekly' | 'Daily'>('Sheet Matrix');
   const [tasks, setTasks] = useState<TaskItem[]>([]);
@@ -109,8 +109,8 @@ export const PostingCalendarView: React.FC<PostingCalendarViewProps> = ({ curren
   }, [currentDate, viewMode, selectedEmployeeId]);
 
   const togglePostingCell = async (brandId: string, dateStr: string, currentIsPosted: boolean) => {
-    if (!selectedEmployeeId) return;
     const cellKey = `${brandId}_${dateStr}`;
+    if (!selectedEmployeeId || togglingCell === cellKey) return;
     setTogglingCell(cellKey);
 
     const newStatus = !currentIsPosted;
