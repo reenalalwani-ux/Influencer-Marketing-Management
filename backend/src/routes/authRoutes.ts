@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { User, Employee, Role } from '../models/allModels';
+import { User, Employee, Role, Brand } from '../models/allModels';
 import { generateToken, authenticateToken, AuthRequest, COOKIE_NAME, JWT_SECRET } from '../middleware/auth';
 import { logActivity } from '../middleware/auditLog';
 import { sendOTPEmail, sendManagerApprovalEmail } from '../services/emailService';
@@ -24,23 +24,44 @@ const isValidCompanyEmail = (email: string) => {
 
 // POST /api/v1/auth/request-otp
 router.post('/request-otp', async (req: AuthRequest, res: Response) => {
-  const { email } = req.body;
+  const { email, loginType } = req.body;
 
   if (!email) {
-    return res.status(400).json({ success: false, message: 'Work email address is required' });
+    return res.status(400).json({ success: false, message: 'Email address is required' });
   }
 
-  if (!isValidCompanyEmail(email)) {
+  const isClientLogin = loginType === 'client';
+
+  if (!isClientLogin && !isValidCompanyEmail(email)) {
     return res.status(400).json({
       success: false,
-      message: 'Access Restricted: Only @ad2ship.com company email addresses are allowed to log in.'
+      message: 'Access Restricted: Only @ad2ship.com company email addresses are allowed to log in as Team/Employee.'
     });
   }
 
   try {
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
-      return res.status(404).json({ success: false, message: 'No registered user found with this email address. Please sign up first.' });
+      return res.status(404).json({
+        success: false,
+        message: isClientLogin
+          ? 'No registered Client account found with this email address. Please contact your Brand Manager.'
+          : 'No registered user found with this email address. Please sign up first.'
+      });
+    }
+
+    if (isClientLogin && user.role !== 'Client') {
+      return res.status(403).json({
+        success: false,
+        message: 'This email belongs to a Team member. Please switch to the Team / Employee Login tab.'
+      });
+    }
+
+    if (!isClientLogin && user.role === 'Client') {
+      return res.status(403).json({
+        success: false,
+        message: 'This email belongs to a Client. Please switch to the Client Portal Login tab.'
+      });
     }
 
     const isManagerRole = ['Super Admin', 'Admin', 'Marketing Manager', 'Assistant Manager', 'Assistant Marketing Manager'].includes(user.role);
@@ -110,17 +131,17 @@ router.post('/verify-otp', async (req: AuthRequest, res: Response) => {
     return res.status(400).json({ success: false, message: 'Email and OTP code are required' });
   }
 
-  if (!isValidCompanyEmail(email)) {
-    return res.status(400).json({
-      success: false,
-      message: 'Access Restricted: Only @ad2ship.com company email addresses are allowed.'
-    });
-  }
-
   try {
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
       return res.status(404).json({ success: false, message: 'No record exists for this user account' });
+    }
+
+    if (user.role !== 'Client' && !isValidCompanyEmail(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Access Restricted: Only @ad2ship.com company email addresses are allowed for Team members.'
+      });
     }
 
     const isManagerRole = ['Super Admin', 'Admin', 'Marketing Manager', 'Assistant Manager', 'Assistant Marketing Manager'].includes(user.role);
@@ -169,7 +190,10 @@ router.post('/verify-otp', async (req: AuthRequest, res: Response) => {
 
     const roleDoc = await Role.findOne({ name: user.role });
     const permissions = roleDoc ? roleDoc.permissions : [];
-    const employee = await Employee.findOne({ email: user.email });
+    const [employee, brandDetails] = await Promise.all([
+      Employee.findOne({ email: user.email }),
+      user.brandId ? Brand.findById(user.brandId).lean() : null
+    ]);
 
     await logActivity({
       userId: user._id,
@@ -192,6 +216,8 @@ router.post('/verify-otp', async (req: AuthRequest, res: Response) => {
         email: user.email,
         role: user.role,
         employeeId: employee ? employee.employeeId : user.employeeId,
+        brandId: user.brandId,
+        brandDetails,
         permissions,
         employeeDetails: employee
       }
@@ -409,16 +435,18 @@ router.post('/verify-signup-otp', async (req: AuthRequest, res: Response) => {
 
 // POST /api/v1/auth/login
 router.post('/login', async (req: AuthRequest, res: Response) => {
-  const { email, password } = req.body;
+  const { email, password, loginType } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ success: false, message: 'Email and password are required' });
   }
 
-  if (!isValidCompanyEmail(email)) {
+  const isClientLogin = loginType === 'client';
+
+  if (!isClientLogin && !isValidCompanyEmail(email)) {
     return res.status(400).json({
       success: false,
-      message: 'Access Restricted: Only @ad2ship.com company email addresses are allowed to log in.'
+      message: 'Access Restricted: Only @ad2ship.com company email addresses are allowed to log in as Team/Employee.'
     });
   }
 
@@ -426,6 +454,20 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    if (isClientLogin && user.role !== 'Client') {
+      return res.status(403).json({
+        success: false,
+        message: 'This account belongs to a Team member. Please switch to the Team / Employee Login tab.'
+      });
+    }
+
+    if (!isClientLogin && user.role === 'Client') {
+      return res.status(403).json({
+        success: false,
+        message: 'This account belongs to a Client. Please switch to the Client Portal Login tab.'
+      });
     }
 
     const isMatch = await bcrypt.compare(password, user.password || '');
@@ -444,12 +486,14 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
     user.tokenIssuedAt = new Date();
     await user.save();
 
-    // Fetch user role & permissions
+    // Fetch user role & permissions and brand details
     const roleDoc = await Role.findOne({ name: user.role });
     const permissions = roleDoc ? roleDoc.permissions : [];
 
-    // Fetch associated employee record if any
-    const employee = await Employee.findOne({ email: user.email });
+    const [employee, brandDetails] = await Promise.all([
+      Employee.findOne({ email: user.email }),
+      user.brandId ? Brand.findById(user.brandId).lean() : null
+    ]);
 
     await logActivity({
       userId: user._id,
@@ -472,6 +516,8 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
         email: user.email,
         role: user.role,
         employeeId: employee ? employee.employeeId : user.employeeId,
+        brandId: user.brandId,
+        brandDetails,
         permissions,
         employeeDetails: employee
       }
@@ -511,9 +557,10 @@ router.post('/logout', async (req: AuthRequest, res: Response) => {
 router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => {
   if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-  const [roleDoc, employee] = await Promise.all([
+  const [roleDoc, employee, brandDetails] = await Promise.all([
     Role.findOne({ name: req.user.role }).lean(),
-    getEmployeeForAuthUser(req.user)
+    getEmployeeForAuthUser(req.user),
+    req.user.brandId ? Brand.findById(req.user.brandId).lean() : null
   ]);
   const permissions = roleDoc ? roleDoc.permissions : [];
 
@@ -526,6 +573,8 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => 
       email: req.user.email,
       role: req.user.role,
       employeeId: employee ? employee.employeeId : req.user.employeeId,
+      brandId: req.user.brandId,
+      brandDetails,
       permissions,
       employeeDetails: employee
     }

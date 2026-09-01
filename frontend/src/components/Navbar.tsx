@@ -201,7 +201,9 @@ export const Navbar: React.FC<NavbarProps> = ({ user, onLogout, activeView, setA
                   </div>
                   <div className="flex items-center gap-1 mt-1">
                     <Shield size={10} className="text-purple-600" />
-                    <span className="text-[11px] text-purple-700 font-black">{user.role === 'Employee' ? 'Member' : user.role}</span>
+                    <span className="text-[11px] text-purple-700 font-black">
+                      {user.role === 'Client' ? `Client (${user.brandDetails?.brandName || 'Portal'})` : (user.role === 'Employee' ? 'Member' : user.role)}
+                    </span>
                   </div>
                 </div>
               </div>

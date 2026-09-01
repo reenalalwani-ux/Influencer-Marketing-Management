@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Briefcase, Plus, Globe, Mail, Phone, ExternalLink, Search, Users, Eye, Edit2, Trash2, Loader2, ChevronDown } from 'lucide-react';
+import { Briefcase, Plus, Globe, Mail, Phone, ExternalLink, Search, Users, Eye, Edit2, Trash2, Loader2, ChevronDown, KeyRound, CheckCircle2, Copy, Instagram } from 'lucide-react';
 import { api } from '../services/api';
 import { Brand } from '../types';
 import { Modal } from '../components/Modal';
@@ -25,6 +25,15 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
+  // Client Portal Credentials Modal State
+  const [showClientAccessModal, setShowClientAccessModal] = useState(false);
+  const [clientAccessBrand, setClientAccessBrand] = useState<Brand | null>(null);
+  const [clientNameInput, setClientNameInput] = useState('');
+  const [clientEmailInput, setClientEmailInput] = useState('');
+  const [clientPasswordInput, setClientPasswordInput] = useState('client123');
+  const [savingClientAccess, setSavingClientAccess] = useState(false);
+  const [clientAccessSuccess, setClientAccessSuccess] = useState<string | null>(null);
+
   // Form states
   const [brandName, setBrandName] = useState('');
   const [industry, setIndustry] = useState('');
@@ -32,6 +41,7 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [website, setWebsite] = useState('');
+  const [instagramUrl, setInstagramUrl] = useState('');
   const [brandType, setBrandType] = useState<'New' | 'Running'>('Running');
   const [targetBarterCollabs, setTargetBarterCollabs] = useState<number>(7);
   const [targetPaidCollabs, setTargetPaidCollabs] = useState<number>(3);
@@ -70,6 +80,7 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
     setEmail('');
     setPhone('');
     setWebsite('');
+    setInstagramUrl('');
     setBrandType('Running');
     setTargetBarterCollabs(7);
     setTargetPaidCollabs(3);
@@ -84,6 +95,7 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
     setEmail(brand.email || '');
     setPhone(brand.phone || '');
     setWebsite(brand.website || '');
+    setInstagramUrl(brand.instagramUrl || '');
     const bType = brand.brandType || 'Running';
     setBrandType(bType);
     setTargetBarterCollabs(brand.targetBarterCollabs !== undefined ? brand.targetBarterCollabs : (bType === 'New' ? 8 : 7));
@@ -96,7 +108,7 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
     setSavingBrand(true);
     try {
       const payload = {
-        brandName, industry, contactPerson, email, phone, website,
+        brandName, industry, contactPerson, email, phone, website, instagramUrl,
         brandType,
         targetBarterCollabs: Number(targetBarterCollabs),
         targetPaidCollabs: Number(targetPaidCollabs)
@@ -112,7 +124,7 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
       if (res.success) {
         setShowAddModal(false);
         fetchBrands();
-        setBrandName(''); setIndustry(''); setContactPerson(''); setEmail(''); setPhone(''); setWebsite('');
+        setBrandName(''); setIndustry(''); setContactPerson(''); setEmail(''); setPhone(''); setWebsite(''); setInstagramUrl('');
         setEditingBrand(null);
       }
     } catch (err: any) {
@@ -153,6 +165,38 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const openClientAccessModal = (brand: Brand) => {
+    setClientAccessBrand(brand);
+    setClientNameInput(brand.contactPerson || brand.brandName + ' Client');
+    setClientEmailInput(brand.email || '');
+    setClientPasswordInput('client123');
+    setClientAccessSuccess(null);
+    setShowClientAccessModal(true);
+  };
+
+  const handleSaveClientAccess = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clientAccessBrand) return;
+    setSavingClientAccess(true);
+    setClientAccessSuccess(null);
+
+    try {
+      const res = await api.post(`/brands/${clientAccessBrand._id}/client-user`, {
+        name: clientNameInput,
+        email: clientEmailInput,
+        password: clientPasswordInput
+      });
+
+      if (res.success) {
+        setClientAccessSuccess(`Client portal login set up successfully for ${clientEmailInput}! Password: ${clientPasswordInput}`);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to set client credentials');
+    } finally {
+      setSavingClientAccess(false);
     }
   };
 
@@ -251,6 +295,30 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
               <span>{row.phone}</span>
             </div>
           )}
+          {row.website && (
+            <a
+              href={row.website.startsWith('http') ? row.website : `https://${row.website}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-purple-600 font-bold hover:underline cursor-pointer"
+              title="Open Website"
+            >
+              <Globe size={11} className="text-purple-600 shrink-0" />
+              <span className="truncate">{row.website}</span>
+            </a>
+          )}
+          {row.instagramUrl && (
+            <a
+              href={row.instagramUrl.startsWith('http') ? row.instagramUrl : `https://instagram.com/${row.instagramUrl.replace('@', '')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-pink-600 font-bold hover:underline cursor-pointer"
+              title="Open Instagram Profile"
+            >
+              <Instagram size={11} className="text-pink-600 shrink-0" />
+              <span className="truncate">{row.instagramUrl}</span>
+            </a>
+          )}
         </div>
       ),
     },
@@ -285,6 +353,15 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
       label: 'Actions',
       render: (_, row) => (
         <div className="flex items-center space-x-1 whitespace-nowrap">
+          {!isEmployee && (
+            <button
+              onClick={() => openClientAccessModal(row)}
+              className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition"
+              title="Manage Client Portal Access"
+            >
+              <KeyRound size={15} />
+            </button>
+          )}
           <button
             onClick={() => handleViewBrandDetails(row._id)}
             className="p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50 transition"
@@ -447,6 +524,7 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
         isOpen={!!selectedBrand}
         onClose={() => setSelectedBrand(null)}
         title="Brand Details & Assignments"
+        maxWidth="max-w-xl"
       >
         {selectedBrand && (
           <div className="space-y-4 text-xs font-medium">
@@ -488,7 +566,38 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
               </div>
               <div>
                 <span className="text-slate-400 text-[10px] uppercase font-bold">Website</span>
-                <p className="font-bold text-purple-600 text-xs truncate">{selectedBrand.website || 'N/A'}</p>
+                {selectedBrand.website ? (
+                  <a
+                    href={selectedBrand.website.startsWith('http') ? selectedBrand.website : `https://${selectedBrand.website}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-extrabold text-purple-600 hover:text-purple-800 underline text-xs flex items-center gap-1.5 cursor-pointer truncate mt-0.5"
+                    title="Open Brand Website"
+                  >
+                    <Globe size={13} className="text-purple-600 shrink-0" />
+                    <span className="truncate">{selectedBrand.website}</span>
+                    <ExternalLink size={11} className="text-purple-500 shrink-0" />
+                  </a>
+                ) : (
+                  <p className="font-bold text-slate-400 text-xs italic">N/A</p>
+                )}
+              </div>
+              <div className="col-span-2">
+                <span className="text-slate-400 text-[10px] uppercase font-bold">Instagram Account</span>
+                {selectedBrand.instagramUrl ? (
+                  <a
+                    href={selectedBrand.instagramUrl.startsWith('http') ? selectedBrand.instagramUrl : `https://instagram.com/${selectedBrand.instagramUrl.replace('@', '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-extrabold text-pink-600 hover:text-pink-700 underline text-xs flex items-center gap-1.5 cursor-pointer mt-0.5"
+                  >
+                    <Instagram size={13} className="text-pink-600 shrink-0" />
+                    <span>{selectedBrand.instagramUrl}</span>
+                    <ExternalLink size={11} className="text-pink-500" />
+                  </a>
+                ) : (
+                  <p className="font-bold text-slate-400 text-xs italic">Not configured</p>
+                )}
               </div>
             </div>
 
@@ -534,6 +643,7 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         title={editingBrand ? "Edit Brand Details & Targets" : "Add New Brand"}
+        maxWidth="max-w-xl"
       >
         <form onSubmit={handleSaveBrand} className="space-y-3.5 text-sm">
           <div>
@@ -662,15 +772,34 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Website</label>
-            <input
-              type="url"
-              value={website}
-              onChange={(e) => setWebsite(e.target.value)}
-              placeholder="https://brand.com"
-              className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium text-xs"
-            />
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <label className="text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1.5 h-5">
+                <Globe size={13} className="text-purple-600 shrink-0" />
+                <span>Website</span>
+              </label>
+              <input
+                type="url"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                placeholder="https://brand.com"
+                className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-extrabold text-pink-700 uppercase tracking-wider mb-1 flex items-center gap-1.5 h-5">
+                <Instagram size={13} className="text-pink-600 shrink-0" />
+                <span className="truncate">Instagram URL</span>
+              </label>
+              <input
+                type="text"
+                value={instagramUrl}
+                onChange={(e) => setInstagramUrl(e.target.value)}
+                placeholder="https://instagram.com/handle"
+                className="w-full bg-slate-50 border border-slate-200 focus:border-pink-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium text-xs"
+              />
+            </div>
           </div>
 
           <div className="flex justify-end space-x-2 pt-3">
@@ -693,6 +822,103 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
                 </>
               ) : (
                 <span>{editingBrand ? "Save Changes" : "Create Brand"}</span>
+              )}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* MANAGE CLIENT PORTAL ACCESS MODAL */}
+      <Modal
+        isOpen={showClientAccessModal}
+        onClose={() => setShowClientAccessModal(false)}
+        title={`Client Portal Access - ${clientAccessBrand?.brandName || 'Brand'}`}
+      >
+        <form onSubmit={handleSaveClientAccess} className="space-y-4">
+          <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 font-medium leading-relaxed">
+            <strong className="font-black flex items-center gap-1 text-amber-800">
+              <KeyRound size={14} /> Client Portal Credentials Generator:
+            </strong>
+            Create or update login access for the brand representative. The client can log in on the main screen by selecting the <strong className="font-bold">Client Portal</strong> tab.
+          </div>
+
+          {clientAccessSuccess && (
+            <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-bold space-y-1">
+              <div className="flex items-center gap-1.5 text-emerald-700">
+                <CheckCircle2 size={16} />
+                <span>Account Activated Successfully!</span>
+              </div>
+              <p className="text-[11px] font-normal text-emerald-900">{clientAccessSuccess}</p>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">
+              Client Representative Name *
+            </label>
+            <input
+              type="text"
+              required
+              value={clientNameInput}
+              onChange={(e) => setClientNameInput(e.target.value)}
+              placeholder="e.g. John Doe"
+              className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2.5 text-slate-900 focus:outline-none font-medium text-xs"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">
+              Client Account Email Address *
+            </label>
+            <input
+              type="email"
+              required
+              value={clientEmailInput}
+              onChange={(e) => setClientEmailInput(e.target.value)}
+              placeholder="client@brand.com"
+              className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2.5 text-slate-900 focus:outline-none font-medium text-xs"
+            />
+            <span className="text-[10px] font-semibold text-slate-400 mt-1 block">
+              Clients can use any email domain (no @ad2ship.com restriction).
+            </span>
+          </div>
+
+          <div>
+            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">
+              Set Initial Password (Optional)
+            </label>
+            <input
+              type="text"
+              value={clientPasswordInput}
+              onChange={(e) => setClientPasswordInput(e.target.value)}
+              placeholder="e.g. client123"
+              className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2.5 text-slate-900 font-mono focus:outline-none font-bold text-xs"
+            />
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-3">
+            <button
+              type="button"
+              onClick={() => setShowClientAccessModal(false)}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition text-xs border border-slate-200"
+            >
+              Close
+            </button>
+            <button
+              type="submit"
+              disabled={savingClientAccess}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-extrabold transition text-xs shadow-md flex items-center gap-1.5 disabled:opacity-60 cursor-pointer"
+            >
+              {savingClientAccess ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Saving Access...</span>
+                </>
+              ) : (
+                <>
+                  <KeyRound size={14} />
+                  <span>Save Client Access</span>
+                </>
               )}
             </button>
           </div>

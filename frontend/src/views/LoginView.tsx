@@ -9,6 +9,7 @@ interface LoginViewProps {
 
 export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
+  const [loginType, setLoginType] = useState<'employee' | 'client'>('employee');
   const [step, setStep] = useState<'credentials' | 'otp' | 'pending_approval'>('credentials');
 
   // Sign In State
@@ -66,15 +67,17 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     setError('');
     setSuccessMessage('');
 
-    if (!email.toLowerCase().trim().endsWith('@ad2ship.com')) {
-      setError('Access Restricted: Email address must end with @ad2ship.com company domain.');
+    const formattedEmail = email.toLowerCase().trim();
+
+    if (loginType === 'employee' && !formattedEmail.endsWith('@ad2ship.com')) {
+      setError('Access Restricted: Employee email address must end with @ad2ship.com company domain.');
       return;
     }
 
     setLoading(true);
 
     try {
-      const res = await api.post('/auth/request-otp', { email: email.toLowerCase().trim() });
+      const res = await api.post('/auth/request-otp', { email: formattedEmail, loginType });
       if (res.success) {
         setOtpCode('');
         setSuccessMessage(`Security OTP sent to ${res.email}. Please check your email inbox.`);
@@ -128,8 +131,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   // Resend OTP for Sign-In
   const handleResendOTP = async () => {
     if (resendTimer > 0) return;
-    if (!email.toLowerCase().trim().endsWith('@ad2ship.com')) {
-      setError('Access Restricted: Email address must end with @ad2ship.com company domain.');
+    const formattedEmail = email.toLowerCase().trim();
+    if (loginType === 'employee' && !formattedEmail.endsWith('@ad2ship.com')) {
+      setError('Access Restricted: Employee email address must end with @ad2ship.com company domain.');
       return;
     }
 
@@ -138,7 +142,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     setSuccessMessage('');
 
     try {
-      const res = await api.post('/auth/request-otp', { email: email.toLowerCase().trim() });
+      const res = await api.post('/auth/request-otp', { email: formattedEmail, loginType });
       if (res.success) {
         setSuccessMessage(`New OTP code sent to ${email}`);
         setResendTimer(30);
@@ -322,10 +326,43 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         {/* STEP 1: SIGN IN EMAIL ADDRESS INPUT */}
         {activeTab === 'signin' && step === 'credentials' && (
           <form onSubmit={handleRequestOTP} className="space-y-4">
+            {/* Login Type Selector (Employee vs Client) */}
+            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100/80 rounded-xl border border-slate-200 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => { setLoginType('employee'); setError(''); }}
+                className={`py-2 px-3 rounded-lg transition flex items-center justify-center gap-1.5 ${
+                  loginType === 'employee'
+                    ? 'bg-purple-600 text-white shadow-sm font-extrabold'
+                    : 'text-slate-600 hover:text-slate-900 font-semibold'
+                }`}
+              >
+                <User size={14} />
+                <span>Team Login</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setLoginType('client'); setError(''); }}
+                className={`py-2 px-3 rounded-lg transition flex items-center justify-center gap-1.5 ${
+                  loginType === 'client'
+                    ? 'bg-purple-600 text-white shadow-sm font-extrabold'
+                    : 'text-slate-600 hover:text-slate-900 font-semibold'
+                }`}
+              >
+                <Briefcase size={14} />
+                <span>Client Portal</span>
+              </button>
+            </div>
+
             <div>
-              <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5">
-                Work Email Address
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">
+                  {loginType === 'employee' ? 'Team Email Address' : 'Client Account Email'}
+                </label>
+                <span className="text-[10px] font-bold text-purple-600">
+                  {loginType === 'employee' ? '@ad2ship.com domain required' : 'Any registered client email'}
+                </span>
+              </div>
               <div className="relative flex items-center">
                 <Mail size={18} className="absolute left-3.5 text-purple-600 pointer-events-none" />
                 <input
@@ -333,7 +370,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
+                  placeholder={loginType === 'employee' ? 'user@ad2ship.com' : 'client@brand.com'}
                   className="w-full bg-slate-50/80 hover:bg-slate-100/70 focus:bg-white border border-slate-200 focus:border-purple-600 focus:ring-4 focus:ring-purple-100 transition-all rounded-xl pl-10 pr-4 py-3 text-xs text-slate-900 placeholder:text-slate-400 font-semibold shadow-2xs"
                 />
               </div>
@@ -344,7 +381,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               disabled={loading}
               className="w-full py-3.5 bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-extrabold rounded-xl shadow-lg shadow-purple-600/25 transition-all flex items-center justify-center space-x-2 text-xs disabled:opacity-50 mt-2"
             >
-              <span>{loading ? 'Sending OTP to Email...' : 'Send Email OTP'}</span>
+              <span>{loading ? 'Sending OTP to Email...' : (loginType === 'client' ? 'Access Client Portal' : 'Send Email OTP')}</span>
               <ArrowRight size={18} />
             </button>
           </form>

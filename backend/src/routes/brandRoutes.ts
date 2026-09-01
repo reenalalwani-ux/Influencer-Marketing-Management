@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
-import { Brand, EmployeeBrand, Employee } from '../models/allModels';
+import bcrypt from 'bcryptjs';
+import { Brand, EmployeeBrand, Employee, User } from '../models/allModels';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 import { logActivity } from '../middleware/auditLog';
@@ -80,7 +81,7 @@ router.get('/:id', authenticateToken, checkPermission('brand.view'), async (req:
 // POST /api/v1/brands
 router.post('/', authenticateToken, checkPermission('brand.create'), async (req: AuthRequest, res: Response) => {
   const { 
-    brandName, logo, website, industry, contactPerson, email, phone, notes,
+    brandName, logo, website, instagramUrl, industry, contactPerson, email, phone, notes,
     brandType = 'Running', targetBarterCollabs, targetPaidCollabs
   } = req.body;
 
@@ -115,6 +116,7 @@ router.post('/', authenticateToken, checkPermission('brand.create'), async (req:
       brandName,
       logo,
       website,
+      instagramUrl,
       industry,
       contactPerson,
       email,
@@ -201,6 +203,69 @@ router.delete('/:id', authenticateToken, checkPermission('brand.delete'), async 
     return res.status(200).json({ success: true, message: 'Brand deleted successfully' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to delete brand', error });
+  }
+});
+
+// POST /api/v1/brands/:id/client-user
+router.post('/:id/client-user', authenticateToken, checkPermission('brand.update'), async (req: AuthRequest, res: Response) => {
+  const { name, email, password } = req.body;
+
+  if (!email || !name) {
+    return res.status(400).json({ success: false, message: 'Client name and email address are required' });
+  }
+
+  try {
+    const brand = await Brand.findById(req.params.id);
+    if (!brand) return res.status(404).json({ success: false, message: 'Brand not found' });
+
+    let user = await User.findOne({ email: email.toLowerCase().trim() });
+    if (user) {
+      user.role = 'Client';
+      user.brandId = brand._id;
+      user.status = 'Active';
+      user.isApproved = true;
+      if (password) {
+        user.password = await bcrypt.hash(password, 10);
+      }
+      await user.save();
+    } else {
+      const hashedPassword = await bcrypt.hash(password || 'client123', 10);
+      user = await User.create({
+        name,
+        email: email.toLowerCase().trim(),
+        password: hashedPassword,
+        role: 'Client',
+        brandId: brand._id,
+        status: 'Active',
+        emailVerified: true,
+        isApproved: true
+      });
+    }
+
+    await logActivity({
+      userId: req.user?._id,
+      userName: req.user?.name || 'System',
+      action: 'CREATE_CLIENT_USER',
+      module: 'Brand Management',
+      entity: 'User',
+      entityId: (user._id as any).toString(),
+      details: `Created/updated Client access for brand ${brand.brandName}`
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Client portal access successfully set up for ${email}`,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        brandId: user.brandId
+      }
+    });
+  } catch (error: any) {
+    console.error('Error creating client user:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Failed to create client user' });
   }
 });
 

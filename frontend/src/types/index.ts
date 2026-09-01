@@ -4,8 +4,46 @@ export interface User {
   email: string;
   role: string;
   employeeId?: string;
+  brandId?: string;
+  brandDetails?: Brand;
   permissions: string[];
   employeeDetails?: Employee;
+}
+
+export interface ClientPosting {
+  id: string;
+  sourceType: 'ContentCalendar' | 'Task' | 'Influencer';
+  title: string;
+  platform: string;
+  contentType: string;
+  postDate: string;
+  status: 'Published' | 'Scheduled' | 'Pending Approval';
+  mediaUrl?: string;
+  publishedUrl?: string;
+  notes?: string;
+  designerName?: string;
+  assigneeName?: string;
+  influencerName?: string;
+  viewsCount?: number;
+  ordersGenerated?: number;
+  clientApprovalStatus: 'Pending' | 'Approved' | 'Revision Requested';
+  clientComments?: string;
+}
+
+export interface ClientOverviewMetrics {
+  totalPosts: number;
+  publishedPosts: number;
+  scheduledPosts: number;
+  activeInfluencers: number;
+  totalViews: number;
+  pendingApprovals: number;
+}
+
+export interface ClientOverviewData {
+  brand?: Brand;
+  metrics: ClientOverviewMetrics;
+  platformBreakdown: Record<string, number>;
+  recentActivities: any[];
 }
 
 export interface Employee {
@@ -30,6 +68,7 @@ export interface Brand {
   brandName: string;
   logo?: string;
   website?: string;
+  instagramUrl?: string;
   industry: string;
   contactPerson: string;
   email: string;

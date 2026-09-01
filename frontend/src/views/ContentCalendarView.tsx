@@ -28,6 +28,17 @@ const SearchableBrandDropdown: React.FC<{
     b.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  if (brands.length <= 1) {
+    return (
+      <div className="flex items-center space-x-1.5 bg-purple-50 px-3 py-1 rounded-xl border border-purple-200 shadow-2xs">
+        <span className="text-[11px] font-extrabold text-purple-700 uppercase tracking-wider shrink-0">Brand:</span>
+        <div className="bg-white border border-purple-300 text-purple-950 text-xs font-black rounded-lg px-3 py-1.5 shadow-2xs flex items-center gap-1.5">
+          <span>🏢 {selectedBrand || 'Assigned Brand'}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative inline-block text-left" ref={dropdownRef}>
       <div className="flex items-center space-x-1.5 bg-purple-50 px-3 py-1 rounded-xl border border-purple-200 shadow-2xs">
@@ -222,6 +233,21 @@ export const ContentCalendarView: React.FC<ContentCalendarViewProps> = ({ curren
     try {
       const res = await api.get('/brands');
       if (res.success && res.data.length > 0) {
+        // If current user is a Client, strictly scope brands list to ONLY their assigned brand
+        if (currentUser?.role === 'Client') {
+          const clientBrandName = currentUser?.brandDetails?.brandName || currentUser?.brandDetails?.name;
+          const matchedBrand = res.data.find((b: any) =>
+            (currentUser.brandId && (b._id === currentUser.brandId || b._id === (currentUser.brandId as any)._id)) ||
+            (clientBrandName && b.brandName.toLowerCase() === clientBrandName.toLowerCase())
+          ) || res.data[0];
+
+          if (matchedBrand) {
+            setBrands([matchedBrand]);
+            setSelectedBrandFilter(matchedBrand.brandName);
+            return;
+          }
+        }
+
         setBrands(res.data);
         const bNames = res.data.map((b: any) => b.brandName);
         setSelectedBrandFilter(prev => {

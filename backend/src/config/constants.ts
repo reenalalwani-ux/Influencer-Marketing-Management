@@ -6,6 +6,7 @@ export const ROLES = {
   ASSISTANT_MARKETING_MANAGER: 'Assistant Marketing Manager',
   TEAM_LEADER: 'Team Leader',
   EMPLOYEE: 'Employee',
+  CLIENT: 'Client',
 };
 
 export const PERMISSIONS = [
@@ -54,7 +55,11 @@ export const PERMISSIONS = [
   'influencer.view',
   'influencer.create',
   'influencer.update',
-  'influencer.delete'
+  'influencer.delete',
+
+  // Client Portal
+  'client.view',
+  'client.approve'
 ];
 
 export const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
@@ -107,6 +112,12 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
     'performance.view', 'report.view',
     'target.view',
     'influencer.view', 'influencer.create', 'influencer.update', 'influencer.delete'
+  ],
+  [ROLES.CLIENT]: [
+    'client.view',
+    'client.approve',
+    'posting.view',
+    'brand.view'
   ]
 };
 

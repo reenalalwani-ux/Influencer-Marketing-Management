@@ -90,6 +90,34 @@ export const seedDatabase = async () => {
       console.log('[Seed] Created Marketing Manager (manager@ad2ship.com) in MongoDB Atlas');
     }
 
+    let clientUser = await User.findOne({ email: 'client@brand.com' });
+    if (!clientUser) {
+      let brandDoc = await Brand.findOne({ status: 'Active' });
+      if (!brandDoc) {
+        brandDoc = await Brand.create({
+          brandId: 'BRD-1001',
+          brandName: 'Nike India',
+          industry: 'Footwear & Apparel',
+          contactPerson: 'Aditya Sharma',
+          email: 'client@brand.com',
+          phone: '+91 98765 00001',
+          status: 'Active'
+        });
+      }
+      const clientPassword = await bcrypt.hash('client123', 10);
+      clientUser = await User.create({
+        name: 'Aditya Sharma (Client)',
+        email: 'client@brand.com',
+        password: clientPassword,
+        role: 'Client',
+        brandId: brandDoc._id,
+        status: 'Active',
+        emailVerified: true,
+        isApproved: true
+      });
+      console.log('[Seed] Created Client Account (client@brand.com / client123) in MongoDB Atlas');
+    }
+
     // Seed initial active targets if none exist
     const targetCount = await Target.countDocuments();
     if (targetCount === 0) {

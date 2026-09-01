@@ -37,6 +37,7 @@ export interface IUser extends Document {
   password?: string;
   role: string; // Role name or ID
   employeeId?: string;
+  brandId?: mongoose.Types.ObjectId;
   status: 'Pending Verification' | 'Pending Approval' | 'Active' | 'Inactive';
   emailVerified?: boolean;
   isApproved?: boolean;
@@ -53,6 +54,7 @@ const UserSchema = new Schema<IUser>({
   password: { type: String, default: '' },
   role: { type: String, required: true, default: 'Employee' },
   employeeId: { type: String },
+  brandId: { type: Schema.Types.ObjectId, ref: 'Brand' },
   status: { type: String, enum: ['Pending Verification', 'Pending Approval', 'Active', 'Inactive'], default: 'Pending Verification' },
   emailVerified: { type: Boolean, default: false },
   isApproved: { type: Boolean, default: false },
@@ -104,6 +106,7 @@ export interface IBrand extends Document {
   brandName: string;
   logo?: string;
   website?: string;
+  instagramUrl?: string;
   industry: string;
   contactPerson: string;
   email: string;
@@ -121,6 +124,7 @@ const BrandSchema = new Schema<IBrand>({
   brandName: { type: String, required: true },
   logo: { type: String },
   website: { type: String },
+  instagramUrl: { type: String },
   industry: { type: String, required: true },
   contactPerson: { type: String, required: true },
   email: { type: String, required: true },
@@ -183,6 +187,8 @@ export interface ITask extends Document {
   remarks?: string;
   isMainTask?: boolean;
   parentTaskId?: mongoose.Types.ObjectId;
+  clientApprovalStatus?: 'Pending' | 'Approved' | 'Revision Requested';
+  clientComments?: string;
 }
 
 const TaskSchema = new Schema<ITask>({
@@ -215,7 +221,9 @@ const TaskSchema = new Schema<ITask>({
   rejectionReason: { type: String },
   comments: { type: String },
   isMainTask: { type: Boolean, default: false },
-  parentTaskId: { type: Schema.Types.ObjectId, ref: 'Task' }
+  parentTaskId: { type: Schema.Types.ObjectId, ref: 'Task' },
+  clientApprovalStatus: { type: String, enum: ['Pending', 'Approved', 'Revision Requested'], default: 'Pending' },
+  clientComments: { type: String, default: '' }
 }, { timestamps: true });
 
 TaskSchema.index({ scheduledDate: 1, status: 1 });
@@ -498,6 +506,8 @@ export interface IContentCalendar extends Document {
   assignedDesignerName?: string;
   status: 'Draft' | 'Pending' | 'Approved' | 'Published';
   notes?: string;
+  clientApprovalStatus?: 'Pending' | 'Approved' | 'Revision Requested';
+  clientComments?: string;
   createdBy?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
@@ -516,6 +526,8 @@ export const ContentCalendarSchema = new Schema<IContentCalendar>({
   assignedDesignerName: { type: String, default: '' },
   status: { type: String, enum: ['Draft', 'Pending', 'Approved', 'Published'], default: 'Pending' },
   notes: { type: String, default: '' },
+  clientApprovalStatus: { type: String, enum: ['Pending', 'Approved', 'Revision Requested'], default: 'Pending' },
+  clientComments: { type: String, default: '' },
   createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 

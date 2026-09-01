@@ -35,6 +35,7 @@ import influencerDirectoryRoutes from './routes/influencerDirectoryRoutes';
 import contentCalendarRoutes from './routes/contentCalendarRoutes';
 import syncRoutes from './routes/syncRoutes';
 import instagramRoutes from './routes/instagramRoutes';
+import clientRoutes from './routes/clientRoutes';
 import { syncBarterFromGoogleSheet } from './services/googleSheetSyncService';
 
 const app = express();
@@ -93,6 +94,7 @@ app.use('/api/v1/influencers', influencerRoutes);
 app.use('/api/v1/influencer-directory', influencerDirectoryRoutes);
 app.use('/api/v1/content-calendar', contentCalendarRoutes);
 app.use('/api/v1/sync', syncRoutes);
+app.use('/api/v1/client', clientRoutes);
 app.use('/api/v1/db', dbRoutes);
 
 // Instagram instagrapi endpoints

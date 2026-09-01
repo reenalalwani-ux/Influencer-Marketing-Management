@@ -28,6 +28,61 @@ interface MenuGroup {
 
 export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveView }) => {
   const isEmployee = user?.role === 'Employee';
+  const isClient = user?.role === 'Client';
+
+  if (isClient) {
+    return (
+      <aside className="w-64 bg-white/90 border-r border-slate-200/80 flex flex-col shrink-0 h-full p-4 space-y-2 backdrop-blur-xl overflow-y-auto">
+        <div className="px-3 py-2 text-[11px] font-extrabold uppercase tracking-widest text-purple-600 flex items-center gap-1.5">
+          <Sparkles size={13} /> Client Portal Modules
+        </div>
+
+        <nav className="space-y-2 flex-1 pt-1">
+          <button
+            onClick={() => { setActiveView('dashboard'); window.scrollTo(0, 0); }}
+            className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl font-bold text-sm transition-all duration-200 ${
+              activeView === 'dashboard'
+                ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-500 text-white shadow-md shadow-purple-500/25'
+                : 'text-slate-700 hover:text-purple-700 hover:bg-purple-50/60'
+            }`}
+          >
+            <div className="flex items-center space-x-2.5 min-w-0">
+              <LayoutDashboard size={18} className={`shrink-0 ${activeView === 'dashboard' ? 'text-white' : 'text-slate-400'}`} />
+              <span className="whitespace-nowrap truncate">Brand Overview & Feed</span>
+            </div>
+          </button>
+
+          <button
+            onClick={() => { setActiveView('content-calendar'); window.scrollTo(0, 0); }}
+            className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl font-bold text-sm transition-all duration-200 ${
+              activeView === 'content-calendar'
+                ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-500 text-white shadow-md shadow-purple-500/25'
+                : 'text-slate-700 hover:text-purple-700 hover:bg-purple-50/60'
+            }`}
+          >
+            <div className="flex items-center space-x-2.5 min-w-0">
+              <Calendar size={18} className={`shrink-0 ${activeView === 'content-calendar' ? 'text-white' : 'text-slate-400'}`} />
+              <span className="whitespace-nowrap truncate">Content Calendar</span>
+            </div>
+          </button>
+
+          <button
+            onClick={() => { setActiveView('reports'); window.scrollTo(0, 0); }}
+            className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl font-bold text-sm transition-all duration-200 ${
+              activeView === 'reports'
+                ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-500 text-white shadow-md shadow-purple-500/25'
+                : 'text-slate-700 hover:text-purple-700 hover:bg-purple-50/60'
+            }`}
+          >
+            <div className="flex items-center space-x-2.5 min-w-0">
+              <FileSpreadsheet size={18} className={`shrink-0 ${activeView === 'reports' ? 'text-white' : 'text-slate-400'}`} />
+              <span className="whitespace-nowrap truncate">Reports & Export</span>
+            </div>
+          </button>
+        </nav>
+      </aside>
+    );
+  }
 
   // Grouped Menu Definitions
   const menuGroups: MenuGroup[] = [

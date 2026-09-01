@@ -47,6 +47,15 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ userRole, currentUser 
             );
           }
         }
+
+        // Apply Client Role filtering to assigned brand only
+        if (currentUser?.role === 'Client') {
+          const clientBrandName = (currentUser?.brandDetails?.brandName || (currentUser?.brandDetails as any)?.name || '').toLowerCase();
+          data = data.filter((item: any) =>
+            (item.brandName && item.brandName.toLowerCase().includes(clientBrandName)) ||
+            (item.brandId && (item.brandId === currentUser.brandId || item.brandId._id === currentUser.brandId))
+          );
+        }
         setReportData(data);
       }
     } catch (err) {

@@ -21,6 +21,7 @@ import { AuditLogView } from './views/AuditLogView';
 import { ReportsView } from './views/ReportsView';
 import { SettingsView } from './views/SettingsView';
 import { InfluencerDirectoryView } from './views/InfluencerDirectoryView';
+import { ClientDashboardView } from './views/ClientDashboardView';
 import { URLSubmissionModal } from './components/URLSubmissionModal';
 import { PendingApprovalModal } from './components/PendingApprovalModal';
 
@@ -173,12 +174,16 @@ export const App: React.FC = () => {
 
         <main className="flex-1 p-4 overflow-y-auto w-full">
           {activeView === 'dashboard' && (
-          <DashboardView
-              user={user}
-              onNavigate={handleNavigate}
-              onOpenSubmitUrlModal={(task) => setSubmitUrlTask(task)}
-              onRegisterTaskUpdater={(fn) => { dashboardTaskUpdaterRef.current = fn; }}
-            />
+            user.role === 'Client' ? (
+              <ClientDashboardView user={user} />
+            ) : (
+              <DashboardView
+                user={user}
+                onNavigate={handleNavigate}
+                onOpenSubmitUrlModal={(task) => setSubmitUrlTask(task)}
+                onRegisterTaskUpdater={(fn) => { dashboardTaskUpdaterRef.current = fn; }}
+              />
+            )
           )}
 
           {activeView === 'targets' && (
