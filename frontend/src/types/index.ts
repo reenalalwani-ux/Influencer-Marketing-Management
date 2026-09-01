@@ -381,6 +381,8 @@ export interface ContentCalendarItem {
   assignedDesignerName?: string;
   status: 'Draft' | 'Pending' | 'Approved' | 'Published';
   notes?: string;
+  cycleId?: string;
+  cycleTitle?: string;
   createdBy?: any;
   createdAt?: string;
   updatedAt?: string;

@@ -13,9 +13,10 @@ router.get('/', authenticateToken, checkPermission('task.view'), async (req: Aut
     const { brandId, brandName, year, month, search, designer, fortnight } = req.query;
     const filter: any = {};
 
-    // 0. Employee Role Brand Filtering
-    const isEmployeeRole = req.user?.role?.toLowerCase() === 'employee';
-    if (isEmployeeRole) {
+    // 0. Employee / Member Role Brand Filtering
+    const userRole = (req.user?.role || '').toLowerCase();
+    const isScopedRole = userRole === 'employee' || userRole === 'member';
+    if (isScopedRole) {
       const emp = await getEmployeeForAuthUser(req.user);
       if (emp) {
         const assignments = await EmployeeBrand.find({ employeeId: emp._id, status: 'Active' }).populate('brandId');
@@ -36,7 +37,7 @@ router.get('/', authenticateToken, checkPermission('task.view'), async (req: Aut
     if (brandId && brandId !== 'All') {
       filter.brandId = brandId;
     } else if (brandName && brandName !== 'All') {
-      filter.brandName = brandName;
+      filter.brandName = { $regex: new RegExp(`^${(brandName as string).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') };
     }
 
     if (designer && designer !== 'All') {
@@ -88,28 +89,32 @@ router.get('/', authenticateToken, checkPermission('task.view'), async (req: Aut
 // DELETE /api/v1/content-calendar/clear-all — delete all calendar entries for a specific brand + period at once
 router.delete('/clear-all', authenticateToken, checkPermission('task.delete'), async (req: AuthRequest, res: Response) => {
   try {
-    const { brandName, year, month, fortnight } = req.query;
-
-    const filter: any = {};
-    if (brandName && brandName !== 'All') {
-      filter.brandName = brandName;
-    }
+    const { brandName, year, month, fortnight, cycleId } = req.query;
 
     const now = new Date();
     const currentYear = Number(year) || now.getFullYear();
     const currentMonth = month !== undefined ? Number(month) - 1 : now.getMonth();
 
-    if (year || month !== undefined) {
-      let start = new Date(currentYear, currentMonth, 1, 0, 0, 0);
-      let end = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
-
-      if (fortnight === '1st-15th') {
-        end = new Date(currentYear, currentMonth, 15, 23, 59, 59);
-      } else if (fortnight === '16th-End') {
-        start = new Date(currentYear, currentMonth, 16, 0, 0, 0);
+    const filter: any = {};
+    if (cycleId && cycleId !== 'All') {
+      filter.cycleId = cycleId;
+    } else {
+      if (brandName && brandName !== 'All') {
+        filter.brandName = { $regex: new RegExp(`^${(brandName as string).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') };
       }
 
-      filter.postDate = { $gte: start, $lte: end };
+      if (year || month !== undefined) {
+        let start = new Date(currentYear, currentMonth, 1, 0, 0, 0);
+        let end = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
+
+        if (fortnight === '1st-15th') {
+          end = new Date(currentYear, currentMonth, 15, 23, 59, 59);
+        } else if (fortnight === '16th-End') {
+          start = new Date(currentYear, currentMonth, 16, 0, 0, 0);
+        }
+
+        filter.postDate = { $gte: start, $lte: end };
+      }
     }
 
     const result = await ContentCalendar.deleteMany(filter);
@@ -120,7 +125,7 @@ router.delete('/clear-all', authenticateToken, checkPermission('task.delete'), a
       action: 'CLEAR_ALL_CONTENT_CALENDAR',
       module: 'Content Calendar Module',
       entity: 'ContentCalendar',
-      newValue: { brandName, deletedCount: result.deletedCount, year: currentYear, month: currentMonth + 1 }
+      newValue: { brandName, cycleId, deletedCount: result.deletedCount, year: currentYear, month: currentMonth + 1 }
     });
 
     return res.status(200).json({
@@ -136,7 +141,7 @@ router.delete('/clear-all', authenticateToken, checkPermission('task.delete'), a
 // POST /api/v1/content-calendar/create-cycle — Generate/Initialize a 15-day or monthly content calendar cycle
 router.post('/create-cycle', authenticateToken, checkPermission('task.create'), async (req: AuthRequest, res: Response) => {
   try {
-    const { brandId, brandName, year, month, fortnight, frequency, platform, assignedDesignerId, assignedDesignerName, defaultPostType } = req.body;
+    const { brandId, brandName, year, month, fortnight, frequency, customDays, platform, assignedDesignerId, assignedDesignerName, defaultPostType, cycleTitle } = req.body;
 
     if (!brandName && !brandId) {
       return res.status(400).json({ success: false, message: 'Brand is required' });
@@ -157,25 +162,42 @@ router.post('/create-cycle', authenticateToken, checkPermission('task.create'), 
     const currentYear = Number(year) || new Date().getFullYear();
     const currentMonth = month !== undefined ? Number(month) - 1 : new Date().getMonth();
 
-    // Determine start and end day numbers
-    let startDay = 1;
-    let endDay = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const postTypes = ['Intro Post', 'Product Reel', 'Brand Carousel', 'Behind The Scenes', 'Customer Review', 'Feature Highlight', 'Special Offer'];
+    const createdEntries: any[] = [];
+    let postTypeIdx = 0;
 
-    if (fortnight === '1st-15th') {
-      startDay = 1;
-      endDay = 15;
-    } else if (fortnight === '16th-End') {
-      startDay = 16;
+    // Full month range (always, since cycle period is now always 'All')
+    const totalDays = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const allDayRange = Array.from({ length: totalDays }, (_, i) => i + 1);
+
+    // Determine which days to create based on frequency
+    let daysToCreate: number[] = [];
+
+    if (frequency === 'Custom' && Array.isArray(customDays) && customDays.length > 0) {
+      // Only the explicitly selected days
+      daysToCreate = customDays.map(Number).filter(d => d >= 1 && d <= totalDays).sort((a, b) => a - b);
+    } else if (frequency === 'AllDays' || frequency === 'Daily') {
+      // Every day of the month
+      daysToCreate = allDayRange;
+    } else if (frequency === 'OddDays' || frequency === 'Alternate') {
+      // 1, 3, 5, 7 ... odd-numbered days
+      daysToCreate = allDayRange.filter(d => d % 2 !== 0);
+    } else if (frequency === 'EvenDays') {
+      // 2, 4, 6, 8 ... even-numbered days
+      daysToCreate = allDayRange.filter(d => d % 2 === 0);
+    } else if (frequency === 'Single') {
+      daysToCreate = [1]; // Just the first day
+    } else {
+      daysToCreate = allDayRange; // Fallback: all days
     }
 
-    // Determine step frequency (1 for Daily, 2 for Alternate days)
-    const step = frequency === 'Alternate' ? 2 : (frequency === 'Single' ? 99 : 1);
+    // Unique cycle ID & title for grouping multi-calendars separately
+    const cycleId = 'cycle_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+    const freqLabel = frequency === 'AllDays' ? 'Daily' : frequency === 'OddDays' ? 'Odd Days' : frequency === 'EvenDays' ? 'Even Days' : 'Custom';
+    const defaultCycleTitle = `${platform || 'Instagram'} — ${freqLabel} (${daysToCreate.length} Posts)`;
+    const finalCycleTitle = cycleTitle && cycleTitle.trim() ? cycleTitle.trim() : defaultCycleTitle;
 
-    const createdEntries: any[] = [];
-    const postTypes = ['Intro Post', 'Product Reel', 'Brand Carousel', 'Behind The Scenes', 'Customer Review', 'Feature Highlight', 'Special Offer'];
-
-    let postTypeIdx = 0;
-    for (let day = startDay; day <= endDay; day += step) {
+    for (const day of daysToCreate) {
       const dateObj = new Date(currentYear, currentMonth, day, 12, 0, 0);
       const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
       const postType = defaultPostType || postTypes[postTypeIdx % postTypes.length];
@@ -192,13 +214,14 @@ router.post('/create-cycle', authenticateToken, checkPermission('task.create'), 
         assignedDesignerId: assignedDesignerId || undefined,
         assignedDesignerName: finalDesignerName,
         status: 'Pending',
-        notes: `Cycle ${fortnight || 'Full Month'} post for ${day}/${currentMonth + 1}/${currentYear}`,
+        notes: `${frequency || 'Full Month'} posting — day ${day}/${currentMonth + 1}/${currentYear}`,
+        cycleId,
+        cycleTitle: finalCycleTitle,
         createdBy: req.user?._id
       });
 
       createdEntries.push(entry);
       postTypeIdx++;
-      if (frequency === 'Single') break;
     }
 
     await logActivity({
@@ -207,7 +230,7 @@ router.post('/create-cycle', authenticateToken, checkPermission('task.create'), 
       action: 'CREATE_CONTENT_CALENDAR_CYCLE',
       module: 'Content Calendar Module',
       entity: 'ContentCalendar',
-      newValue: { brandName: finalBrandName, year: currentYear, month: currentMonth + 1, fortnight, count: createdEntries.length }
+      newValue: { brandName: finalBrandName, year: currentYear, month: currentMonth + 1, fortnight, frequency, count: createdEntries.length }
     });
 
     return res.status(200).json({
@@ -220,6 +243,7 @@ router.post('/create-cycle', authenticateToken, checkPermission('task.create'), 
     return res.status(500).json({ success: false, message: 'Error creating content calendar cycle', error });
   }
 });
+
 
 // POST /api/v1/content-calendar
 router.post('/', authenticateToken, checkPermission('task.create'), async (req: AuthRequest, res: Response) => {
@@ -323,16 +347,16 @@ router.delete('/:id', authenticateToken, checkPermission('task.delete'), async (
   }
 });
 
-// POST /api/v1/content-calendar/share — generate a shareable public token for a brand+month calendar
+// POST /api/v1/content-calendar/share — generate a shareable public token for a brand+month+cycle calendar
 router.post('/share', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
-    const { brandName, year, month } = req.body;
+    const { brandName, year, month, cycleId } = req.body;
     if (!brandName) {
       return res.status(400).json({ success: false, message: 'brandName is required' });
     }
 
-    // Build a deterministic token from brand + year + month so same share link is reused
-    const tokenPayload = `${brandName}|${year || new Date().getFullYear()}|${month || new Date().getMonth() + 1}`;
+    const targetCycle = cycleId || 'All';
+    const tokenPayload = `${brandName}|${year || new Date().getFullYear()}|${month || new Date().getMonth() + 1}|${targetCycle}`;
     const token = Buffer.from(tokenPayload).toString('base64url');
 
     return res.status(200).json({
@@ -350,7 +374,7 @@ router.get('/public/:token', async (req, res: Response) => {
   try {
     const { token } = req.params;
 
-    // Decode token to get brand + year + month
+    // Decode token to get brand + year + month + optional cycleId
     let tokenPayload: string;
     try {
       tokenPayload = Buffer.from(token, 'base64url').toString('utf8');
@@ -363,17 +387,23 @@ router.get('/public/:token', async (req, res: Response) => {
       return res.status(400).json({ success: false, message: 'Malformed share token' });
     }
 
-    const [brandName, yearStr, monthStr] = parts;
+    const [brandName, yearStr, monthStr, cycleId] = parts;
     const year = Number(yearStr);
     const month = Number(monthStr) - 1; // 0-indexed month
 
     const startOfMonth = new Date(year, month, 1, 0, 0, 0);
     const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59);
 
-    const items = await ContentCalendar.find({
+    const query: any = {
       brandName: { $regex: new RegExp(`^${brandName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
       postDate: { $gte: startOfMonth, $lte: endOfMonth }
-    })
+    };
+
+    if (cycleId && cycleId !== 'All') {
+      query.cycleId = cycleId;
+    }
+
+    const items = await ContentCalendar.find(query)
       .populate('brandId', 'brandName')
       .populate('assignedDesignerId', 'name designation')
       .sort({ postDate: 1 });
@@ -388,6 +418,7 @@ router.get('/public/:token', async (req, res: Response) => {
         year,
         month: month + 1,
         monthName: new Date(year, month, 1).toLocaleString('en-US', { month: 'long' }),
+        cycleId: cycleId || 'All',
         generatedAt: new Date()
       }
     });

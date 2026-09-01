@@ -13,9 +13,10 @@ router.get('/', authenticateToken, checkPermission('brand.view'), async (req: Au
   try {
     let filter: any = {};
 
-    // Filter brands to ONLY those assigned if the user is an employee
-    const isEmployeeRole = req.user?.role?.toLowerCase() === 'employee';
-    if (isEmployeeRole) {
+    // Filter brands to ONLY those assigned if the user is an employee or member
+    const userRole = (req.user?.role || '').toLowerCase();
+    const isScopedRole = userRole === 'employee' || userRole === 'member';
+    if (isScopedRole) {
       const emp = await getEmployeeForAuthUser(req.user);
       if (emp) {
         const assignments = await EmployeeBrand.find({ employeeId: emp._id, status: 'Active' });

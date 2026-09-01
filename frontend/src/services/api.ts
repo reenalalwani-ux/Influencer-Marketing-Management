@@ -36,51 +36,58 @@ const parseJsonResponse = async (res: Response) => {
   throw new Error(`Server returned status ${res.status}: ${res.statusText || 'Non-JSON response: ' + text.slice(0, 100)}`);
 };
 
+const executeFetch = async (fetchCall: () => Promise<Response>) => {
+  try {
+    const res = await fetchCall();
+    return await parseJsonResponse(res);
+  } catch (err: any) {
+    if (err instanceof TypeError && err.message === 'Failed to fetch') {
+      throw new Error('Server connection issue. The backend server may be restarting — please try again in a moment.');
+    }
+    throw err;
+  }
+};
+
 export const api = {
   async get(endpoint: string) {
-    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+    return executeFetch(() => fetch(`${API_BASE_URL}${endpoint}`, {
       headers: getHeaders(),
-      credentials: 'include'  // Send HttpOnly cookie automatically
-    });
-    return parseJsonResponse(res);
+      credentials: 'include'
+    }));
   },
 
   async post(endpoint: string, body: any) {
-    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+    return executeFetch(() => fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'POST',
       headers: getHeaders(),
-      credentials: 'include',  // Send HttpOnly cookie automatically
+      credentials: 'include',
       body: JSON.stringify(body)
-    });
-    return parseJsonResponse(res);
+    }));
   },
 
   async put(endpoint: string, body: any) {
-    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+    return executeFetch(() => fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'PUT',
       headers: getHeaders(),
-      credentials: 'include',  // Send HttpOnly cookie automatically
+      credentials: 'include',
       body: JSON.stringify(body)
-    });
-    return parseJsonResponse(res);
+    }));
   },
 
   async patch(endpoint: string, body?: any) {
-    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+    return executeFetch(() => fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'PATCH',
       headers: getHeaders(),
-      credentials: 'include',  // Send HttpOnly cookie automatically
+      credentials: 'include',
       body: body ? JSON.stringify(body) : undefined
-    });
-    return parseJsonResponse(res);
+    }));
   },
 
   async delete(endpoint: string) {
-    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+    return executeFetch(() => fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'DELETE',
       headers: getHeaders(),
-      credentials: 'include'  // Send HttpOnly cookie automatically
-    });
-    return parseJsonResponse(res);
+      credentials: 'include'
+    }));
   }
 };

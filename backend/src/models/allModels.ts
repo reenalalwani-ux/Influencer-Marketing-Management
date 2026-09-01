@@ -506,6 +506,8 @@ export interface IContentCalendar extends Document {
   assignedDesignerName?: string;
   status: 'Draft' | 'Pending' | 'Approved' | 'Published';
   notes?: string;
+  cycleId?: string;
+  cycleTitle?: string;
   clientApprovalStatus?: 'Pending' | 'Approved' | 'Revision Requested';
   clientComments?: string;
   createdBy?: mongoose.Types.ObjectId;
@@ -526,6 +528,8 @@ export const ContentCalendarSchema = new Schema<IContentCalendar>({
   assignedDesignerName: { type: String, default: '' },
   status: { type: String, enum: ['Draft', 'Pending', 'Approved', 'Published'], default: 'Pending' },
   notes: { type: String, default: '' },
+  cycleId: { type: String, default: '' },
+  cycleTitle: { type: String, default: '' },
   clientApprovalStatus: { type: String, enum: ['Pending', 'Approved', 'Revision Requested'], default: 'Pending' },
   clientComments: { type: String, default: '' },
   createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
