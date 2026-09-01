@@ -86,8 +86,8 @@ router.post('/', authenticateToken, checkPermission('brand.create'), async (req:
     brandType = 'Running', targetBarterCollabs, targetPaidCollabs
   } = req.body;
 
-  if (!brandName || !industry || !contactPerson || !email || !phone) {
-    return res.status(400).json({ success: false, message: 'Required brand details missing' });
+  if (!brandName || !industry) {
+    return res.status(400).json({ success: false, message: 'Brand name and industry are required' });
   }
 
   try {

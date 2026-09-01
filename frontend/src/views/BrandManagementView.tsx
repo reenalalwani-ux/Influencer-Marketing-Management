@@ -11,6 +11,114 @@ interface BrandManagementViewProps {
   userRole?: string;
 }
 
+const INDUSTRY_OPTIONS = [
+  { label: 'Fashion & Apparel', icon: '👗' },
+  { label: 'Beauty & Cosmetics', icon: '💄' },
+  { label: 'Skincare & Wellness', icon: '🌿' },
+  { label: 'Food & Beverages', icon: '🍕' },
+  { label: 'Jewelry & Accessories', icon: '💍' },
+  { label: 'Home & Living', icon: '🛋️' },
+  { label: 'Electronics & Tech', icon: '📱' },
+  { label: 'Kids & Baby Care', icon: '👶' },
+  { label: 'Travel & Hospitality', icon: '✈️' },
+  { label: 'Fitness & Sports', icon: '🏋️' },
+  { label: 'Education & E-Learning', icon: '🎓' },
+  { label: 'Lifestyle & Luxury', icon: '🎨' },
+  { label: 'Other', icon: '💡' }
+];
+
+const CustomIndustrySelect: React.FC<{
+  value: string;
+  onChange: (val: string) => void;
+}> = ({ value, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const wrapperRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOpt = INDUSTRY_OPTIONS.find(o => o.label === value);
+  const filteredOpts = INDUSTRY_OPTIONS.filter(o => o.label.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div className="relative w-full text-left" ref={wrapperRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full bg-slate-50 border border-slate-200 hover:border-purple-400 focus:border-purple-500 rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none font-bold text-xs flex items-center justify-between cursor-pointer transition shadow-2xs"
+      >
+        <div className="flex items-center gap-2 truncate">
+          {selectedOpt ? (
+            <>
+              <span className="text-sm shrink-0">{selectedOpt.icon}</span>
+              <span className="truncate text-slate-900 font-extrabold">{selectedOpt.label}</span>
+            </>
+          ) : value ? (
+            <>
+              <span className="text-sm shrink-0">🏢</span>
+              <span className="truncate text-slate-900 font-extrabold">{value}</span>
+            </>
+          ) : (
+            <span className="text-slate-400 font-medium">-- Select Industry --</span>
+          )}
+        </div>
+        <ChevronDown size={14} className={`text-purple-600 transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="origin-top-left absolute left-0 right-0 mt-1.5 rounded-2xl bg-white shadow-2xl border border-purple-200 ring-1 ring-purple-950/5 focus:outline-none z-50 overflow-hidden p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-100">
+          <div className="p-1.5 border-b border-purple-100 bg-purple-50/50 rounded-xl">
+            <input
+              type="text"
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search industry..."
+              className="w-full bg-white border border-purple-200 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-purple-500"
+            />
+          </div>
+          <div className="max-h-52 overflow-y-auto space-y-0.5">
+            {filteredOpts.length === 0 ? (
+              <div className="p-3 text-center text-xs font-semibold text-slate-400">No industry found</div>
+            ) : (
+              filteredOpts.map((opt) => (
+                <button
+                  key={opt.label}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.label);
+                    setIsOpen(false);
+                    setSearch('');
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition cursor-pointer ${
+                    value === opt.label
+                      ? 'bg-purple-600 text-white shadow-2xs font-extrabold'
+                      : 'text-slate-800 hover:bg-purple-50 hover:text-purple-900'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="text-sm shrink-0">{opt.icon}</span>
+                    <span className="truncate">{opt.label}</span>
+                  </div>
+                  {value === opt.label && <CheckCircle2 size={13} className="text-white shrink-0" />}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRole }) => {
   const isEmployee = userRole === 'Employee';
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -42,9 +150,9 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
   const [phone, setPhone] = useState('');
   const [website, setWebsite] = useState('');
   const [instagramUrl, setInstagramUrl] = useState('');
-  const [brandType, setBrandType] = useState<'New' | 'Running'>('Running');
-  const [targetBarterCollabs, setTargetBarterCollabs] = useState<number>(7);
-  const [targetPaidCollabs, setTargetPaidCollabs] = useState<number>(3);
+  const [brandType, setBrandType] = useState<'New' | 'Running'>('New');
+  const [targetBarterCollabs, setTargetBarterCollabs] = useState<number>(8);
+  const [targetPaidCollabs, setTargetPaidCollabs] = useState<number>(2);
 
   const fetchBrands = async () => {
     try {
@@ -81,9 +189,9 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
     setPhone('');
     setWebsite('');
     setInstagramUrl('');
-    setBrandType('Running');
-    setTargetBarterCollabs(7);
-    setTargetPaidCollabs(3);
+    setBrandType('New');
+    setTargetBarterCollabs(8);
+    setTargetPaidCollabs(2);
     setShowAddModal(true);
   };
 
@@ -725,37 +833,31 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
 
           <div>
             <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Industry *</label>
-            <input
-              type="text"
-              required
+            <CustomIndustrySelect
               value={industry}
-              onChange={(e) => setIndustry(e.target.value)}
-              placeholder="e.g. Fashion & Lifestyle"
-              className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium text-xs"
+              onChange={(val) => setIndustry(val)}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Contact Person *</label>
+            <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Contact Person</label>
             <input
               type="text"
-              required
               value={contactPerson}
               onChange={(e) => setContactPerson(e.target.value)}
-              placeholder="e.g. Brand Marketing POC"
+              placeholder="e.g. Brand Marketing POC (Optional)"
               className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium text-xs"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Email *</label>
+              <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Email</label>
               <input
                 type="email"
-                required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="contact@brand.com"
+                placeholder="contact@brand.com (Optional)"
                 className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium text-xs"
               />
             </div>

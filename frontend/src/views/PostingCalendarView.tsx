@@ -15,7 +15,7 @@ export const PostingCalendarView: React.FC<PostingCalendarViewProps> = ({ curren
   const PAST_DATE_ROLES = ['Super Admin', 'Admin', 'Marketing Manager', 'Assistant Manager', 'Assistant Marketing Manager'];
   const canEditPastDates = PAST_DATE_ROLES.includes(currentUser?.role);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<'Sheet Matrix' | 'Monthly' | 'Weekly' | 'Daily'>('Monthly');
+  const [viewMode, setViewMode] = useState<'Sheet Matrix' | 'Monthly' | 'Weekly' | 'Daily'>('Sheet Matrix');
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
 

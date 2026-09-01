@@ -37,7 +37,7 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedStatus, setSelectedStatus] = useState('All');
   const [followerTier, setFollowerTier] = useState('All');
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -583,22 +583,6 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
                 <option value="macro">Macro (500K+)</option>
               </select>
 
-              {/* Grid / Table Toggle */}
-              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-purple-600 shadow-xs' : 'text-slate-500'}`}
-                >
-                  <Grid size={15} />
-                </button>
-                <button
-                  onClick={() => setViewMode('table')}
-                  className={`p-1.5 rounded-lg transition-all ${viewMode === 'table' ? 'bg-white text-purple-600 shadow-xs' : 'text-slate-500'}`}
-                >
-                  <TableIcon size={15} />
-                </button>
-              </div>
-
               {/* Add New Influencer Button */}
               <button
                 onClick={openAddModal}
@@ -628,168 +612,6 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
               >
                 <Plus size={15} /> Add First Influencer
               </button>
-            </div>
-          ) : viewMode === 'grid' ? (
-            /* COMPACT GRID CARDS VIEW */
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {directoryItems.map((item) => (
-                <div
-                  key={item._id}
-                  className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col group relative"
-                >
-                  {/* Top Colored Banner Bar */}
-                  <div className="h-14 bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-500 relative">
-                    <div className="absolute top-2.5 right-2.5 flex items-center gap-1">
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-2xs ${
-                        item.status === 'Preferred' ? 'bg-emerald-500 text-white' :
-                        item.status === 'Blacklisted' ? 'bg-rose-500 text-white' :
-                        item.status === 'In Discussion' ? 'bg-amber-400 text-slate-950' :
-                        'bg-white/95 text-purple-900 font-extrabold'
-                      }`}>
-                        {item.status}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Profile Info Row */}
-                  <div className="px-4 pt-0 pb-4 flex-1 flex flex-col -mt-7">
-                    <div className="flex items-end justify-between">
-                      <div className="relative">
-                        <img
-                          src={getCreatorAvatar(item.avatar, item.instagramHandle, item.name)}
-                          alt={item.name}
-                          referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            const cleanHandle = (item.instagramHandle || '').replace(/^@/, '').replace(/\s+/g, '').trim();
-                            if (!target.src.includes('unavatar.io') && cleanHandle) {
-                              target.src = `https://unavatar.io/instagram/${cleanHandle}`;
-                            } else {
-                              target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(getCleanCreatorName(item.name, item.instagramHandle))}&background=7c3aed&color=fff&bold=true`;
-                            }
-                          }}
-                          style={{ width: '56px', height: '56px' }}
-                          className="rounded-xl border-2 border-white object-cover shadow-sm bg-slate-100 shrink-0"
-                        />
-                        {item.isVerified && (
-                          <CheckCircle2 size={15} className="absolute -bottom-0.5 -right-0.5 text-purple-600 fill-purple-100 bg-white rounded-full" />
-                        )}
-                      </div>
-
-                      {/* Past Collabs Counter */}
-                      <div className="bg-purple-50 border border-purple-200/80 rounded-lg px-2 py-0.5 text-center">
-                        <div className="text-[9px] uppercase font-extrabold text-purple-600 leading-tight">Past Collabs</div>
-                        <div className="text-[11px] font-black text-purple-900 leading-tight">{item.pastCollabsCount || 0} Deals</div>
-                      </div>
-                    </div>
-
-                    <div className="mt-2.5 min-w-0">
-                      <h3 className="font-extrabold text-slate-900 text-sm leading-snug truncate group-hover:text-purple-700 transition-colors" title={item.name}>
-                        {getCleanCreatorName(item.name, item.instagramHandle)}
-                      </h3>
-                      <a
-                        href={getCleanInstagramUrl(item.instagramHandle, item.profileLink)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs font-semibold text-purple-600 hover:underline truncate inline-flex items-center gap-1 mt-0.5 max-w-full"
-                      >
-                        <span className="truncate">{item.instagramHandle}</span> <ExternalLink size={10} className="shrink-0" />
-                      </a>
-                    </div>
-
-                    {/* Category & Location */}
-                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-bold">
-                        {item.category}
-                      </span>
-                      {item.location && (
-                        <span className="text-[10px] font-medium text-slate-500 flex items-center gap-0.5 truncate">
-                          <MapPin size={10} className="text-slate-400 shrink-0" /> {item.location}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Bio */}
-                    {item.bio && (
-                      <p className="text-[11px] text-slate-600 mt-2 line-clamp-2 italic bg-slate-50 p-2 rounded-lg border border-slate-100">
-                        "{item.bio}"
-                      </p>
-                    )}
-
-                    {/* Brands Worked With Summary */}
-                    <div
-                      onClick={() => openBrandHistoryModal(item)}
-                      className="mt-2.5 p-2.5 rounded-xl bg-gradient-to-r from-purple-50/80 to-indigo-50/80 border border-purple-100 hover:border-purple-300 transition-all cursor-pointer group/brand"
-                    >
-                      <div className="flex items-center justify-between gap-1 text-[9px] font-extrabold uppercase text-purple-700 tracking-wider">
-                        <span className="flex items-center gap-1">
-                          <Briefcase size={11} className="text-purple-600 shrink-0" /> Brands Worked With
-                        </span>
-                        <span className="bg-purple-200/80 text-purple-900 px-1.5 py-0.2 rounded-full font-black text-[9px]">
-                          {item.brandsWorkedWith?.length || 0} Brands
-                        </span>
-                      </div>
-                      <div className="text-xs font-bold text-slate-800 mt-1 line-clamp-1 group-hover/brand:text-purple-900 transition-colors">
-                        {item.brandsWorkedWith && item.brandsWorkedWith.length > 0
-                          ? item.brandsWorkedWith.join(', ')
-                          : 'Click to view collaboration details'}
-                      </div>
-                    </div>
-
-                    {/* Direct Contact Actions & Rating */}
-                    <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-1.5">
-                      {/* Star Rating */}
-                      <div className="flex items-center gap-0.5">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <Star
-                            key={star}
-                            size={11}
-                            className={star <= (item.rating || 5) ? 'text-amber-400 fill-amber-400' : 'text-slate-200'}
-                          />
-                        ))}
-                      </div>
-
-                      {/* Quick Contact Buttons */}
-                      <div className="flex items-center gap-1">
-                        {item.phone && (
-                          <a
-                            href={`https://wa.me/${item.phone.replace(/[^0-9]/g, '')}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
-                            title="Call / WhatsApp"
-                          >
-                            <Phone size={13} />
-                          </a>
-                        )}
-                        {item.email && (
-                          <a
-                            href={`mailto:${item.email}`}
-                            className="p-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
-                            title="Send Email"
-                          >
-                            <Mail size={13} />
-                          </a>
-                        )}
-                        <button
-                          onClick={() => openEditModal(item)}
-                          className="p-1.5 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors cursor-pointer"
-                          title="Edit Profile"
-                        >
-                          <Edit2 size={13} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteItem(item._id!, item.name)}
-                          className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors cursor-pointer"
-                          title="Delete from Directory"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
             </div>
           ) : (
             /* COMPACT TABLE VIEW */
