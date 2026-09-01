@@ -193,13 +193,7 @@ const StatusPillDropdown: React.FC<{
         <option value="In Discussion" className="bg-white text-slate-900 font-bold py-1">💬 In Discussion</option>
         <option value="Parcel Sent" className="bg-white text-slate-900 font-bold py-1">📦 Parcel Sent</option>
         <option value="Under Review" className="bg-white text-slate-900 font-bold py-1">🟡 Under Review</option>
-        {isManagerOrAdmin ? (
-          <option value="Completed" className="bg-white text-slate-900 font-bold py-1">🟢 Completed (Approve)</option>
-        ) : (
-          currentStatus === 'Completed' && (
-            <option value="Completed" className="bg-white text-slate-900 font-bold py-1">🟢 Completed</option>
-          )
-        )}
+        <option value="Completed" className="bg-white text-slate-900 font-bold py-1">🟢 Completed</option>
         <option value="Settled" className="bg-white text-slate-900 font-bold py-1">🟣 Settled</option>
       </select>
       <ChevronDown size={13} className="absolute right-2.5 pointer-events-none opacity-80" />
