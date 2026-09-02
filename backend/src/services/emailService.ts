@@ -1,3 +1,4 @@
+import nodemailer from 'nodemailer';
 import dns from 'dns';
 
 // Force Node.js to resolve IPv4 addresses first on cloud environments like Render
@@ -7,8 +8,28 @@ try {
   // Ignore if unsupported in Node version
 }
 
+const getTransporter = () => {
+  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const port = Number(process.env.SMTP_PORT) || 465;
+  const user = process.env.SMTP_USER || 'reena.lalwani@ad2ship.com';
+  const pass = process.env.SMTP_PASS || 'gzolidmmbhnmdnrq';
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: {
+      user,
+      pass,
+    },
+    tls: {
+      rejectUnauthorized: false
+    }
+  });
+};
+
 export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: string = 'Team Member'): Promise<boolean> => {
-  const fromAddress = (process.env.FROM_EMAIL || 'reena.lalwani@ad2ship.com').trim();
+  const fromAddress = (process.env.FROM_EMAIL || process.env.SMTP_USER || 'reena.lalwani@ad2ship.com').trim();
   const appName = (process.env.APP_NAME || 'Influencer Marketing Operation').trim();
 
   const subject = `Your ${appName} security code is ${otpCode}`;
@@ -54,10 +75,28 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
     </html>
   `;
 
-  // ONLY Google Apps Script Webhook API (HTTPS Port 443)
-  const webhookUrl = (process.env.GOOGLE_SCRIPT_URL || process.env.GMAIL_WEBHOOK_URL || '').trim();
+  // 1. Primary: SMTP via Nodemailer
+  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    try {
+      const transporter = getTransporter();
+      const info = await transporter.sendMail({
+        from: `"${appName}" <${fromAddress}>`,
+        to: toEmail,
+        subject: subject,
+        text: textContent,
+        html: htmlContent
+      });
 
-  if (webhookUrl) {
+      console.log(`[SMTP Success] Security OTP email delivered to ${toEmail} (MessageId: ${info.messageId})`);
+      return true;
+    } catch (smtpErr: any) {
+      console.error(`[SMTP Error sending OTP to ${toEmail}]:`, smtpErr?.message || smtpErr);
+    }
+  }
+
+  // 2. Secondary Webhook Fallback (if script.google.com webhook configured)
+  const webhookUrl = (process.env.GMAIL_WEBHOOK_URL || '').trim();
+  if (webhookUrl && webhookUrl.includes('script.google.com')) {
     try {
       const webhookRes = await fetch(webhookUrl, {
         method: 'POST',
@@ -71,16 +110,12 @@ export const sendOTPEmail = async (toEmail: string, otpCode: string, userName: s
         })
       });
 
-      console.log(`[Google Webhook API Response Status]: ${webhookRes.status}`);
-
       if (webhookRes.ok || webhookRes.status === 200 || webhookRes.status === 302) {
-        console.log(`[Google Webhook API Success] OTP Email delivered to ${toEmail}`);
+        console.log(`[Webhook Success] OTP Email delivered to ${toEmail}`);
         return true;
-      } else {
-        console.error(`[Google Webhook API Error]: Status ${webhookRes.status}`);
       }
     } catch (webhookErr: any) {
-      console.error(`[Google Webhook API Error]`, webhookErr?.message || webhookErr);
+      console.error(`[Webhook Error]`, webhookErr?.message || webhookErr);
     }
   }
 
@@ -96,6 +131,7 @@ export const sendManagerApprovalEmail = async (
   newUser: { name: string; email: string; phone?: string; department?: string }
 ): Promise<boolean> => {
   const appName = (process.env.APP_NAME || 'Influencer Marketing Operation').trim();
+  const fromAddress = (process.env.FROM_EMAIL || process.env.SMTP_USER || 'reena.lalwani@ad2ship.com').trim();
   const subject = `[ACTION REQUIRED] New User Registration Request - Manager Approval Required: ${newUser.name}`;
   
   const textContent = `Hello Manager,\n\nA new user account has verified their email address and is requesting access to ${appName}.\n\nUser Details:\n- Name: ${newUser.name}\n- Work Email: ${newUser.email}\n- Phone: ${newUser.phone || 'N/A'}\n- Department: ${newUser.department || 'Influencer Marketing'}\n\nPlease log in to the Influencer Marketing Operation portal and go to Members Directory to approve or assign their system role.\n\nRegards,\n${appName} Automation System`;
@@ -159,29 +195,25 @@ export const sendManagerApprovalEmail = async (
     </html>
   `;
 
-  const webhookUrl = (process.env.GOOGLE_SCRIPT_URL || process.env.GMAIL_WEBHOOK_URL || '').trim();
-
   for (const managerEmail of managerEmails) {
-    if (webhookUrl) {
+    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
       try {
-        await fetch(webhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          redirect: 'follow',
-          body: JSON.stringify({
-            to: managerEmail,
-            subject: subject,
-            text: textContent,
-            html: htmlContent
-          })
+        const transporter = getTransporter();
+        await transporter.sendMail({
+          from: `"${appName}" <${fromAddress}>`,
+          to: managerEmail,
+          subject: subject,
+          text: textContent,
+          html: htmlContent
         });
-        console.log(`[Manager Notification Email Sent] Delivered to Manager: ${managerEmail}`);
-      } catch (err: any) {
-        console.error(`[Manager Email Error]:`, err);
+        console.log(`[SMTP Success] Delivered Manager Approval Email to: ${managerEmail}`);
+        continue;
+      } catch (smtpErr: any) {
+        console.error(`[SMTP Error sending manager approval email to ${managerEmail}]:`, smtpErr?.message || smtpErr);
       }
-    } else {
-      console.log(`[MANAGER EMAIL NOTIFICATION] Manager: ${managerEmail} | New User: ${newUser.name} (${newUser.email})`);
     }
+
+    console.log(`[MANAGER EMAIL NOTIFICATION] Manager: ${managerEmail} | New User: ${newUser.name} (${newUser.email})`);
   }
 
   return true;

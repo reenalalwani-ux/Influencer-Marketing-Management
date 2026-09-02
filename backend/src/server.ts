@@ -5,7 +5,7 @@ dotenv.config();
 import dns from 'dns';
 try {
   dns.setDefaultResultOrder('ipv4first');
-} catch (e) {}
+} catch (e) { }
 
 import express from 'express';
 import cors from 'cors';
@@ -48,6 +48,7 @@ app.use(cors({
     'http://localhost:5173',
     'http://localhost:4173',
     'https://influencer-marketing-management.vercel.app',
+    'https://media.ad2ship.com',
     process.env.FRONTEND_URL || ''
   ],
   credentials: true  // Required for HttpOnly cookies
@@ -112,7 +113,7 @@ const startServer = async () => {
     // Start Background Google Sheet Auto-Sync Worker (runs every 60 seconds)
     console.log('[Cron Worker] Initializing Google Sheet Auto-Sync worker...');
     setTimeout(() => {
-      syncBarterFromGoogleSheet().catch(() => {});
+      syncBarterFromGoogleSheet().catch(() => { });
     }, 5000);
 
     setInterval(async () => {
