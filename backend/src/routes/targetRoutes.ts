@@ -213,21 +213,25 @@ router.get('/team-breakdown', authenticateToken, checkPermission('target.view'),
         .map(a => a.brandId.toString());
 
       const assignedBrandDocs = allBrands.filter(b => assignedBrandIds.includes((b._id as any).toString()));
-      const assignedBrandNames = assignedBrandDocs.map(b => b.brandName.toLowerCase());
+      const assignedBrandNames = assignedBrandDocs.map(b => b.brandName.toLowerCase().trim());
 
-      const empName = emp.name.toLowerCase();
+      const empName = emp.name.toLowerCase().trim();
+      const empId = (emp.employeeId || '').toLowerCase().trim();
 
-      const memberPaid = allPaidCollabs.filter(c => {
-        const brandMatch = c.brandName && assignedBrandNames.includes(c.brandName.toLowerCase());
-        const mgrMatch = c.influencerManager && c.influencerManager.toLowerCase().includes(empName);
-        return brandMatch || mgrMatch;
-      });
+      const isDealForMember = (c: any) => {
+        const mgr = (c.influencerManager || '').toLowerCase();
+        const exec = (c.assignedExecutive || '').toLowerCase();
+        const brand = (c.brandName || '').toLowerCase().trim();
 
-      const memberBarter = allBarterCollabs.filter(c => {
-        const brandMatch = c.brandName && assignedBrandNames.includes(c.brandName.toLowerCase());
-        const mgrMatch = c.influencerManager && c.influencerManager.toLowerCase().includes(empName);
-        return brandMatch || mgrMatch;
-      });
+        const nameMatch = empName && (mgr.includes(empName) || exec.includes(empName));
+        const idMatch = empId && (mgr.includes(empId) || exec.includes(empId));
+        const brandMatch = brand && assignedBrandNames.includes(brand);
+
+        return Boolean(nameMatch || idMatch || brandMatch);
+      };
+
+      const memberPaid = allPaidCollabs.filter(isDealForMember);
+      const memberBarter = allBarterCollabs.filter(isDealForMember);
 
       const netMargin = memberPaid.reduce((acc, curr) => {
         const m = curr.ad2shipMargin !== undefined ? curr.ad2shipMargin : ((curr.brandOnboardingAmt || curr.inAmount || 0) - (curr.influencerOnboardingAmt || curr.outAmount || 0));
@@ -333,6 +337,25 @@ router.get('/team-breakdown', authenticateToken, checkPermission('target.view'),
     const teamSlab = teamAchievedMargin >= teamTargetAmount ? '10%' : teamAchievedMargin >= (teamSize * 80000) ? '5%' : '0%';
     const teamBarterCompletionPercent = Math.min(100, Math.round((teamAchievedBarterCount / (teamBarterTarget || 1)) * 100));
 
+    // Optional Search & Server-Side Pagination
+    const { page, limit, search } = req.query;
+    let filteredMembers = memberBreakdowns;
+    if (search && typeof search === 'string' && search.trim()) {
+      const q = search.trim().toLowerCase();
+      filteredMembers = filteredMembers.filter(m =>
+        m.employee.name.toLowerCase().includes(q) ||
+        (m.employee.employeeId && m.employee.employeeId.toLowerCase().includes(q)) ||
+        (m.employee.email && m.employee.email.toLowerCase().includes(q))
+      );
+    }
+
+    const totalMembersCount = filteredMembers.length;
+    const pageNum = page ? Math.max(1, parseInt(page as string, 10)) : 1;
+    const limitNum = limit ? Math.max(1, parseInt(limit as string, 10)) : 10;
+    const totalPages = Math.ceil(totalMembersCount / limitNum) || 1;
+    const startIndex = (pageNum - 1) * limitNum;
+    const paginatedMembers = filteredMembers.slice(startIndex, startIndex + limitNum);
+
     return res.status(200).json({
       success: true,
       data: {
@@ -347,7 +370,13 @@ router.get('/team-breakdown', authenticateToken, checkPermission('target.view'),
         teamBarterCompletionPercent,
         teamQualifyingVideosCount,
         teamTotalBonus,
-        members: memberBreakdowns
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: totalMembersCount,
+          totalPages
+        },
+        members: paginatedMembers
       }
     });
   } catch (error) {

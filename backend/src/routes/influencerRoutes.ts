@@ -68,12 +68,13 @@ const triggerTargetSync = async () => {
   }
 };
 
+const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 // GET /api/v1/influencers
 router.get('/', authenticateToken, checkPermission('influencer.view'), async (req: AuthRequest, res: Response) => {
   try {
-    const { category, timeframe, year, month, search } = req.query;
+    const { category, timeframe, year, month, search, brand, manager, status, deliverable } = req.query;
     const filter: any = { isDeleted: { $ne: true } };
-
 
     // 0. Employee Role Scoping (Only show data where employee is the assigned manager/executive)
     if (req.user?.role === 'Employee') {
@@ -151,19 +152,75 @@ router.get('/', authenticateToken, checkPermission('influencer.view'), async (re
     }
 
     // 3. Search Filter
-    if (search) {
+    if (search && typeof search === 'string' && search.trim()) {
+      const sRegex = new RegExp(escapeRegex(search.trim()), 'i');
       filter.$or = [
-        { influencerName: new RegExp(search as string, 'i') },
-        { brandName: new RegExp(search as string, 'i') },
-        { notes: new RegExp(search as string, 'i') }
+        { influencerName: sRegex },
+        { brandName: sRegex },
+        { influencerManager: sRegex },
+        { phone: sRegex },
+        { notes: sRegex }
       ];
+    }
+
+    // 4. Specific Dropdown Filters from Database
+    if (brand && typeof brand === 'string' && brand.trim()) {
+      filter.brandName = new RegExp(`^${escapeRegex(brand.trim())}$`, 'i');
+    }
+
+    if (manager && typeof manager === 'string' && manager.trim()) {
+      if (manager === '__UNASSIGNED__') {
+        filter.$or = [
+          { influencerManager: { $exists: false } },
+          { influencerManager: null },
+          { influencerManager: '' }
+        ];
+      } else {
+        const mgrRegex = new RegExp(escapeRegex(manager.trim()), 'i');
+        filter.$and = filter.$and || [];
+        filter.$and.push({
+          $or: [
+            { influencerManager: mgrRegex },
+            { assignedExecutive: mgrRegex }
+          ]
+        });
+      }
+    }
+
+    if (status && typeof status === 'string' && status.trim()) {
+      filter.status = new RegExp(`^${escapeRegex(status.trim())}$`, 'i');
+    }
+
+    if (deliverable && typeof deliverable === 'string' && deliverable.trim()) {
+      filter.videoType = new RegExp(`^${escapeRegex(deliverable.trim())}$`, 'i');
     }
 
     const pageNum = req.query.page ? Math.max(1, Number(req.query.page)) : undefined;
     const limitNum = req.query.limit ? Math.max(1, Number(req.query.limit)) : 10;
 
-    // Fetch all matching records' financials for aggregate metrics
-    const allMatching = await Influencer.find(filter).select('inAmount outAmount');
+    // Fetch dynamic distinct filter options from database for this category & timeframe scope
+    const baseCategoryFilter: any = { isDeleted: { $ne: true } };
+    if (category && category !== 'All') {
+      baseCategoryFilter.category = category;
+    }
+
+    // Global Tab Counts for this timeframe & employee scope (stable across tab switches)
+    const timeScopedBase: any = { isDeleted: { $ne: true } };
+    if (filter.$and) {
+      timeScopedBase.$and = filter.$and;
+    }
+
+    const [allDistinctBrands, allDistinctManagers, allDistinctStatuses, allDistinctDeliverables, allMatching, paidCount, barterCount, allCount] = await Promise.all([
+      Influencer.distinct('brandName', baseCategoryFilter),
+      Influencer.distinct('influencerManager', baseCategoryFilter),
+      Influencer.distinct('status', baseCategoryFilter),
+      Influencer.distinct('videoType', baseCategoryFilter),
+      Influencer.find(filter).select('inAmount outAmount'),
+      Influencer.countDocuments({ ...timeScopedBase, category: 'Paid' }),
+      Influencer.countDocuments({ ...timeScopedBase, category: 'Barter' }),
+      Influencer.countDocuments(timeScopedBase)
+    ]);
+
     const totalIn = allMatching.reduce((acc, curr) => acc + (curr.inAmount || 0), 0);
     const totalOut = allMatching.reduce((acc, curr) => acc + (curr.outAmount || 0), 0);
     const netBalance = totalIn - totalOut;
@@ -187,6 +244,17 @@ router.get('/', authenticateToken, checkPermission('influencer.view'), async (re
         totalOut,
         netBalance,
         totalCount
+      },
+      tabCounts: {
+        paid: paidCount,
+        barter: barterCount,
+        all: allCount
+      },
+      filterOptions: {
+        brands: (allDistinctBrands as string[]).filter(Boolean).map(s => s.trim()).filter((v, i, a) => a.indexOf(v) === i).sort(),
+        managers: (allDistinctManagers as string[]).filter(Boolean).map(s => s.trim()).filter((v, i, a) => a.indexOf(v) === i).sort(),
+        statuses: (allDistinctStatuses as string[]).filter(Boolean).map(s => s.trim()).filter((v, i, a) => a.indexOf(v) === i).sort(),
+        deliverables: (allDistinctDeliverables as string[]).filter(Boolean).map(s => s.trim()).filter((v, i, a) => a.indexOf(v) === i).sort()
       },
       pagination: {
         page: pageNum || 1,
