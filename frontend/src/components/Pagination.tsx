@@ -16,9 +16,10 @@ export const Pagination: React.FC<PaginationProps> = ({
   itemsPerPage,
   onPageChange,
 }) => {
-  if (totalPages <= 1) return null;
+  if (totalItems === 0) return null;
 
-  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+  const effectiveTotalPages = Math.max(1, totalPages);
+  const safePage = Math.min(Math.max(1, currentPage), effectiveTotalPages);
   const startItem = totalItems === 0 ? 0 : (safePage - 1) * itemsPerPage + 1;
   const endItem = Math.min(safePage * itemsPerPage, totalItems);
 
@@ -33,15 +34,15 @@ export const Pagination: React.FC<PaginationProps> = ({
       <div className="flex items-center space-x-1">
         <button
           onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-          className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          disabled={safePage <= 1}
+          className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
           title="Previous Page"
         >
           <ChevronLeft size={16} />
         </button>
 
-        {Array.from({ length: totalPages }, (_, i) => i + 1)
-          .filter(page => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1)
+        {Array.from({ length: effectiveTotalPages }, (_, i) => i + 1)
+          .filter(page => page === 1 || page === effectiveTotalPages || Math.abs(page - safePage) <= 1)
           .map((page, index, array) => {
             const showEllipsis = index > 0 && page - array[index - 1] > 1;
             return (
@@ -49,8 +50,8 @@ export const Pagination: React.FC<PaginationProps> = ({
                 {showEllipsis && <span className="px-1 text-slate-400">...</span>}
                 <button
                   onClick={() => onPageChange(page)}
-                  className={`w-7 h-7 rounded-lg font-bold transition flex items-center justify-center ${
-                    currentPage === page
+                  className={`w-7 h-7 rounded-lg font-bold transition flex items-center justify-center cursor-pointer ${
+                    safePage === page
                       ? 'bg-purple-600 text-white shadow-xs'
                       : 'bg-white border border-slate-200 hover:bg-slate-50 text-slate-700'
                   }`}
@@ -63,8 +64,8 @@ export const Pagination: React.FC<PaginationProps> = ({
 
         <button
           onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
-          className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          disabled={safePage >= effectiveTotalPages}
+          className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
           title="Next Page"
         >
           <ChevronRight size={16} />

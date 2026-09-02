@@ -392,125 +392,128 @@ export const EmployeePerformanceView: React.FC<EmployeePerformanceViewProps> = (
           {viewMode === 'table' ? (
             <DataTable
               columns={columns}
-              data={paginatedData}
+              data={filteredData}
+              itemsPerPage={10}
               rowKey={(item) => item.employee?.id || item.employee?.employeeId}
               emptyMessage="No performance data available."
             />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {paginatedData.map((item) => {
-                const { employee, metrics, incentiveSummary, qualifyingDeals } = item;
-                const margin = incentiveSummary?.netMargin || 0;
-                const targetPct = incentiveSummary?.targetAchievedPercent || 0;
-                const tier = incentiveSummary?.targetTier || '0%';
-                const totalIncentive = incentiveSummary?.totalTakeHomeIncentive || 0;
-                const bonusCount = incentiveSummary?.qualifyingBonusDealsCount || 0;
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {paginatedData.map((item) => {
+                  const { employee, metrics, incentiveSummary, qualifyingDeals } = item;
+                  const margin = incentiveSummary?.netMargin || 0;
+                  const targetPct = incentiveSummary?.targetAchievedPercent || 0;
+                  const tier = incentiveSummary?.targetTier || '0%';
+                  const totalIncentive = incentiveSummary?.totalTakeHomeIncentive || 0;
+                  const bonusCount = incentiveSummary?.qualifyingBonusDealsCount || 0;
 
-                return (
-                  <div key={employee.id} className="bg-white glass-card-hover p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 text-white flex items-center justify-center font-extrabold text-base shadow">
-                          {employee.name.charAt(0)}
+                  return (
+                    <div key={employee.id} className="bg-white glass-card-hover p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 text-white flex items-center justify-center font-extrabold text-base shadow">
+                            {employee.name.charAt(0)}
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-slate-900 text-sm">{employee.name}</h3>
+                            <span className="text-[11px] text-purple-600 font-bold">{employee.employeeId} • {employee.designation}</span>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="font-bold text-slate-900 text-sm">{employee.name}</h3>
-                          <span className="text-[11px] text-purple-600 font-bold">{employee.employeeId} • {employee.designation}</span>
+
+                        <div className="text-right">
+                          <span className="text-xl font-black text-emerald-600">₹{new Intl.NumberFormat().format(totalIncentive)}</span>
+                          <span className="text-[9px] text-slate-500 block uppercase font-bold">Total Incentive</span>
                         </div>
                       </div>
 
-                      <div className="text-right">
-                        <span className="text-xl font-black text-emerald-600">₹{new Intl.NumberFormat().format(totalIncentive)}</span>
-                        <span className="text-[9px] text-slate-500 block uppercase font-bold">Total Incentive</span>
-                      </div>
-                    </div>
+                      {/* Net Margin & Slabs Box (Clean Light Theme) */}
+                      <div className="p-3.5 bg-gradient-to-br from-slate-50 via-purple-50/40 to-emerald-50/40 border border-slate-200/90 rounded-2xl space-y-2.5 shadow-2xs">
+                        {!isEmployee && (
+                          <div className="flex justify-between items-center text-xs font-bold">
+                            <span className="text-slate-600">Net Ad2ship Margin:</span>
+                            <span className="text-base font-black text-slate-900">
+                              ₹{new Intl.NumberFormat().format(margin)}
+                            </span>
+                          </div>
+                        )}
 
-                    {/* Net Margin & Slabs Box (Clean Light Theme) */}
-                    <div className="p-3.5 bg-gradient-to-br from-slate-50 via-purple-50/40 to-emerald-50/40 border border-slate-200/90 rounded-2xl space-y-2.5 shadow-2xs">
-                      {!isEmployee && (
-                        <div className="flex justify-between items-center text-xs font-bold">
-                          <span className="text-slate-600">Net Ad2ship Margin:</span>
-                          <span className="text-base font-black text-slate-900">
-                            ₹{new Intl.NumberFormat().format(margin)}
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[11px] font-bold text-slate-500">
+                            <span>Target Progress ({targetPct}%)</span>
+                            <span className="text-purple-600">Target: ₹1,20,000</span>
+                          </div>
+                          <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                            <div
+                              className="bg-gradient-to-r from-purple-600 via-indigo-600 to-emerald-500 h-full rounded-full transition-all duration-500"
+                              style={{ width: `${Math.min(targetPct, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-200/80 text-xs">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${
+                            tier === '10%' 
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300' 
+                              : tier === '5%' 
+                                ? 'bg-blue-100 text-blue-800 border-blue-300' 
+                                : 'bg-slate-100 text-slate-600 border-slate-200'
+                          }`}>
+                            {tier === '10%' ? '🏆 10% Slab (1L+)' : tier === '5%' ? '🥈 5% Slab (80k+)' : '0% Slab (<80k)'}
+                          </span>
+                          <span className="text-xs font-semibold text-slate-600">
+                            Target Bonus: <strong className="text-emerald-700 font-extrabold">₹{new Intl.NumberFormat().format(incentiveSummary?.targetIncentiveAmount || 0)}</strong>
                           </span>
                         </div>
-                      )}
 
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[11px] font-bold text-slate-500">
-                          <span>Target Progress ({targetPct}%)</span>
-                          <span className="text-purple-600">Target: ₹1,20,000</span>
+                        {bonusCount > 0 && (
+                          <div className="flex items-center justify-between pt-1.5 border-t border-slate-200/80 text-xs">
+                            <span className="text-amber-800 font-bold flex items-center gap-1 text-[11px] bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                              🌟 {bonusCount} Videos (100+ Orders)
+                            </span>
+                            <span className="text-amber-700 font-black text-xs">
+                              +₹{new Intl.NumberFormat().format(incentiveSummary?.orderBonusAmount || 0)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Collab Counts & Tasks */}
+                      <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                        <div className="p-2 rounded-xl bg-purple-50 border border-purple-200">
+                          <span className="text-[10px] uppercase font-bold text-purple-700 block">Barter Collabs</span>
+                          <span className="text-base font-extrabold text-purple-900">{incentiveSummary?.barterCount || 0}</span>
                         </div>
-                        <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                          <div
-                            className="bg-gradient-to-r from-purple-600 via-indigo-600 to-emerald-500 h-full rounded-full transition-all duration-500"
-                            style={{ width: `${Math.min(targetPct, 100)}%` }}
-                          />
+                        <div className="p-2 rounded-xl bg-indigo-50 border border-indigo-200">
+                          <span className="text-[10px] uppercase font-bold text-indigo-700 block">Paid Collabs</span>
+                          <span className="text-base font-extrabold text-indigo-900">{incentiveSummary?.paidCount || 0}</span>
+                        </div>
+                        <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">
+                          <span className="text-[10px] uppercase font-bold text-slate-600 block">Brands Managed</span>
+                          <span className="text-base font-bold text-slate-900">{metrics.brandsManaged}</span>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-200/80 text-xs">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${
-                          tier === '10%' 
-                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300' 
-                            : tier === '5%' 
-                              ? 'bg-blue-100 text-blue-800 border-blue-300' 
-                              : 'bg-slate-100 text-slate-600 border-slate-200'
-                        }`}>
-                          {tier === '10%' ? '🏆 10% Slab (1L+)' : tier === '5%' ? '🥈 5% Slab (80k+)' : '0% Slab (<80k)'}
-                        </span>
-                        <span className="text-xs font-semibold text-slate-600">
-                          Target Bonus: <strong className="text-emerald-700 font-extrabold">₹{new Intl.NumberFormat().format(incentiveSummary?.targetIncentiveAmount || 0)}</strong>
-                        </span>
-                      </div>
-
-                      {bonusCount > 0 && (
-                        <div className="flex items-center justify-between pt-1.5 border-t border-slate-200/80 text-xs">
-                          <span className="text-amber-800 font-bold flex items-center gap-1 text-[11px] bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                            🌟 {bonusCount} Videos (100+ Orders)
-                          </span>
-                          <span className="text-amber-700 font-black text-xs">
-                            +₹{new Intl.NumberFormat().format(incentiveSummary?.orderBonusAmount || 0)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Collab Counts & Tasks */}
-                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                      <div className="p-2 rounded-xl bg-purple-50 border border-purple-200">
-                        <span className="text-[10px] uppercase font-bold text-purple-700 block">Barter Collabs</span>
-                        <span className="text-base font-extrabold text-purple-900">{incentiveSummary?.barterCount || 0}</span>
-                      </div>
-                      <div className="p-2 rounded-xl bg-indigo-50 border border-indigo-200">
-                        <span className="text-[10px] uppercase font-bold text-indigo-700 block">Paid Collabs</span>
-                        <span className="text-base font-extrabold text-indigo-900">{incentiveSummary?.paidCount || 0}</span>
-                      </div>
-                      <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">
-                        <span className="text-[10px] uppercase font-bold text-slate-600 block">Brands Managed</span>
-                        <span className="text-base font-bold text-slate-900">{metrics.brandsManaged}</span>
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                        <span>Task Completion Rate: <strong className="text-emerald-600 font-bold">{metrics.completionRate}%</strong></span>
                       </div>
                     </div>
+                  );
+                })}
+              </div>
 
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                      <span>Task Completion Rate: <strong className="text-emerald-600 font-bold">{metrics.completionRate}%</strong></span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+              {/* Pagination Controls for Grid Mode */}
+              <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
+                <Pagination
+                  currentPage={validPage}
+                  totalPages={totalPages}
+                  totalItems={filteredData.length}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={setCurrentPage}
+                />
+              </div>
+            </>
           )}
-
-          {/* Pagination Controls */}
-          <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
-            <Pagination
-              currentPage={validPage}
-              totalPages={totalPages}
-              totalItems={filteredData.length}
-              itemsPerPage={itemsPerPage}
-              onPageChange={setCurrentPage}
-            />
-          </div>
         </div>
       )}
 
