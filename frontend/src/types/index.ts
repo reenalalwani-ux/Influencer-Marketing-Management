@@ -46,6 +46,18 @@ export interface ClientOverviewData {
   recentActivities: any[];
 }
 
+export interface IDepartment {
+  _id: string;
+  name: string;
+  code?: string;
+  description?: string;
+  status: 0 | 1 | 'Active' | 'Inactive';
+  isDeleted?: boolean;
+  deletedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Employee {
   _id: string;
   employeeId: string;
@@ -54,7 +66,7 @@ export interface Employee {
   email: string;
   phone: string;
   profileImage?: string;
-  department: string;
+  department: string | IDepartment;
   designation: string;
   role: string;
   reportingManagerId?: Employee | string;
@@ -200,7 +212,7 @@ export interface EmployeePerformanceData {
     employeeId: string;
     name: string;
     email: string;
-    department: string;
+    department: string | IDepartment;
     designation: string;
     role: string;
   };
@@ -215,7 +227,7 @@ export interface MemberTargetItem {
     employeeId: string;
     name: string;
     email: string;
-    department?: string;
+    department?: string | IDepartment;
     designation: string;
     assignedBrandsCount: number;
   };

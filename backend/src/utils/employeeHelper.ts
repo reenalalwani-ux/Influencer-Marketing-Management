@@ -15,5 +15,5 @@ export async function getEmployeeForAuthUser(user?: IUser | null): Promise<IEmpl
 
   if (queryConditions.length === 0) return null;
 
-  return await Employee.findOne({ $or: queryConditions });
+  return await Employee.findOne({ $or: queryConditions }).populate('department', 'name code description status');
 }

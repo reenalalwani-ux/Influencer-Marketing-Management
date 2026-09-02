@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { Setting } from '../models/allModels';
+import { Setting, Department } from '../models/allModels';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 import { PLATFORMS, CONTENT_TYPES, TASK_STATUSES, PRIORITIES, DEPARTMENTS, DESIGNATIONS } from '../config/constants';
@@ -11,6 +11,7 @@ const router = Router();
 router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const dbSettings = await Setting.find();
+    const dbDepartments = await Department.find({ status: 'Active' }).sort({ name: 1 });
     
     // Default fallback configurations
     const defaultSettings = {
@@ -18,7 +19,8 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       contentTypes: CONTENT_TYPES,
       taskStatuses: TASK_STATUSES,
       priorities: PRIORITIES,
-      departments: DEPARTMENTS,
+      departments: dbDepartments.length > 0 ? dbDepartments.map(d => d.name) : DEPARTMENTS,
+      departmentObjects: dbDepartments,
       designations: DESIGNATIONS
     };
 

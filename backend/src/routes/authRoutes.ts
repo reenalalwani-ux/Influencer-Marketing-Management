@@ -405,7 +405,7 @@ router.post('/verify-signup-otp', async (req: AuthRequest, res: Response) => {
         name: user.name,
         email: user.email,
         phone: empRecord?.phone,
-        department: empRecord?.department
+        department: typeof empRecord?.department === 'object' && empRecord?.department ? (empRecord.department as any).name : (empRecord?.department as string)
       }).catch(err => {
         console.error('[Manager Email Background Error]', err);
       });

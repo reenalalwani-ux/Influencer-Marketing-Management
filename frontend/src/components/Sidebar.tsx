@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Users, Briefcase, UserCheck, Calendar,
   CheckSquare, CheckCircle, BarChart3, FileSpreadsheet, ShieldAlert,
-  Settings, Clock, Target, Sparkles, ChevronDown, ChevronRight, Layers
+  Settings, Clock, Target, Sparkles, ChevronDown, ChevronRight, Layers, Building2
 } from 'lucide-react';
 import { User } from '../types';
 
@@ -112,6 +112,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
       icon: Users,
       subItems: [
         { id: 'employees', label: 'Members Directory', icon: Users },
+        { id: 'departments', label: 'Departments', icon: Building2 },
         { id: 'performance', label: 'Performance', icon: BarChart3 },
       ]
     }] : []),

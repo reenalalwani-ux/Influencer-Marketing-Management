@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, ArrowRight, User, Sparkles, KeyRound, CheckCircle2, RotateCcw, ArrowLeft, Lock, Phone, Briefcase, ChevronDown } from 'lucide-react';
 import { api } from '../services/api';
-import { User as UserType } from '../types';
+import { User as UserType, IDepartment } from '../types';
 
 interface LoginViewProps {
   onLoginSuccess: (user: UserType, token: string) => void;
@@ -20,17 +20,27 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [signupName, setSignupName] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPhone, setSignupPhone] = useState('');
-  const [signupDepartment, setSignupDepartment] = useState('Influencer Marketing');
+  const [signupDepartment, setSignupDepartment] = useState('');
+  const [deptList, setDeptList] = useState<IDepartment[]>([]);
   const [isDeptOpen, setIsDeptOpen] = useState(false);
   const deptRef = React.useRef<HTMLDivElement>(null);
 
-  const deptOptions = [
-    'Influencer Marketing',
-    'Content Creation',
-    'Campaign Strategy',
-    'Quality Control',
-    'Management'
-  ];
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const res = await api.get('/departments');
+        if (res.success && Array.isArray(res.data)) {
+          setDeptList(res.data);
+          if (res.data.length > 0) {
+            setSignupDepartment(res.data[0]._id);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load dynamic departments:', err);
+      }
+    };
+    fetchDepartments();
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -338,7 +348,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 }`}
               >
                 <User size={14} />
-                <span>Team Login</span>
+                <span>Member Login</span>
               </button>
               <button
                 type="button"
@@ -511,7 +521,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     className="w-full bg-slate-50/80 hover:bg-slate-100/70 focus:bg-white border border-slate-200 focus:border-purple-600 focus:ring-4 focus:ring-purple-100 transition-all rounded-xl pl-10 pr-9 py-2.5 text-xs text-slate-900 font-semibold flex items-center justify-between shadow-2xs cursor-pointer text-left"
                   >
                     <Briefcase size={18} className="absolute left-3.5 text-purple-600 pointer-events-none" />
-                    <span className="truncate">{signupDepartment}</span>
+                    <span className="truncate">
+                      {deptList.find(d => d._id === signupDepartment)?.name || 'Select Department'}
+                    </span>
                     <ChevronDown
                       size={16}
                       className={`text-slate-400 pointer-events-none transition-transform duration-200 shrink-0 ${isDeptOpen ? 'rotate-180 text-purple-600' : ''
@@ -520,15 +532,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   </button>
 
                   {isDeptOpen && (
-                    <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-slate-200/90 rounded-2xl shadow-xl shadow-purple-900/10 z-50 py-1.5 overflow-hidden animate-fade-in space-y-0.5">
-                      {deptOptions.map((dept) => {
-                        const isSelected = signupDepartment === dept;
+                    <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-slate-200/90 rounded-2xl shadow-xl shadow-purple-900/10 z-50 py-1.5 overflow-hidden animate-fade-in space-y-0.5 max-h-48 overflow-y-auto">
+                      {deptList.map((dept) => {
+                        const isSelected = signupDepartment === dept._id;
                         return (
                           <button
-                            key={dept}
+                            key={dept._id}
                             type="button"
                             onClick={() => {
-                              setSignupDepartment(dept);
+                              setSignupDepartment(dept._id);
                               setIsDeptOpen(false);
                             }}
                             className={`w-full text-left px-3.5 py-2 text-xs font-semibold flex items-center justify-between transition cursor-pointer ${isSelected
@@ -536,7 +548,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                                 : 'text-slate-700 hover:bg-purple-50/60 hover:text-purple-600'
                               }`}
                           >
-                            <span>{dept}</span>
+                            <span>{dept.name}</span>
                             {isSelected && <CheckCircle2 size={14} className="text-purple-600 shrink-0 ml-2" />}
                           </button>
                         );

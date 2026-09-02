@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import {
-  Permission, Role, User, Employee, Brand, EmployeeBrand,
+  Permission, Role, User, Department, Employee, Brand, EmployeeBrand,
   Task, Notification, AuditLog, Setting, Target, Influencer, ContentCalendar
 } from '../models/allModels';
 import { PERMISSIONS, ROLE_DEFAULT_PERMISSIONS, ROLES, PLATFORMS, CONTENT_TYPES, TASK_STATUSES, PRIORITIES, DEPARTMENTS, DESIGNATIONS } from '../config/constants';
@@ -37,6 +37,55 @@ export const seedDatabase = async () => {
         },
         { upsert: true }
       );
+    }
+
+    // Seed Default Departments and migrate existing Employee records
+    const defaultDepts = [
+      { name: 'Influencer Marketing', code: 'IM', description: 'Influencer campaign management & outreach' },
+      { name: 'Content Creation', code: 'CC', description: 'Creative content production and design' },
+      { name: 'Campaign Strategy', code: 'CS', description: 'Campaign planning and strategic positioning' },
+      { name: 'Quality Control', code: 'QC', description: 'Quality assurance and compliance review' },
+      { name: 'Management', code: 'MGMT', description: 'Executive leadership and team management' }
+    ];
+
+    const deptMap: { [key: string]: any } = {};
+
+    for (const d of defaultDepts) {
+      let dept = await Department.findOne({ name: d.name });
+      if (!dept) {
+        dept = await Department.create({ ...d, status: 0 });
+        console.log(`[Seed] Created Department '${d.name}' in DB`);
+      }
+      deptMap[d.name] = dept._id;
+    }
+
+    await Department.updateMany({ status: 'Active' }, { $set: { status: 0 } });
+    await Department.updateMany({ status: 'Inactive' }, { $set: { status: 1 } });
+
+    // Migrate any Employee records whose department is a string name or invalid reference
+    const employeesToMigrate = await Employee.find();
+    for (const emp of employeesToMigrate) {
+      let targetDeptId: any = null;
+
+      if (typeof emp.department === 'string') {
+        const deptName = (emp.department as string).trim();
+        if (deptMap[deptName]) {
+          targetDeptId = deptMap[deptName];
+        } else if (deptName) {
+          let customDept = await Department.findOne({ name: { $regex: new RegExp(`^${deptName}$`, 'i') } });
+          if (!customDept) {
+            customDept = await Department.create({ name: deptName, status: 'Active' });
+            deptMap[deptName] = customDept._id;
+          }
+          targetDeptId = customDept._id;
+        }
+      } else if (!emp.department && deptMap['Influencer Marketing']) {
+        targetDeptId = deptMap['Influencer Marketing'];
+      }
+
+      if (targetDeptId) {
+        await Employee.updateOne({ _id: emp._id }, { $set: { department: targetDeptId } });
+      }
     }
 
     // Migrate all existing non-@ad2ship.com emails in MongoDB to use @ad2ship.com domain

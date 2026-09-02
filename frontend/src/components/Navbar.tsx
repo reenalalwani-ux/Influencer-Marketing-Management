@@ -52,7 +52,9 @@ export const Navbar: React.FC<NavbarProps> = ({ user, onLogout, activeView, setA
     if (!user) return;
     setProfileName(user.name || '');
     setProfilePhone(user.employeeDetails?.phone || '+91 98765 43210');
-    setProfileDepartment(user.employeeDetails?.department || 'Influencer Marketing');
+    const deptVal = user.employeeDetails?.department;
+    const deptName = typeof deptVal === 'object' && deptVal ? (deptVal as any).name : (deptVal || 'Influencer Marketing');
+    setProfileDepartment(deptName);
     setProfileDesignation(user.employeeDetails?.designation || 'Influencer Executive');
     setProfileMessage(null);
 

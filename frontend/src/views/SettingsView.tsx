@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Settings as SettingsIcon, Shield, Sliders, Plus, Edit2, Users, CheckCircle2, UserCheck, Lock, Sparkles, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { Settings as SettingsIcon, Shield, Sliders, Plus, Edit2, Users, CheckCircle2, UserCheck, Lock, Sparkles, Check, AlertCircle, Loader2, Trash2, Building2 } from 'lucide-react';
 import { api } from '../services/api';
-import { SystemRole, Employee } from '../types';
+import { SystemRole, Employee, IDepartment } from '../types';
 import { Modal } from '../components/Modal';
 import { InlineLoader } from '../components/PageLoader';
 
@@ -218,6 +218,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ userRole, currentUse
     }
   };
 
+
+
   const handleUpdateEmployeeRole = async (empId: string, newRole: string) => {
     setSaving(true);
     setMessage(null);
@@ -389,7 +391,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ userRole, currentUse
                         </td>
 
                         <td className="px-6 py-4 text-slate-800 font-bold">
-                          {emp.department}
+                          {typeof emp.department === 'object' && emp.department ? emp.department.name : (emp.department || 'N/A')}
                         </td>
 
                         <td className="px-6 py-4 text-slate-700 font-semibold">
@@ -448,20 +450,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ userRole, currentUse
                   {settings.contentTypes?.map((c: string) => (
                     <span key={c} className="px-3 py-1 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 font-bold text-xs">
                       {c}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-3">
-                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                  <Sliders size={18} className="text-purple-600" />
-                  Internal Departments
-                </h3>
-                <div className="flex flex-wrap gap-1.5 pt-2">
-                  {settings.departments?.map((d: string) => (
-                    <span key={d} className="px-3 py-1 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-bold text-xs">
-                      {d}
                     </span>
                   ))}
                 </div>
@@ -651,6 +639,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ userRole, currentUse
           </div>
         </form>
       </Modal>
+
+
     </div>
   );
 };

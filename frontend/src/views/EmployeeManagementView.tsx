@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Users, Plus, Search, Mail, Eye, Edit2, Trash2, CheckCircle2, Phone, Briefcase, Calendar, Shield, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
-import { Employee } from '../types';
+import { Employee, IDepartment } from '../types';
 import { Modal } from '../components/Modal';
 import { Pagination } from '../components/Pagination';
 import { InlineLoader } from '../components/PageLoader';
@@ -32,6 +32,7 @@ export const EmployeeManagementView: React.FC = () => {
 
   const [pendingEmployees, setPendingEmployees] = useState<Employee[]>([]);
   const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [departmentsList, setDepartmentsList] = useState<IDepartment[]>([]);
 
   const fetchEmployees = async () => {
     try {
@@ -40,6 +41,14 @@ export const EmployeeManagementView: React.FC = () => {
       
       const pRes = await api.get('/employees/pending-approvals');
       if (pRes.success) setPendingEmployees(pRes.data);
+
+      const dRes = await api.get('/departments');
+      if (dRes.success && Array.isArray(dRes.data)) {
+        setDepartmentsList(dRes.data);
+        if (dRes.data.length > 0 && !department) {
+          setDepartment(dRes.data[0]._id);
+        }
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -99,7 +108,7 @@ export const EmployeeManagementView: React.FC = () => {
     setName(emp.name);
     setEmail(emp.email);
     setPhone(emp.phone || '');
-    setDepartment(emp.department || 'Influencer Marketing');
+    setDepartment(typeof emp.department === 'object' && emp.department ? emp.department._id : (emp.department || ''));
     setDesignation(emp.designation || 'Influencer Executive');
     setRole(emp.role || 'Employee');
     setStatus(emp.status as any || 'Active');
@@ -192,7 +201,12 @@ export const EmployeeManagementView: React.FC = () => {
       ),
     },
     { key: 'designation', label: 'Designation', sortable: true },
-    { key: 'department', label: 'Department', sortable: true },
+    {
+      key: 'department',
+      label: 'Department',
+      sortable: true,
+      render: (val) => typeof val === 'object' && val ? val.name : (val || 'Influencer Marketing')
+    },
     {
       key: 'role',
       label: 'System Role',
@@ -404,7 +418,9 @@ export const EmployeeManagementView: React.FC = () => {
               </div>
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <label className="text-[10px] font-black text-slate-400 uppercase">Department</label>
-                <div className="font-bold text-slate-900 text-xs mt-0.5">{viewingEmployee.department || 'Influencer Marketing'}</div>
+                <div className="font-bold text-slate-900 text-xs mt-0.5">
+                  {typeof viewingEmployee.department === 'object' && viewingEmployee.department ? viewingEmployee.department.name : (viewingEmployee.department || 'Influencer Marketing')}
+                </div>
               </div>
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <label className="text-[10px] font-black text-slate-400 uppercase">Designation</label>
@@ -469,12 +485,15 @@ export const EmployeeManagementView: React.FC = () => {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Department</label>
-              <input
-                type="text"
+              <select
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 font-medium focus:outline-none"
-              />
+                className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 font-semibold focus:outline-none"
+              >
+                {departmentsList.map((d) => (
+                  <option key={d._id} value={d._id}>{d.name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Designation</label>
@@ -587,12 +606,15 @@ export const EmployeeManagementView: React.FC = () => {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Department</label>
-              <input
-                type="text"
+              <select
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none font-medium"
-              />
+                className="w-full bg-slate-50 border border-slate-200 focus:border-purple-500 rounded-xl px-3 py-2 text-slate-900 font-semibold focus:outline-none"
+              >
+                {departmentsList.map((d) => (
+                  <option key={d._id} value={d._id}>{d.name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-extrabold text-slate-700 uppercase mb-1">Designation</label>

@@ -10,7 +10,7 @@ const router = Router();
 // GET /api/v1/employees
 router.get('/', authenticateToken, checkPermission('employee.view'), async (req: AuthRequest, res: Response) => {
   try {
-    const employees = await Employee.find().populate('reportingManagerId', 'name employeeId designation').sort({ createdAt: -1 });
+    const employees = await Employee.find().populate('reportingManagerId', 'name employeeId designation').populate('department', 'name code description status').sort({ createdAt: -1 });
     return res.status(200).json({ 
       success: true, 
       count: employees.length, 
@@ -38,7 +38,7 @@ router.get('/pending-approvals', authenticateToken, checkPermission('employee.vi
       isApproved: false,
       emailVerified: true,
       status: 'Pending Approval'
-    }).sort({ createdAt: -1 });
+    }).populate('department', 'name code description status').sort({ createdAt: -1 });
 
     console.log('[Pending Approvals Debug] Matched verified pending:', pendingEmployees.length);
 
@@ -56,7 +56,7 @@ router.get('/pending-approvals', authenticateToken, checkPermission('employee.vi
 // GET /api/v1/employees/:id
 router.get('/:id', authenticateToken, checkPermission('employee.view'), async (req: AuthRequest, res: Response) => {
   try {
-    const employee = await Employee.findById(req.params.id).populate('reportingManagerId', 'name employeeId email designation');
+    const employee = await Employee.findById(req.params.id).populate('reportingManagerId', 'name employeeId email designation').populate('department', 'name code description status');
     if (!employee) return res.status(404).json({ success: false, message: 'No record exists for this employee' });
     return res.status(200).json({ success: true, data: employee, message: 'Employee fetched successfully' });
   } catch (error) {

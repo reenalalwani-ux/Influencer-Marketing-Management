@@ -238,7 +238,10 @@ export const PostingCalendarView: React.FC<PostingCalendarViewProps> = ({ curren
                 <div className="px-4 py-2 bg-purple-100/90 border border-purple-300 text-purple-950 rounded-xl text-xs font-black flex items-center gap-2 shadow-2xs">
                   <span>{currentUser?.name || 'Gunjan'}</span>
                   <span className="text-[10px] text-purple-700 font-semibold bg-purple-200/80 px-2 py-0.5 rounded-md">
-                    {matrixEmployees.find(e => e._id === selectedEmployeeId)?.department || 'Influencer Marketing'}
+                    {(() => {
+                      const dept = matrixEmployees.find(e => e._id === selectedEmployeeId)?.department;
+                      return typeof dept === 'object' && dept ? (dept as any).name : (dept || 'Influencer Marketing');
+                    })()}
                   </span>
                 </div>
               ) : (
@@ -257,7 +260,10 @@ export const PostingCalendarView: React.FC<PostingCalendarViewProps> = ({ curren
                     </span>
                     {matrixEmployees.find(e => e._id === selectedEmployeeId) && (
                       <span className="text-[10px] text-purple-600 font-semibold bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200 truncate">
-                        {matrixEmployees.find(e => e._id === selectedEmployeeId)?.department || 'Staff'}
+                        {(() => {
+                          const dept = matrixEmployees.find(e => e._id === selectedEmployeeId)?.department;
+                          return typeof dept === 'object' && dept ? (dept as any).name : (dept || 'Staff');
+                        })()}
                       </span>
                     )}
                   </div>
@@ -281,19 +287,21 @@ export const PostingCalendarView: React.FC<PostingCalendarViewProps> = ({ curren
 
                     {/* Staff List Options */}
                     <div className="max-h-60 overflow-y-auto space-y-1 pr-1">
-                      {matrixEmployees.filter(emp =>
-                        emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
-                        (emp.department || '').toLowerCase().includes(employeeSearchTerm.toLowerCase())
-                      ).length === 0 ? (
+                      {matrixEmployees.filter(emp => {
+                        const deptName = typeof emp.department === 'object' && emp.department ? (emp.department as any).name : (emp.department || '');
+                        return emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
+                          deptName.toLowerCase().includes(employeeSearchTerm.toLowerCase());
+                      }).length === 0 ? (
                         <div className="px-3 py-4 text-center text-xs text-slate-400 font-medium">
                           No matching staff members found
                         </div>
                       ) : (
                         matrixEmployees
-                          .filter(emp =>
-                            emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
-                            (emp.department || '').toLowerCase().includes(employeeSearchTerm.toLowerCase())
-                          )
+                          .filter(emp => {
+                            const deptName = typeof emp.department === 'object' && emp.department ? (emp.department as any).name : (emp.department || '');
+                            return emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
+                              deptName.toLowerCase().includes(employeeSearchTerm.toLowerCase());
+                          })
                           .map((emp) => (
                             <button
                               key={emp._id}
@@ -312,7 +320,7 @@ export const PostingCalendarView: React.FC<PostingCalendarViewProps> = ({ curren
                               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
                                 selectedEmployeeId === emp._id ? 'bg-purple-700 text-purple-100' : 'bg-slate-100 text-slate-500'
                               }`}>
-                                {emp.department || 'Staff'}
+                                {typeof emp.department === 'object' && emp.department ? (emp.department as any).name : (emp.department || 'Staff')}
                               </span>
                             </button>
                           ))

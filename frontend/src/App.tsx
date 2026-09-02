@@ -20,6 +20,7 @@ import { EmployeePerformanceView } from './views/EmployeePerformanceView';
 import { AuditLogView } from './views/AuditLogView';
 import { ReportsView } from './views/ReportsView';
 import { SettingsView } from './views/SettingsView';
+import { DepartmentManagementView } from './views/DepartmentManagementView';
 import { InfluencerDirectoryView } from './views/InfluencerDirectoryView';
 import { ClientDashboardView } from './views/ClientDashboardView';
 import { URLSubmissionModal } from './components/URLSubmissionModal';
@@ -86,9 +87,9 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // Guard for Employee role accessing prohibited views (e.g., settings or system reports)
+  // Guard for Employee role accessing prohibited views (e.g., settings, system reports, department management)
   useEffect(() => {
-    if (user && user.role === 'Employee' && (activeView === 'settings' || activeView === 'reports')) {
+    if (user && user.role === 'Employee' && (activeView === 'settings' || activeView === 'reports' || activeView === 'departments')) {
       handleNavigate('dashboard');
     }
   }, [user, activeView]);
@@ -326,6 +327,7 @@ export const App: React.FC = () => {
               onOpenSubmitUrlModal={(task) => setSubmitUrlTask(task)}
             />
           )}
+          {activeView === 'departments' && <DepartmentManagementView />}
           {activeView === 'performance' && <EmployeePerformanceView currentUser={user} />}
           {activeView === 'reports' && <ReportsView userRole={user.role} currentUser={user} />}
           {activeView === 'audit-logs' && <AuditLogView />}

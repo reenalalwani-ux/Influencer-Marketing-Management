@@ -65,6 +65,25 @@ const UserSchema = new Schema<IUser>({
   otpExpiresAt: { type: Date }
 }, { timestamps: true });
 
+// 3b. Department Schema
+export interface IDepartment extends Document {
+  name: string;
+  code?: string;
+  description?: string;
+  status: 0 | 1;
+  isDeleted?: boolean;
+  deletedAt?: Date;
+}
+
+const DepartmentSchema = new Schema<IDepartment>({
+  name: { type: String, required: true, trim: true },
+  code: { type: String, trim: true },
+  description: { type: String, default: '' },
+  status: { type: Schema.Types.Mixed, default: 0 },
+  isDeleted: { type: Boolean, default: false },
+  deletedAt: { type: Date }
+}, { timestamps: true });
+
 // 4. Employee Schema
 export interface IEmployee extends Document {
   employeeId: string;
@@ -73,7 +92,7 @@ export interface IEmployee extends Document {
   email: string;
   phone: string;
   profileImage?: string;
-  department: string;
+  department: mongoose.Types.ObjectId | IDepartment | string;
   designation: string;
   role: string;
   reportingManagerId?: mongoose.Types.ObjectId;
@@ -90,7 +109,7 @@ const EmployeeSchema = new Schema<IEmployee>({
   email: { type: String, required: true, unique: true },
   phone: { type: String, default: '' },
   profileImage: { type: String },
-  department: { type: String, default: 'Influencer Marketing' },
+  department: { type: Schema.Types.Mixed, ref: 'Department' },
   designation: { type: String, default: 'Influencer Executive' },
   role: { type: String, default: 'Employee' },
   reportingManagerId: { type: Schema.Types.ObjectId, ref: 'Employee' },
@@ -631,6 +650,7 @@ InfluencerDirectorySchema.index({ name: 'text', instagramHandle: 'text', bio: 't
 export const Permission = mongoose.model<IPermission>('Permission', PermissionSchema);
 export const Role = mongoose.model<IRole>('Role', RoleSchema);
 export const User = mongoose.model<IUser>('User', UserSchema);
+export const Department = mongoose.model<IDepartment>('Department', DepartmentSchema);
 export const Employee = mongoose.model<IEmployee>('Employee', EmployeeSchema);
 export const Brand = mongoose.model<IBrand>('Brand', BrandSchema);
 export const EmployeeBrand = mongoose.model<IEmployeeBrand>('EmployeeBrand', EmployeeBrandSchema);
