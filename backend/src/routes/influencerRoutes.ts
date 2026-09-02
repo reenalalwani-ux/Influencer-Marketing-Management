@@ -193,10 +193,6 @@ router.post('/', authenticateToken, checkPermission('influencer.create'), async 
       platform, status, contentLink, adsCode, viewsCount, ordersCount, ordersGenerated, isApproved, approvalStatus, reason, notes, remark, transactionDate, connectedDate
     } = req.body;
 
-    if (!influencerName) {
-      return res.status(400).json({ success: false, message: 'Influencer name is required' });
-    }
-
     let finalBrandName = brandName;
     if (brandId && !finalBrandName) {
       const b = await Brand.findById(brandId);
@@ -339,37 +335,14 @@ router.put('/:id', authenticateToken, checkPermission('influencer.update'), asyn
     const oldStatus = record.status;
     const oldInfluencerName = record.influencerName;
 
-    if (influencerName) record.influencerName = influencerName;
+    if (influencerName !== undefined) record.influencerName = influencerName;
     if (influencerManager !== undefined) record.influencerManager = influencerManager;
     if (brandManagerTeam !== undefined) record.brandManagerTeam = brandManagerTeam;
-    if (brandId) record.brandId = brandId;
+    if (brandId !== undefined) record.brandId = brandId || undefined;
     if (brandName) record.brandName = brandName;
     if (phone !== undefined) record.phone = phone;
-
-    if (influencerInstagramId !== undefined || profileLink !== undefined) {
-      const { handle, link } = cleanInstagramHandleAndLink(influencerInstagramId, profileLink);
-      if (handle) record.influencerInstagramId = handle;
-      if (link) record.profileLink = link;
-
-      // Sync InfluencerDirectory entry if exists
-      try {
-        const dirDoc = await InfluencerDirectory.findOne({
-          $or: [
-            { name: new RegExp(`^${(influencerName || oldInfluencerName).trim()}$`, 'i') },
-            { instagramHandle: new RegExp(`^@?${(record.influencerInstagramId || '').replace('@', '')}$`, 'i') }
-          ]
-        });
-        if (dirDoc) {
-          if (handle) dirDoc.instagramHandle = handle;
-          if (link) dirDoc.profileLink = link;
-          if (phone !== undefined) dirDoc.phone = phone;
-          if (influencerName) dirDoc.name = influencerName;
-          await dirDoc.save();
-        }
-      } catch (dirErr) {
-        console.error('[InfluencerUpdate] Directory sync error:', dirErr);
-      }
-    }
+    if (influencerInstagramId !== undefined) record.influencerInstagramId = influencerInstagramId;
+    if (profileLink !== undefined) record.profileLink = profileLink;
 
     if (category) record.category = category;
 
