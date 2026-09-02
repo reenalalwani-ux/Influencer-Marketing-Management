@@ -20,6 +20,11 @@ interface DataTableProps<T> {
   pagination?: boolean;
   itemsPerPage?: number;
   className?: string;
+  // Optional Server-side pagination support:
+  currentPage?: number;
+  totalItems?: number;
+  totalPages?: number;
+  onPageChange?: (page: number) => void;
 }
 
 type SortDir = 'asc' | 'desc' | null;
@@ -33,15 +38,24 @@ export function DataTable<T extends Record<string, any>>({
   pagination = true,
   itemsPerPage = 10,
   className = '',
+  currentPage: externalCurrentPage,
+  totalItems: externalTotalItems,
+  totalPages: externalTotalPages,
+  onPageChange,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>(null);
-  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [internalCurrentPage, setInternalCurrentPage] = useState<number>(1);
 
-  // Reset to page 1 whenever data changes (e.g. search filter applied)
+  const isServerSide = Boolean(onPageChange);
+  const activeCurrentPage = isServerSide && externalCurrentPage !== undefined ? externalCurrentPage : internalCurrentPage;
+
+  // Reset internal page to 1 whenever data changes (for client-side mode)
   React.useEffect(() => {
-    setCurrentPage(1);
-  }, [data.length]);
+    if (!isServerSide) {
+      setInternalCurrentPage(1);
+    }
+  }, [data.length, isServerSide]);
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -64,12 +78,24 @@ export function DataTable<T extends Record<string, any>>({
     });
   }, [data, sortKey, sortDir]);
 
-  const totalPages = Math.ceil(sortedData.length / itemsPerPage);
+  const calculatedTotalPages = Math.ceil(sortedData.length / itemsPerPage);
+  const activeTotalPages = isServerSide && externalTotalPages !== undefined ? externalTotalPages : calculatedTotalPages;
+  const activeTotalItems = isServerSide && externalTotalItems !== undefined ? externalTotalItems : sortedData.length;
+
   const paginatedData = useMemo(() => {
     if (!pagination) return sortedData;
-    const start = (currentPage - 1) * itemsPerPage;
+    if (isServerSide) return sortedData; // server already sends requested page slice
+    const start = (activeCurrentPage - 1) * itemsPerPage;
     return sortedData.slice(start, start + itemsPerPage);
-  }, [sortedData, pagination, currentPage, itemsPerPage]);
+  }, [sortedData, pagination, isServerSide, activeCurrentPage, itemsPerPage]);
+
+  const handlePageChange = (page: number) => {
+    if (onPageChange) {
+      onPageChange(page);
+    } else {
+      setInternalCurrentPage(page);
+    }
+  };
 
   const SortIcon = ({ colKey }: { colKey: string }) => {
     if (sortKey !== colKey) return <span className="text-[10px] font-extrabold text-slate-400/80 ml-1 tracking-tighter">↑↓</span>;
@@ -133,7 +159,7 @@ export function DataTable<T extends Record<string, any>>({
                     return (
                       <td key={String(col.key)} className={`px-5 py-3.5 whitespace-nowrap ${alignClass}`}>
                         {col.render
-                          ? col.render(row[col.key as keyof T], row, (currentPage - 1) * itemsPerPage + idx)
+                          ? col.render(row[col.key as keyof T], row, (activeCurrentPage - 1) * itemsPerPage + idx)
                           : <span className="text-slate-800 font-bold">{String(row[col.key as keyof T] ?? '—')}</span>
                         }
                       </td>
@@ -146,14 +172,14 @@ export function DataTable<T extends Record<string, any>>({
         </table>
       </div>
 
-      {pagination && sortedData.length > 0 && (
+      {pagination && activeTotalItems > 0 && (
         <div className="px-5 py-3 bg-slate-50/50 border-t border-slate-100">
           <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={sortedData.length}
+            currentPage={activeCurrentPage}
+            totalPages={activeTotalPages}
+            totalItems={activeTotalItems}
             itemsPerPage={itemsPerPage}
-            onPageChange={(page) => setCurrentPage(page)}
+            onPageChange={handlePageChange}
           />
         </div>
       )}

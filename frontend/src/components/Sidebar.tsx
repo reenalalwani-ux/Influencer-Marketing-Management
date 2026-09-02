@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Users, Briefcase, UserCheck, Calendar,
   CheckSquare, CheckCircle, BarChart3, FileSpreadsheet, ShieldAlert,
-  Settings, Clock, Target, Sparkles, ChevronDown, ChevronRight, Layers, Building2
+  Settings, Clock, Target, Sparkles, ChevronDown, ChevronRight, Layers, Building2, LogOut
 } from 'lucide-react';
 import { User } from '../types';
 
@@ -10,6 +10,7 @@ interface SidebarProps {
   user: User | null;
   activeView: string;
   setActiveView: (view: string) => void;
+  onLogout?: () => void;
 }
 
 interface SubMenuItem {
@@ -26,7 +27,7 @@ interface MenuGroup {
   subItems: SubMenuItem[];
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveView }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveView, onLogout }) => {
   const isEmployee = user?.role === 'Employee';
   const isClient = user?.role === 'Client';
 
@@ -80,6 +81,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
             </div>
           </button>
         </nav>
+
+        {/* Sidebar Footer Logout Button */}
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center space-x-2.5 px-3 py-2.5 rounded-xl font-extrabold text-xs text-rose-600 bg-rose-50/70 hover:bg-rose-100/90 border border-rose-200/80 transition shadow-2xs cursor-pointer mt-auto"
+            title="Logout of session"
+          >
+            <LogOut size={16} className="text-rose-600 shrink-0" />
+            <span>Logout</span>
+          </button>
+        )}
       </aside>
     );
   }
@@ -334,13 +347,26 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
         })}
       </nav>
 
-      {/* Footer info */}
-      <div className="p-3.5 bg-slate-50 rounded-2xl text-xs text-slate-500 mt-auto border border-slate-200">
-        <div className="font-bold text-slate-800 flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          Influencer OPS v1.0
+      {/* Footer info & Bottom-Left Logout Button */}
+      <div className="pt-2 space-y-2 mt-auto">
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center space-x-2.5 px-3.5 py-2.5 rounded-xl font-extrabold text-xs text-rose-600 bg-rose-50/80 hover:bg-rose-100 border border-rose-200/90 transition shadow-2xs cursor-pointer"
+            title="Logout of session"
+          >
+            <LogOut size={16} className="text-rose-600 shrink-0" />
+            <span>Logout</span>
+          </button>
+        )}
+
+        <div className="p-3 bg-slate-50 rounded-2xl text-xs text-slate-500 border border-slate-200">
+          <div className="font-bold text-slate-800 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            Influencer OPS v1.0
+          </div>
+          <p className="text-[11px] text-slate-500 mt-0.5">Modular Navigation</p>
         </div>
-        <p className="text-[11px] text-slate-500 mt-1">Modular Navigation</p>
       </div>
     </aside>
   );

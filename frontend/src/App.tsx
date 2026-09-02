@@ -39,6 +39,7 @@ export const App: React.FC = () => {
   // forceLogout is a no-op when this is false, so a 401 on the login page
   // (e.g. the initial checkAuth call when no session exists) never queues a modal.
   const isLoggedInRef = useRef(false);
+  const logoutTriggerRef = useRef<(() => void) | null>(null);
 
   // Check if current hash is a public share route, e.g. #/share/token
   const getShareTokenFromHash = () => {
@@ -238,6 +239,7 @@ export const App: React.FC = () => {
       <Navbar
         user={user}
         onLogout={handleLogout}
+        onRequestLogout={(trigger) => { logoutTriggerRef.current = trigger; }}
         activeView={activeView}
         setActiveView={handleNavigate}
         onUpdateUser={(updatedUser) => setUser(updatedUser)}
@@ -258,6 +260,10 @@ export const App: React.FC = () => {
           user={user}
           activeView={activeView}
           setActiveView={handleNavigate}
+          onLogout={() => {
+            if (logoutTriggerRef.current) logoutTriggerRef.current();
+            else handleLogout();
+          }}
         />
 
         <main className="flex-1 p-4 overflow-y-auto w-full">

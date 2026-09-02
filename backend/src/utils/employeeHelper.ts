@@ -2,18 +2,22 @@ import { Employee, IEmployee, IUser } from '../models/allModels';
 
 /**
  * Robustly finds the Employee document corresponding to an authenticated User document.
- * Searches by userId, employeeId, email (case-insensitive), or name.
+ * Matches strictly by userId or exact user email address to prevent cross-account mismatches.
  */
 export async function getEmployeeForAuthUser(user?: IUser | null): Promise<IEmployee | null> {
   if (!user) return null;
 
-  const queryConditions: any[] = [];
-  if (user._id) queryConditions.push({ userId: user._id });
-  if (user.employeeId) queryConditions.push({ employeeId: user.employeeId });
-  if (user.email) queryConditions.push({ email: user.email.toLowerCase() });
-  if (user.name) queryConditions.push({ name: user.name });
+  // 1. Primary lookup: Match exact userId
+  if (user._id) {
+    const empByUserId = await Employee.findOne({ userId: user._id }).populate('department', 'name code description status');
+    if (empByUserId) return empByUserId;
+  }
 
-  if (queryConditions.length === 0) return null;
+  // 2. Secondary lookup: Match exact user email address
+  if (user.email) {
+    const empByEmail = await Employee.findOne({ email: user.email.toLowerCase() }).populate('department', 'name code description status');
+    if (empByEmail) return empByEmail;
+  }
 
-  return await Employee.findOne({ $or: queryConditions }).populate('department', 'name code description status');
+  return null;
 }

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { User, TaskItem, EmployeePerformanceData } from '../types';
+import { DataTable, DataTableColumn } from '../components/DataTable';
 import { Pagination } from '../components/Pagination';
 import { PageLoader } from '../components/PageLoader';
 
@@ -21,9 +22,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [perfData, setPerfData] = useState<EmployeePerformanceData[]>([]);
+  const [perfPage, setPerfPage] = useState(1);
+  const [perfTotal, setPerfTotal] = useState(0);
+  const [perfTotalPages, setPerfTotalPages] = useState(1);
+  const [loadingPerf, setLoadingPerf] = useState(false);
   const [logPage, setLogPage] = useState(1);
   const [localTasks, setLocalTasks] = useState<any[]>([]);
   const itemsPerPage = 6;
+  const perfLimit = 10;
+
+  const fetchPerformance = async (page: number = 1) => {
+    if (user?.role === 'Employee') return;
+    setLoadingPerf(true);
+    try {
+      const perfRes = await api.get(`/performance?page=${page}&limit=${perfLimit}`);
+      if (perfRes.success) {
+        setPerfData(perfRes.data || []);
+        setPerfTotal(perfRes.total ?? (perfRes.data?.length || 0));
+        setPerfTotalPages(perfRes.totalPages ?? 1);
+        setPerfPage(page);
+      }
+    } catch (err) {
+      console.error('Failed to fetch performance leaderboard', err);
+    } finally {
+      setLoadingPerf(false);
+    }
+  };
 
   const fetchDashboardStats = async () => {
     try {
@@ -38,8 +62,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
 
       // Fetch company performance leaderboard ONLY for Manager / Admin roles
       if (!isEmp) {
-        const perfRes = await api.get('/performance');
-        if (perfRes.success) setPerfData(perfRes.data || []);
+        await fetchPerformance(1);
       }
     } catch (err) {
       console.error('Failed to fetch dashboard stats', err);
@@ -113,30 +136,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <button
-            onClick={() => onNavigate('daily-posting')}
-            className="px-4 py-2.5 btn-gradient-primary text-white rounded-xl font-extrabold text-xs transition shadow-md flex items-center space-x-2 cursor-pointer"
-          >
-            <Clock size={16} />
-            <span>Daily Postings</span>
-          </button>
-          <button
-            onClick={() => onNavigate('influencers')}
-            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-extrabold text-xs transition border border-slate-200 flex items-center space-x-2 cursor-pointer"
-          >
-            <Layers size={16} />
-            <span>Influencer Target</span>
-          </button>
-          <button
-            onClick={() => onNavigate('calendar')}
-            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-extrabold text-xs transition border border-slate-200 flex items-center space-x-2 cursor-pointer"
-          >
-            <Calendar size={16} />
-            <span>Calendar</span>
-          </button>
-        </div>
       </div>
+
 
       {/* Metric Summary Cards */}
       {isEmployee ? (
@@ -301,134 +302,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
       )}
 
       {/* Main Content Area */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Today's Schedule & Work Hub Table */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-xs flex flex-col justify-between space-y-4">
-          <div>
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
-              <div>
-                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
-                  <Clock size={20} className="text-purple-600" />
-                  Today's Operational Schedule
-                </h3>
-                <p className="text-xs text-slate-500 font-semibold mt-0.5">
-                  Daily content posting schedule & URL submissions for assigned brands.
-                </p>
-              </div>
+      <div className="grid grid-cols-1 gap-4">
+        {/* Today's Schedule & Work Hub Table — COMMENTED OUT */}
+        {/* ... */}
 
-              <button
-                onClick={() => onNavigate('daily-posting')}
-                className="px-3.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl font-extrabold text-xs transition border border-purple-200 flex items-center gap-1"
-              >
-                <span>View Full Schedule</span>
-                <ArrowUpRight size={14} />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {(!localTasks || localTasks.length === 0) ? (
-                <div className="p-8 bg-gradient-to-br from-purple-50/50 to-slate-50 rounded-2xl border border-purple-100/80 text-center space-y-2">
-                  <p className="text-xs text-slate-500 font-semibold">No operational tasks found in database for today.</p>
-                </div>
-              ) : (
-                localTasks.map((t: any) => (
-                  <div
-                    key={t._id}
-                    className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:border-purple-300 transition shadow-2xs"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded-md text-[10px] uppercase font-black bg-purple-100 text-purple-700 border border-purple-200">
-                          {t.platform || 'Instagram'} • {t.contentType || 'Post'}
-                        </span>
-                        <span className="text-xs font-semibold text-slate-500">
-                          {t.scheduledTime || '10:00 AM'}
-                        </span>
-                      </div>
-                      <div className="font-extrabold text-slate-900 text-sm">{t.title}</div>
-                      <div className="text-xs text-slate-600">
-                        Brand: <span className="font-extrabold text-slate-900">{typeof t.brandId === 'object' ? t.brandId?.brandName : 'N/A'}</span>
-                      </div>
-                      {/* Show submitted URL inline */}
-                      {t.publishedUrl && (
-                        <div className="text-[10px] text-slate-400 font-medium truncate max-w-xs">
-                          🔗 {t.publishedUrl}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end flex-wrap">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-black ${
-                        t.status === 'Verified' ? 'badge-verified' :
-                          t.status === 'Submitted' ? 'badge-submitted' :
-                            t.status === 'Pending' ? 'badge-pending' : 'badge-rejected'
-                      }`}>
-                        {t.status}
-                      </span>
-
-                      {/* Submit URL — for Pending or Rejected tasks */}
-                      {(t.status === 'Pending' || t.status === 'Rejected') && (
-                        <button
-                          onClick={() => onOpenSubmitUrlModal(t)}
-                          className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-extrabold transition flex items-center space-x-1 shadow-xs cursor-pointer"
-                        >
-                          <Send size={12} />
-                          <span>{t.status === 'Rejected' ? 'Re-submit URL' : 'Submit URL'}</span>
-                        </button>
-                      )}
-
-                      {/* Edit URL — for Submitted tasks */}
-                      {t.status === 'Submitted' && (
-                        <button
-                          onClick={() => onOpenSubmitUrlModal(t)}
-                          className="px-3.5 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-xs font-extrabold transition flex items-center space-x-1 shadow-xs cursor-pointer"
-                        >
-                          <Pencil size={12} />
-                          <span>Edit URL</span>
-                        </button>
-                      )}
-
-                      {/* View URL — for tasks that have a submitted URL */}
-                      {t.publishedUrl && (
-                        <a
-                          href={t.publishedUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-extrabold transition flex items-center space-x-1 border border-emerald-200 cursor-pointer"
-                          title="Open Published URL"
-                        >
-                          <ExternalLink size={12} />
-                          <span>View URL</span>
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Quick Metrics Summary Bar */}
-          <div className={`pt-3 border-t border-slate-100 grid ${isEmployee ? 'grid-cols-3' : 'grid-cols-2'} gap-3 text-center`}>
-            <div className="p-3 rounded-2xl bg-emerald-50/80 border border-emerald-100">
-              <div className="text-lg font-black text-emerald-700">{data?.todaySummary?.completed || 0}</div>
-              <div className="text-[10px] uppercase font-black text-emerald-600">Verified</div>
-            </div>
-            <div className="p-3 rounded-2xl bg-amber-50/80 border border-amber-100">
-              <div className="text-lg font-black text-amber-700">{data?.todaySummary?.pending || 0}</div>
-              <div className="text-[10px] uppercase font-black text-amber-600">Pending</div>
-            </div>
-            {isEmployee && (
-              <div className="p-3 rounded-2xl bg-purple-50/80 border border-purple-100">
-                <div className="text-lg font-black text-purple-700">{data?.myBrands?.length || 0}</div>
-                <div className="text-[10px] uppercase font-black text-purple-600">Assigned Brands</div>
-              </div>
-            )}
-          </div>
-        </div>
 
         {/* Sidebar Panel: My Assigned Brands / System Activity */}
         <div className="space-y-4">
+
           {isEmployee ? (
             <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -541,59 +422,110 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user, onNavigate, 
             </button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-800">
-              <thead className="bg-slate-50 text-[11px] uppercase font-black text-slate-500 border-b border-slate-200">
-                <tr>
-                  <th className="px-4 py-3">Rank</th>
-                  <th className="px-4 py-3">Member</th>
-                  <th className="px-4 py-3">Designation</th>
-                  <th className="px-4 py-3">Assigned Brands</th>
-                  <th className="px-4 py-3">Completed Tasks</th>
-                  <th className="px-4 py-3">Verification Rate</th>
-                  <th className="px-4 py-3">Performance Grade</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs font-semibold">
-                {perfData.map((emp: any, idx: number) => {
-                  const empName = emp.employee?.name || emp.employeeName || 'Employee';
-                  const empCode = emp.employee?.employeeId || emp.employeeId || `EMP-${1000 + idx}`;
-                  const empDesig = emp.employee?.designation || emp.designation || 'Influencer Executive';
-                  const brandsManaged = emp.metrics?.brandsManaged ?? emp.assignedBrands ?? 0;
-                  const completedTasks = emp.metrics?.completed ?? emp.completedTasks ?? 0;
-                  const compRate = emp.metrics?.completionRate !== undefined ? `${emp.metrics.completionRate}%` : (emp.verifiedRate || '0%');
+          {/* Team Performance DataTable */}
+          {(() => {
+            const tableData = perfData.map((emp: any, idx: number) => ({
+              _idx: idx,
+              rank: (perfPage - 1) * perfLimit + idx + 1,
+              name: emp.employee?.name || emp.employeeName || 'Employee',
+              employeeId: emp.employee?.employeeId || emp.employeeId || `EMP-${1000 + (perfPage - 1) * perfLimit + idx}`,
+              designation: emp.employee?.designation || emp.designation || 'Influencer Executive',
+              brandsManaged: emp.metrics?.brandsManaged ?? emp.assignedBrands ?? 0,
+              completedTasks: emp.metrics?.completed ?? emp.completedTasks ?? 0,
+              compRate: emp.metrics?.completionRate !== undefined ? emp.metrics.completionRate : parseInt(emp.verifiedRate || '0'),
+            }));
 
-                  return (
-                    <tr key={idx} className="hover:bg-purple-50/40 transition">
-                      <td className="px-4 py-3 font-black text-slate-900">
-                        {idx === 0 ? <span className="text-amber-500 font-extrabold flex items-center gap-1"><Medal size={14} /> #1</span> : `#${idx + 1}`}
-                      </td>
-                      <td className="px-4 py-3 font-extrabold text-slate-900">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-purple-100 text-purple-800 flex items-center justify-center font-black text-xs shadow-2xs">
-                            {empName.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <div>{empName}</div>
-                            <div className="text-[10px] text-purple-600 font-bold">{empCode}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{empDesig}</td>
-                      <td className="px-4 py-3 font-bold text-slate-900">{brandsManaged} Brands</td>
-                      <td className="px-4 py-3 font-black text-emerald-600">{completedTasks} Tasks</td>
-                      <td className="px-4 py-3 font-extrabold text-purple-700">{compRate}</td>
-                      <td className="px-4 py-3">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
-                          {parseInt(compRate) >= 80 ? 'High Performer' : parseInt(compRate) >= 50 ? 'Steady' : 'Active'}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+            const columns: DataTableColumn<typeof tableData[0]>[] = [
+              {
+                key: 'rank',
+                label: 'Rank',
+                sortable: true,
+                width: 'w-16',
+                render: (_val, row) => row.rank === 1
+                  ? <span className="text-amber-500 font-extrabold flex items-center gap-1"><Medal size={14} /> #1</span>
+                  : <span className="font-black text-slate-700">#{row.rank}</span>,
+              },
+              {
+                key: 'name',
+                label: 'Member',
+                sortable: true,
+                render: (_val, row) => (
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-purple-100 text-purple-800 flex items-center justify-center font-black text-xs shadow-2xs">
+                      {row.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="font-extrabold text-slate-900">{row.name}</div>
+                      <div className="text-[10px] text-purple-600 font-bold">{row.employeeId}</div>
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                key: 'designation',
+                label: 'Designation',
+                sortable: true,
+                render: (_val, row) => <span className="text-slate-600">{row.designation}</span>,
+              },
+              {
+                key: 'brandsManaged',
+                label: 'Assigned Brands',
+                sortable: true,
+                render: (_val, row) => <span className="font-bold text-slate-900">{row.brandsManaged} Brands</span>,
+              },
+              {
+                key: 'completedTasks',
+                label: 'Completed Tasks',
+                sortable: true,
+                render: (_val, row) => <span className="font-black text-emerald-600">{row.completedTasks} Tasks</span>,
+              },
+              {
+                key: 'compRate',
+                label: 'Verification Rate',
+                sortable: true,
+                render: (_val, row) => <span className="font-extrabold text-purple-700">{row.compRate}%</span>,
+              },
+              {
+                key: 'compRate',
+                label: 'Performance Grade',
+                render: (_val, row) => (
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
+                    row.compRate >= 80
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                      : row.compRate >= 50
+                      ? 'bg-blue-100 text-blue-800 border-blue-200'
+                      : 'bg-slate-100 text-slate-700 border-slate-200'
+                  }`}>
+                    {row.compRate >= 80 ? 'High Performer' : row.compRate >= 50 ? 'Steady' : 'Active'}
+                  </span>
+                ),
+              },
+            ];
+
+            return (
+              <div className="relative">
+                {loadingPerf && (
+                  <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-3xl">
+                    <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl shadow-lg border border-purple-100 text-purple-700 font-bold text-xs">
+                      <Loader2 size={16} className="animate-spin text-purple-600" />
+                      <span>Loading page {perfPage}...</span>
+                    </div>
+                  </div>
+                )}
+                <DataTable
+                  columns={columns}
+                  data={tableData}
+                  rowKey="_idx"
+                  itemsPerPage={perfLimit}
+                  currentPage={perfPage}
+                  totalItems={perfTotal}
+                  totalPages={perfTotalPages}
+                  onPageChange={(page) => fetchPerformance(page)}
+                  emptyMessage="No team performance data available."
+                />
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>

@@ -130,29 +130,8 @@ export const TargetTopBanner: React.FC<TargetTopBannerProps> = ({ user, onNaviga
             />
           </div>
         </div>
-
-        {/* Right: Actions */}
-        <div className="flex items-center space-x-2 shrink-0">
-          {isTargetManager && (
-            <button
-              onClick={() => setShowQuickEdit(true)}
-              className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold text-white transition flex items-center space-x-1.5 border border-white/10"
-              title="Quick Update Target Progress"
-            >
-              <Edit3 size={13} />
-              <span>Update</span>
-            </button>
-          )}
-
-          <button
-            onClick={onNavigateToTargets}
-            className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-xs font-bold text-white transition flex items-center space-x-1 shadow-sm"
-          >
-            <span>Target Module</span>
-            <ChevronRight size={14} />
-          </button>
-        </div>
       </div>
+
 
       {/* Quick Update Modal */}
       {showQuickEdit && (

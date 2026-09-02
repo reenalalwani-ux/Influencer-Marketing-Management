@@ -553,21 +553,17 @@ router.post('/logout', async (req: AuthRequest, res: Response) => {
   return res.status(200).json({ success: true, message: 'Logged out successfully' });
 });
 
-// GET /api/v1/auth/me
+// GET /api/v1/auth/me - Get logged in user profile
 router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => {
   if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-  const [roleDoc, employee, brandDetails] = await Promise.all([
-    Role.findOne({ name: req.user.role }).lean(),
-    getEmployeeForAuthUser(req.user),
-    req.user.brandId ? Brand.findById(req.user.brandId).lean() : null
-  ]);
-  const permissions = roleDoc ? roleDoc.permissions : [];
+  try {
+    const [employee, brandDetails] = await Promise.all([
+      getEmployeeForAuthUser(req.user),
+      req.user.brandId ? Brand.findById(req.user.brandId).lean() : null
+    ]);
 
-  return res.status(200).json({
-    success: true,
-    message: 'Current user profile fetched successfully',
-    user: {
+    const userObj = {
       id: req.user._id,
       name: req.user.name,
       email: req.user.email,
@@ -575,10 +571,19 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => 
       employeeId: employee ? employee.employeeId : req.user.employeeId,
       brandId: req.user.brandId,
       brandDetails,
-      permissions,
       employeeDetails: employee
-    }
-  });
+    };
+
+    return res.status(200).json({
+      success: true,
+      message: 'Current user profile fetched successfully',
+      user: userObj,
+      data: userObj
+    });
+  } catch (error: any) {
+    console.error('Fetch profile error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch profile details' });
+  }
 });
 
 // PUT /api/v1/auth/profile
@@ -601,8 +606,6 @@ router.put('/profile', authenticateToken, async (req: AuthRequest, res: Response
       await employee.save();
     }
 
-    const roleDoc = await Role.findOne({ name: req.user.role });
-    const permissions = roleDoc ? roleDoc.permissions : [];
 
     await logActivity({
       userId: req.user._id,
@@ -622,7 +625,6 @@ router.put('/profile', authenticateToken, async (req: AuthRequest, res: Response
         email: req.user.email,
         role: req.user.role,
         employeeId: employee ? employee.employeeId : req.user.employeeId,
-        permissions,
         employeeDetails: employee
       }
     });
