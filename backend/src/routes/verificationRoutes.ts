@@ -9,15 +9,31 @@ const router = Router();
 // GET /api/v1/verification/pending
 router.get('/pending', authenticateToken, checkPermission('task.verify'), async (req: AuthRequest, res: Response) => {
   try {
-    const pendingTasks = await Task.find({ verificationStatus: 'Pending Verification' })
+    const totalCount = await Task.countDocuments({ verificationStatus: 'Pending Verification' });
+    const pageNum = req.query.page ? Math.max(1, Number(req.query.page)) : undefined;
+    const limitNum = req.query.limit ? Math.max(1, Number(req.query.limit)) : 10;
+
+    let query = Task.find({ verificationStatus: 'Pending Verification' })
       .populate('employeeId', 'name employeeId email designation department')
       .populate('brandId', 'brandName brandId logo industry')
       .sort({ publishedDate: -1 });
+
+    if (pageNum !== undefined) {
+      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+
+    const pendingTasks = await query;
 
     return res.status(200).json({ 
       success: true, 
       count: pendingTasks.length, 
       data: pendingTasks,
+      pagination: {
+        page: pageNum || 1,
+        limit: limitNum,
+        total: totalCount,
+        totalPages: Math.max(1, Math.ceil(totalCount / limitNum))
+      },
       message: pendingTasks.length === 0 ? 'No records found' : 'Pending verification tasks fetched successfully'
     });
   } catch (error) {

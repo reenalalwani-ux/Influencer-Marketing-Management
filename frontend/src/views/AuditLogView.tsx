@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import { AuditLogItem } from '../types';
-import { Pagination } from '../components/Pagination';
+import { DataTable, DataTableColumn } from '../components/DataTable';
 import { InlineLoader } from '../components/PageLoader';
 import { CustomSelectDropdown } from '../components/CustomSelectDropdown';
 
@@ -56,6 +56,88 @@ export const AuditLogView: React.FC = () => {
   // Unique lists for dropdown filters
   const uniqueUsers = Array.from(new Set(logs.map(l => l.userName).filter(Boolean)));
   const uniqueModules = Array.from(new Set(logs.map(l => l.module).filter(Boolean)));
+
+  const columns: DataTableColumn<AuditLogItem>[] = [
+    {
+      key: 'timestamp',
+      label: 'Timestamp',
+      render: (_, log) => {
+        const dateObj = new Date(log.timestamp);
+        const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const formattedTime = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        return (
+          <div className="whitespace-nowrap text-slate-500 font-semibold text-[11px]">
+            <div>{formattedDate}</div>
+            <div className="text-slate-400 text-[10px]">{formattedTime}</div>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'userName',
+      label: 'User / Member',
+      render: (_, log) => (
+        <div className="flex items-center space-x-2.5">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-600 to-indigo-600 text-white font-extrabold text-xs flex items-center justify-center shadow-2xs">
+            {log.userName ? log.userName.charAt(0).toUpperCase() : 'U'}
+          </div>
+          <div>
+            <div className="font-extrabold text-slate-900">{log.userName}</div>
+            {log.userEmail && <div className="text-[10px] text-slate-400 font-medium">{log.userEmail}</div>}
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'userRole',
+      label: 'Role',
+      render: (_, log) => (
+        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+          log.userRole?.includes('Manager') ? 'bg-purple-100 text-purple-800 border border-purple-200' : 'bg-slate-100 text-slate-700 border border-slate-200'
+        }`}>
+          {log.userRole || 'Employee'}
+        </span>
+      )
+    },
+    {
+      key: 'action',
+      label: 'Action',
+      align: 'center',
+      render: (_, log) => {
+        const isLogin = log.action.includes('LOGIN');
+        const isStatus = log.action === 'UPDATE_STATUS';
+        const isCreate = log.action === 'CREATE_RECORD' || log.action === 'CREATE_BRAND';
+        const isDelete = log.action === 'DELETE_RECORD';
+        return (
+          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
+            isLogin ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
+            isStatus ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+            isCreate ? 'bg-purple-100 text-purple-800 border border-purple-200' :
+            isDelete ? 'bg-rose-100 text-rose-800 border border-rose-200' :
+            'bg-amber-100 text-amber-800 border border-amber-200'
+          }`}>
+            {log.action.replace(/_/g, ' ')}
+          </span>
+        );
+      }
+    },
+    {
+      key: 'module',
+      label: 'Module',
+      render: (_, log) => (
+        <span className="font-bold text-slate-600 text-[11px]">{log.module}</span>
+      )
+    },
+    {
+      key: 'details',
+      label: 'Activity Description',
+      render: (_, log) => (
+        <div className="font-bold text-slate-800 text-xs">
+          {log.details || `${log.action} performed on ${log.entity}`}
+        </div>
+      )
+    }
+  ];
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
@@ -230,12 +312,12 @@ export const AuditLogView: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex items-center space-x-2 text-xs font-bold text-slate-500">
-            <span>Rows per page:</span>
+          <div className="flex items-center space-x-2 text-xs text-slate-500 font-bold">
+            <span>Per Page:</span>
             <select
               value={limit}
               onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
-              className="px-2.5 py-1 rounded-lg border border-slate-300 bg-slate-50 text-slate-800 font-extrabold outline-none"
+              className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 outline-none"
             >
               <option value={10}>10</option>
               <option value={25}>25</option>
@@ -250,99 +332,17 @@ export const AuditLogView: React.FC = () => {
             <InlineLoader message="Fetching live user activity logs..." />
           </div>
         ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-900 text-white text-[11px] font-extrabold uppercase tracking-wider">
-                    <th className="p-3.5 pl-6">Timestamp</th>
-                    <th className="p-3.5">User / Member</th>
-                    <th className="p-3.5">Role</th>
-                    <th className="p-3.5 text-center">Action</th>
-                    <th className="p-3.5">Module</th>
-                    <th className="p-3.5">Activity Description</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
-                  {logs.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="p-10 text-center text-slate-400 font-bold">
-                        No activity logs found for the selected filters.
-                      </td>
-                    </tr>
-                  ) : (
-                    logs.map((log) => {
-                      const dateObj = new Date(log.timestamp);
-                      const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                      const formattedTime = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-
-                      const isLogin = log.action.includes('LOGIN');
-                      const isStatus = log.action === 'UPDATE_STATUS';
-                      const isCreate = log.action === 'CREATE_RECORD' || log.action === 'CREATE_BRAND';
-                      const isDelete = log.action === 'DELETE_RECORD';
-
-                      return (
-                        <tr key={log._id} className="hover:bg-purple-50/40 transition">
-                          <td className="p-3.5 pl-6 whitespace-nowrap text-slate-500 font-semibold text-[11px]">
-                            <div>{formattedDate}</div>
-                            <div className="text-slate-400 text-[10px]">{formattedTime}</div>
-                          </td>
-                          <td className="p-3.5 whitespace-nowrap">
-                            <div className="flex items-center space-x-2.5">
-                              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-600 to-indigo-600 text-white font-extrabold text-xs flex items-center justify-center shadow-2xs">
-                                {log.userName ? log.userName.charAt(0).toUpperCase() : 'U'}
-                              </div>
-                              <div>
-                                <div className="font-extrabold text-slate-900">{log.userName}</div>
-                                {log.userEmail && <div className="text-[10px] text-slate-400 font-medium">{log.userEmail}</div>}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="p-3.5 whitespace-nowrap">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                              log.userRole?.includes('Manager') ? 'bg-purple-100 text-purple-800 border border-purple-200' : 'bg-slate-100 text-slate-700 border border-slate-200'
-                            }`}>
-                              {log.userRole || 'Employee'}
-                            </span>
-                          </td>
-                          <td className="p-3.5 whitespace-nowrap text-center">
-                            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
-                              isLogin ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
-                              isStatus ? 'bg-blue-100 text-blue-800 border border-blue-200' :
-                              isCreate ? 'bg-purple-100 text-purple-800 border border-purple-200' :
-                              isDelete ? 'bg-rose-100 text-rose-800 border border-rose-200' :
-                              'bg-amber-100 text-amber-800 border border-amber-200'
-                            }`}>
-                              {log.action.replace(/_/g, ' ')}
-                            </span>
-                          </td>
-                          <td className="p-3.5 whitespace-nowrap font-bold text-slate-600 text-[11px]">
-                            {log.module}
-                          </td>
-                          <td className="p-3.5">
-                            <div className="font-bold text-slate-800 text-xs">
-                              {log.details || `${log.action} performed on ${log.entity}`}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            <div className="p-4 border-t border-slate-100 bg-slate-50/50">
-              <Pagination
-                currentPage={page}
-                totalPages={totalPages}
-                totalItems={total}
-                itemsPerPage={limit}
-                onPageChange={(p) => setPage(p)}
-              />
-            </div>
-          </>
+          <DataTable
+            columns={columns}
+            data={logs}
+            rowKey="_id"
+            emptyMessage="No activity logs found for the selected filters."
+            currentPage={page}
+            totalPages={totalPages}
+            totalItems={total}
+            itemsPerPage={limit}
+            onPageChange={(p) => setPage(p)}
+          />
         )}
       </div>
     </div>

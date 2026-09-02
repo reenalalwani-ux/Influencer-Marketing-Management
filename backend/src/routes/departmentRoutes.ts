@@ -27,10 +27,24 @@ router.get('/', async (req: Request, res: Response) => {
 // GET /api/v1/departments/all - Get all departments including inactive (Super Admin / Admin)
 router.get('/all', authenticateToken, checkPermission('settings.view'), async (req: AuthRequest, res: Response) => {
   try {
-    const departments = await Department.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 });
+    const totalCount = await Department.countDocuments({ isDeleted: { $ne: true } });
+    const pageNum = req.query.page ? Math.max(1, Number(req.query.page)) : undefined;
+    const limitNum = req.query.limit ? Math.max(1, Number(req.query.limit)) : 10;
+
+    let query = Department.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 });
+    if (pageNum !== undefined) {
+      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+    const departments = await query;
     return res.status(200).json({
       success: true,
       data: departments,
+      pagination: {
+        page: pageNum || 1,
+        limit: limitNum,
+        total: totalCount,
+        totalPages: Math.max(1, Math.ceil(totalCount / limitNum))
+      },
       message: 'All departments retrieved successfully'
     });
   } catch (error) {

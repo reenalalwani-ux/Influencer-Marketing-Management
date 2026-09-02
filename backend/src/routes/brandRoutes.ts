@@ -27,7 +27,15 @@ router.get('/', authenticateToken, checkPermission('brand.view'), async (req: Au
       }
     }
 
-    const brands = await Brand.find(filter).sort({ createdAt: -1 });
+    const totalCount = await Brand.countDocuments(filter);
+    const pageNum = req.query.page ? Math.max(1, Number(req.query.page)) : undefined;
+    const limitNum = req.query.limit ? Math.max(1, Number(req.query.limit)) : 10;
+
+    let query = Brand.find(filter).sort({ createdAt: -1 });
+    if (pageNum !== undefined) {
+      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+    const brands = await query;
 
     // Fetch all active employee assignments to attach assigned executive name to each brand
     const assignments = await EmployeeBrand.find({ status: 'Active' })
@@ -49,6 +57,12 @@ router.get('/', authenticateToken, checkPermission('brand.view'), async (req: Au
       success: true, 
       count: enrichedBrands.length, 
       data: enrichedBrands,
+      pagination: {
+        page: pageNum || 1,
+        limit: limitNum,
+        total: totalCount,
+        totalPages: Math.max(1, Math.ceil(totalCount / limitNum))
+      },
       message: enrichedBrands.length === 0 ? 'No records found' : 'Brands fetched successfully'
     });
   } catch (error) {

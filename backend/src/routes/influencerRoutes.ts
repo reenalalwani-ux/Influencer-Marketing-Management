@@ -157,14 +157,25 @@ router.get('/', authenticateToken, checkPermission('influencer.view'), async (re
       ];
     }
 
-    const influencers = await Influencer.find(filter)
+    const pageNum = req.query.page ? Math.max(1, Number(req.query.page)) : undefined;
+    const limitNum = req.query.limit ? Math.max(1, Number(req.query.limit)) : 10;
+
+    // Fetch all matching records' financials for aggregate metrics
+    const allMatching = await Influencer.find(filter).select('inAmount outAmount');
+    const totalIn = allMatching.reduce((acc, curr) => acc + (curr.inAmount || 0), 0);
+    const totalOut = allMatching.reduce((acc, curr) => acc + (curr.outAmount || 0), 0);
+    const netBalance = totalIn - totalOut;
+    const totalCount = allMatching.length;
+
+    let query = Influencer.find(filter)
       .populate('brandId', 'brandName brandId logo')
       .sort({ transactionDate: 1, orderDate: 1, sNo: 1 });
 
-    // Aggregate metrics
-    const totalIn = influencers.reduce((acc, curr) => acc + (curr.inAmount || 0), 0);
-    const totalOut = influencers.reduce((acc, curr) => acc + (curr.outAmount || 0), 0);
-    const netBalance = totalIn - totalOut;
+    if (pageNum !== undefined) {
+      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+
+    const influencers = await query;
 
     return res.status(200).json({
       success: true,
@@ -173,7 +184,13 @@ router.get('/', authenticateToken, checkPermission('influencer.view'), async (re
         totalIn,
         totalOut,
         netBalance,
-        totalCount: influencers.length
+        totalCount
+      },
+      pagination: {
+        page: pageNum || 1,
+        limit: limitNum,
+        total: totalCount,
+        totalPages: Math.max(1, Math.ceil(totalCount / limitNum))
       },
       data: influencers,
       message: influencers.length === 0 ? 'No records found' : 'Influencer records fetched successfully'
@@ -522,10 +539,19 @@ router.get('/payment-logs', authenticateToken, checkPermission('influencer.view'
       ];
     }
 
-    const logs = await PaymentLog.find(filter).sort({ transactionDate: 1, createdAt: 1 });
+    const pageNum = req.query.page ? Math.max(1, Number(req.query.page)) : undefined;
+    const limitNum = req.query.limit ? Math.max(1, Number(req.query.limit)) : 10;
 
-    const totalIn = logs.filter(l => l.type === 'IN').reduce((acc, l) => acc + (l.amount || 0), 0);
-    const totalOut = logs.filter(l => l.type === 'OUT').reduce((acc, l) => acc + (l.amount || 0), 0);
+    const allLogs = await PaymentLog.find(filter).select('type amount');
+    const totalIn = allLogs.filter(l => l.type === 'IN').reduce((acc, l) => acc + (l.amount || 0), 0);
+    const totalOut = allLogs.filter(l => l.type === 'OUT').reduce((acc, l) => acc + (l.amount || 0), 0);
+    const totalCount = allLogs.length;
+
+    let query = PaymentLog.find(filter).sort({ transactionDate: 1, createdAt: 1 });
+    if (pageNum !== undefined) {
+      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+    const logs = await query;
 
     return res.status(200).json({
       success: true,
@@ -534,7 +560,13 @@ router.get('/payment-logs', authenticateToken, checkPermission('influencer.view'
         totalIn,
         totalOut,
         netBalance: totalIn - totalOut,
-        totalCount: logs.length
+        totalCount
+      },
+      pagination: {
+        page: pageNum || 1,
+        limit: limitNum,
+        total: totalCount,
+        totalPages: Math.max(1, Math.ceil(totalCount / limitNum))
       },
       message: logs.length === 0 ? 'No records found' : 'Payment logs fetched successfully'
     });

@@ -22,12 +22,21 @@ export const DepartmentManagementView: React.FC = () => {
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<0 | 1>(0);
 
-  const fetchDepartments = async () => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [serverTotalItems, setServerTotalItems] = useState(0);
+  const itemsPerPage = 10;
+
+  const fetchDepartments = async (page = currentPage) => {
     setLoading(true);
     try {
-      const res = await api.get('/departments/all');
+      const res = await api.get(`/departments/all?page=${page}&limit=${itemsPerPage}`);
       if (res.success && Array.isArray(res.data)) {
         setDepartments(res.data);
+        if (res.pagination) {
+          setServerTotalPages(res.pagination.totalPages || 1);
+          setServerTotalItems(res.pagination.total || 0);
+        }
       }
     } catch (err: any) {
       console.error('Failed to fetch departments:', err);
@@ -38,7 +47,7 @@ export const DepartmentManagementView: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchDepartments();
+    fetchDepartments(1);
   }, []);
 
   useEffect(() => {
@@ -370,8 +379,14 @@ export const DepartmentManagementView: React.FC = () => {
             ? `No departments found matching "${searchTerm}".`
             : 'No department records found. Click "+ Add Department" to create one.'
         }
-        pagination={true}
-        itemsPerPage={10}
+        currentPage={currentPage}
+        totalPages={serverTotalPages}
+        totalItems={serverTotalItems || filteredDepartments.length}
+        itemsPerPage={itemsPerPage}
+        onPageChange={(page) => {
+          setCurrentPage(page);
+          fetchDepartments(page);
+        }}
       />
 
       {/* CREATE / EDIT DEPARTMENT MODAL */}

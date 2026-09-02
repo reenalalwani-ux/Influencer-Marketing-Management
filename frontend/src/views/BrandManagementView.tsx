@@ -131,6 +131,8 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [serverTotalItems, setServerTotalItems] = useState(0);
   const itemsPerPage = 10;
 
   // Client Portal Credentials Modal State
@@ -154,10 +156,16 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
   const [targetBarterCollabs, setTargetBarterCollabs] = useState<number>(8);
   const [targetPaidCollabs, setTargetPaidCollabs] = useState<number>(2);
 
-  const fetchBrands = async () => {
+  const fetchBrands = async (page = currentPage) => {
     try {
-      const res = await api.get('/brands');
-      if (res.success) setBrands(res.data);
+      const res = await api.get(`/brands?page=${page}&limit=${itemsPerPage}`);
+      if (res.success) {
+        setBrands(res.data);
+        if (res.pagination) {
+          setServerTotalPages(res.pagination.totalPages || 1);
+          setServerTotalItems(res.pagination.total || 0);
+        }
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -166,7 +174,7 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
   };
 
   useEffect(() => {
-    fetchBrands();
+    fetchBrands(1);
   }, []);
 
   const handleBrandTypeChange = (type: 'New' | 'Running') => {
@@ -320,10 +328,7 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
     return matchesSearch && matchesType;
   });
 
-  const paginatedBrands = filteredBrands.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const paginatedBrands = filteredBrands;
 
   const columns: DataTableColumn<Brand>[] = [
     {
@@ -615,14 +620,14 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
             data={paginatedBrands}
             rowKey="_id"
             emptyMessage="No brands found matching criteria."
-          />
-          
-          <Pagination
             currentPage={currentPage}
-            totalPages={Math.ceil(filteredBrands.length / itemsPerPage) || 1}
-            totalItems={filteredBrands.length}
+            totalPages={serverTotalPages}
+            totalItems={serverTotalItems || filteredBrands.length}
             itemsPerPage={itemsPerPage}
-            onPageChange={(page) => setCurrentPage(page)}
+            onPageChange={(page) => {
+              setCurrentPage(page);
+              fetchBrands(page);
+            }}
           />
         </div>
       )}

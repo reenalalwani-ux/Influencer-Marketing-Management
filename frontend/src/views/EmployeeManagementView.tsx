@@ -12,6 +12,8 @@ export const EmployeeManagementView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [serverTotalItems, setServerTotalItems] = useState(0);
   const itemsPerPage = 10;
 
   // Modal States
@@ -32,12 +34,18 @@ export const EmployeeManagementView: React.FC = () => {
 
   const [pendingEmployees, setPendingEmployees] = useState<Employee[]>([]);
   const [approvingId, setApprovingId] = useState<string | null>(null);
-  const [departmentsList, setDepartmentsList] = useState<IDepartment[]>([]);
+  const [departmentsList, setDepartmentsList] = useState<any[]>([]);
 
-  const fetchEmployees = async () => {
+  const fetchEmployees = async (page = currentPage) => {
     try {
-      const res = await api.get('/employees');
-      if (res.success) setEmployees(res.data);
+      const res = await api.get(`/employees?page=${page}&limit=${itemsPerPage}`);
+      if (res.success) {
+        setEmployees(res.data);
+        if (res.pagination) {
+          setServerTotalPages(res.pagination.totalPages || 1);
+          setServerTotalItems(res.pagination.total || 0);
+        }
+      }
       
       const pRes = await api.get('/employees/pending-approvals');
       if (pRes.success) setPendingEmployees(pRes.data);
@@ -167,10 +175,7 @@ export const EmployeeManagementView: React.FC = () => {
     e.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const paginatedEmployees = filteredEmployees.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const paginatedEmployees = filteredEmployees;
 
   const columns: DataTableColumn<Employee>[] = [
     {
@@ -363,23 +368,20 @@ export const EmployeeManagementView: React.FC = () => {
       {loading ? (
         <InlineLoader message="Loading member list..." />
       ) : (
-        <div className="space-y-3">
-          <DataTable
-            columns={columns}
-            data={paginatedEmployees}
-            rowKey="_id"
-            emptyMessage="No members found matching your search."
-          />
-          <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={Math.ceil(filteredEmployees.length / itemsPerPage)}
-              totalItems={filteredEmployees.length}
-              itemsPerPage={itemsPerPage}
-              onPageChange={setCurrentPage}
-            />
-          </div>
-        </div>
+        <DataTable
+          columns={columns}
+          data={paginatedEmployees}
+          rowKey="_id"
+          emptyMessage="No members found matching your search."
+          currentPage={currentPage}
+          totalPages={serverTotalPages}
+          totalItems={serverTotalItems || filteredEmployees.length}
+          itemsPerPage={itemsPerPage}
+          onPageChange={(page) => {
+            setCurrentPage(page);
+            fetchEmployees(page);
+          }}
+        />
       )}
 
       {/* View Employee Details Modal */}

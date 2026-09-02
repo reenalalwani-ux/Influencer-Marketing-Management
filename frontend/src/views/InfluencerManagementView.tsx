@@ -546,9 +546,6 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     setSelectedViewItem(item);
   };
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
-
   // Fetch Google Sheet Sync Status
   const fetchSyncStatus = async () => {
     try {
@@ -643,20 +640,32 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     }
   };
 
-  // Fetch Influencers
-  const fetchInfluencers = async () => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [serverTotalItems, setServerTotalItems] = useState(0);
+  const itemsPerPage = 10;
+
+  // Fetch Influencers with Server-Side Pagination
+  const fetchInfluencers = async (page = currentPage) => {
     setLoading(true);
     try {
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1;
 
-      let url = `/influencers?timeframe=${timeframe}&year=${year}&month=${month}`;
+      let url = `/influencers?timeframe=${timeframe}&year=${year}&month=${month}&page=${page}&limit=${itemsPerPage}`;
+      if (viewMode === 'Paid Collaborations') url += '&category=Paid';
+      if (viewMode === 'Barter Collaborations') url += '&category=Barter';
+      if (searchTerm.trim()) url += `&search=${encodeURIComponent(searchTerm.trim())}`;
 
       const res = await api.get(url);
       if (res.success) {
         setInfluencers(res.data);
         if (res.metrics) {
           setMetrics(res.metrics);
+        }
+        if (res.pagination) {
+          setServerTotalPages(res.pagination.totalPages || 1);
+          setServerTotalItems(res.pagination.total || 0);
         }
       }
     } catch (err) {
@@ -1213,9 +1222,9 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
   const barterPct = barterGoal > 0 ? Math.min(100, Math.round((barterAchieved / barterGoal) * 100)) : 0;
 
   // Pagination
-  const totalPages = Math.ceil(filteredInfluencers.length / itemsPerPage) || 1;
+  const totalPages = serverTotalPages || Math.ceil(filteredInfluencers.length / itemsPerPage) || 1;
   const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
-  const paginatedInfluencers = filteredInfluencers.slice((safeCurrentPage - 1) * itemsPerPage, safeCurrentPage * itemsPerPage);
+  const paginatedInfluencers = filteredInfluencers;
 
   const SortHeader = ({ field, label, align = 'left' }: { field: string; label: string; align?: 'left' | 'right' | 'center' }) => {
     const isSorted = sortKey === field;
@@ -2673,9 +2682,12 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                 <Pagination
                   currentPage={safeCurrentPage}
                   totalPages={totalPages}
-                  totalItems={filteredInfluencers.length}
+                  totalItems={serverTotalItems || filteredInfluencers.length}
                   itemsPerPage={itemsPerPage}
-                  onPageChange={(p) => setCurrentPage(p)}
+                  onPageChange={(p) => {
+                    setCurrentPage(p);
+                    fetchInfluencers(p);
+                  }}
                 />
               </div>
             )}

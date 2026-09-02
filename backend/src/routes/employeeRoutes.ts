@@ -10,11 +10,30 @@ const router = Router();
 // GET /api/v1/employees
 router.get('/', authenticateToken, checkPermission('employee.view'), async (req: AuthRequest, res: Response) => {
   try {
-    const employees = await Employee.find().populate('reportingManagerId', 'name employeeId designation').populate('department', 'name code description status').sort({ createdAt: -1 });
+    const totalCount = await Employee.countDocuments();
+    const pageNum = req.query.page ? Math.max(1, Number(req.query.page)) : undefined;
+    const limitNum = req.query.limit ? Math.max(1, Number(req.query.limit)) : 10;
+
+    let query = Employee.find()
+      .populate('reportingManagerId', 'name employeeId designation')
+      .populate('department', 'name code description status')
+      .sort({ createdAt: -1 });
+
+    if (pageNum !== undefined) {
+      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+
+    const employees = await query;
     return res.status(200).json({ 
       success: true, 
       count: employees.length, 
       data: employees,
+      pagination: {
+        page: pageNum || 1,
+        limit: limitNum,
+        total: totalCount,
+        totalPages: Math.max(1, Math.ceil(totalCount / limitNum))
+      },
       message: employees.length === 0 ? 'No records found' : 'Employees fetched successfully'
     });
   } catch (error) {

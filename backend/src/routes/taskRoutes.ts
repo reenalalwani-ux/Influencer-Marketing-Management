@@ -51,17 +51,33 @@ router.get('/', authenticateToken, checkPermission('task.view'), async (req: Aut
   }
 
   try {
-    const tasks = await Task.find(filter)
+    const totalCount = await Task.countDocuments(filter);
+    const pageNum = req.query.page ? Math.max(1, Number(req.query.page)) : undefined;
+    const limitNum = req.query.limit ? Math.max(1, Number(req.query.limit)) : 10;
+
+    let query = Task.find(filter)
       .populate('employeeId', 'name employeeId designation department')
       .populate('brandId', 'brandName brandId logo industry')
       .populate('verifiedBy', 'name role')
       .populate('parentTaskId', 'taskId title brandId platform contentType')
       .sort({ scheduledDate: 1, scheduledTime: 1 });
 
+    if (pageNum !== undefined) {
+      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+
+    const tasks = await query;
+
     return res.status(200).json({ 
       success: true, 
       count: tasks.length, 
       data: tasks,
+      pagination: {
+        page: pageNum || 1,
+        limit: limitNum,
+        total: totalCount,
+        totalPages: Math.max(1, Math.ceil(totalCount / limitNum))
+      },
       message: tasks.length === 0 ? 'No records found' : 'Tasks fetched successfully'
     });
   } catch (error) {

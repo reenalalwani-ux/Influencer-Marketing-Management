@@ -15,16 +15,32 @@ router.get('/', authenticateToken, checkPermission('brand.view'), async (req: Au
   if (status) filter.status = status;
 
   try {
-    const assignments = await EmployeeBrand.find(filter)
+    const totalCount = await EmployeeBrand.countDocuments(filter);
+    const pageNum = req.query.page ? Math.max(1, Number(req.query.page)) : undefined;
+    const limitNum = req.query.limit ? Math.max(1, Number(req.query.limit)) : 10;
+
+    let query = EmployeeBrand.find(filter)
       .populate('employeeId', 'name employeeId designation department email')
       .populate('brandId', 'brandName brandId logo industry')
       .populate('assignedBy', 'name role')
       .sort({ createdAt: -1 });
 
+    if (pageNum !== undefined) {
+      query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+    }
+
+    const assignments = await query;
+
     return res.status(200).json({ 
       success: true, 
       count: assignments.length, 
       data: assignments,
+      pagination: {
+        page: pageNum || 1,
+        limit: limitNum,
+        total: totalCount,
+        totalPages: Math.max(1, Math.ceil(totalCount / limitNum))
+      },
       message: assignments.length === 0 ? 'No records found' : 'Assignments fetched successfully'
     });
   } catch (error) {

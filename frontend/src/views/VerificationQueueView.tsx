@@ -13,12 +13,20 @@ export const VerificationQueueView: React.FC = () => {
   const [rejectionReason, setRejectionReason] = useState('');
   const [comments, setComments] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [serverTotalItems, setServerTotalItems] = useState(0);
   const itemsPerPage = 5;
 
-  const fetchPending = async () => {
+  const fetchPending = async (page = currentPage) => {
     try {
-      const res = await api.get('/verification/pending');
-      if (res.success) setPendingTasks(res.data);
+      const res = await api.get(`/verification/pending?page=${page}&limit=${itemsPerPage}`);
+      if (res.success) {
+        setPendingTasks(res.data);
+        if (res.pagination) {
+          setServerTotalPages(res.pagination.totalPages || 1);
+          setServerTotalItems(res.pagination.total || 0);
+        }
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -27,7 +35,7 @@ export const VerificationQueueView: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchPending();
+    fetchPending(1);
   }, []);
 
   const handleVerifyDecision = async (decision: 'Verified' | 'Rejected') => {
@@ -81,7 +89,7 @@ export const VerificationQueueView: React.FC = () => {
             </div>
           ) : (
             <>
-              {pendingTasks.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((t) => {
+              {pendingTasks.map((t) => {
                 const emp = t.employeeId as any;
                 const brand = t.brandId as any;
                 return (
@@ -130,10 +138,13 @@ export const VerificationQueueView: React.FC = () => {
               <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
                 <Pagination
                   currentPage={currentPage}
-                  totalPages={Math.ceil(pendingTasks.length / itemsPerPage)}
-                  totalItems={pendingTasks.length}
+                  totalPages={serverTotalPages}
+                  totalItems={serverTotalItems || pendingTasks.length}
                   itemsPerPage={itemsPerPage}
-                  onPageChange={setCurrentPage}
+                  onPageChange={(page) => {
+                    setCurrentPage(page);
+                    fetchPending(page);
+                  }}
                 />
               </div>
             </>
