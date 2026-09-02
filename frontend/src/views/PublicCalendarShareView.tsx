@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { CalendarDays, CheckCircle2, Clock, FileSpreadsheet, Link2, Video, User, AlertCircle, RefreshCw, Building2, Grid, List } from 'lucide-react';
+import { api } from '../services/api';
 
 interface PublicCalendarItem {
   _id: string;
@@ -46,14 +47,11 @@ export const PublicCalendarShareView: React.FC<{ token: string }> = ({ token }) 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
 
-  const API_BASE = 'http://localhost:5000/api/v1';
-
   const fetchData = async () => {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${API_BASE}/content-calendar/public/${token}`);
-      const json = await res.json();
+      const json = await api.get(`/content-calendar/public/${token}`);
       if (json.success) {
         setItems(json.data);
         setMeta(json.meta);
@@ -61,8 +59,8 @@ export const PublicCalendarShareView: React.FC<{ token: string }> = ({ token }) 
       } else {
         setError(json.message || 'Failed to load calendar');
       }
-    } catch (e) {
-      setError('Unable to connect to server. Please try again later.');
+    } catch (e: any) {
+      setError(e.message || 'Unable to connect to server. Please try again later.');
     } finally {
       setLoading(false);
     }

@@ -884,12 +884,12 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     setEditingItem(item);
     setInfluencerManager(item.influencerManager || '');
     setBrandManagerTeam(item.brandManagerTeam || '');
-    setInfluencerName(item.influencerName);
-    setInfluencerInstagramId(item.influencerInstagramId || item.profileLink || '');
+    setInfluencerName(item.influencerName || '');
+    setInfluencerInstagramId(item.influencerInstagramId || '');
     setSelectedBrandId(typeof item.brandId === 'object' ? item.brandId?._id : item.brandId || '');
     setCustomBrandName(item.brandName);
     setPhone(item.phone || '');
-    setProfileLink(item.profileLink || item.influencerInstagramId || '');
+    setProfileLink(item.profileLink || '');
     setCategory(item.category);
     setBrandOnboardingAmt(item.brandOnboardingAmt || item.inAmount || 0);
     setBrandReceivedAmt(item.brandReceivedAmt || item.inAmount || 0);
@@ -927,15 +927,20 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
       const brandObj = brands.find(b => b._id === selectedBrandId);
       const bName = brandObj ? brandObj.brandName : (customBrandName || 'Bunaiwala');
 
+      const cleanHandle = influencerInstagramId.trim();
+      const cleanProfileLink = cleanHandle
+        ? (cleanHandle.startsWith('http') ? cleanHandle : `https://instagram.com/${cleanHandle.replace(/^@/, '')}`)
+        : (profileLink.trim() || '');
+
       const payload = {
         influencerManager,
         brandManagerTeam,
-        influencerName,
-        influencerInstagramId,
+        influencerName: influencerName.trim(),
+        influencerInstagramId: cleanHandle,
         brandId: selectedBrandId || undefined,
         brandName: bName,
         phone,
-        profileLink: profileLink || influencerInstagramId,
+        profileLink: cleanProfileLink,
         category,
         brandOnboardingAmt: Number(brandOnboardingAmt) || 0,
         brandReceivedAmt: Number(brandReceivedAmt) || 0,
@@ -2869,7 +2874,11 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                   type="text"
                   placeholder="e.g. @payalrajput057 or profile link"
                   value={influencerInstagramId}
-                  onChange={(e) => setInfluencerInstagramId(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setInfluencerInstagramId(val);
+                    setProfileLink(val ? (val.startsWith('http') ? val : `https://instagram.com/${val.replace(/^@/, '')}`) : '');
+                  }}
                   className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none text-xs font-semibold text-slate-900 transition"
                 />
               </div>
