@@ -8,6 +8,7 @@ import {
 import { api } from '../services/api';
 import { InfluencerDirectoryItem, DiscoveredInfluencer } from '../types';
 import { Modal } from '../components/Modal';
+import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { Pagination } from '../components/Pagination';
 
 interface InfluencerDirectoryViewProps {
@@ -177,17 +178,29 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
   };
 
   // Reset old fake follower data from DB so Instagram API can write real values
-  const handleResetOldData = async () => {
-    if (!window.confirm('This will clear all fake follower counts from the database so live Instagram API can sync real data. Continue?')) return;
-    try {
-      const res = await api.post('/influencer-directory/reset-old-data', {});
-      if (res.success) {
-        showToast(`🗑️ ${res.message}`);
-        fetchDirectory(currentPage, true);
+  const handleResetOldData = () => {
+    setDeleteModalState({
+      isOpen: true,
+      title: 'Reset Directory Data',
+      itemType: 'cached follower counts for all creators',
+      warningMessage: 'This will reset follower counts to 0 so the live Instagram API can sync real data.',
+      loading: false,
+      onConfirm: async () => {
+        setDeleteModalState(prev => ({ ...prev, loading: true }));
+        try {
+          const res = await api.post('/influencer-directory/reset-old-data', {});
+          if (res.success) {
+            setDeleteModalState(prev => ({ ...prev, isOpen: false }));
+            showToast(`🗑️ ${res.message}`);
+            fetchDirectory(currentPage, true);
+          }
+        } catch (err: any) {
+          showToast(`⚠️ ${err.message || 'Reset failed'}`);
+        } finally {
+          setDeleteModalState(prev => ({ ...prev, loading: false }));
+        }
       }
-    } catch (err: any) {
-      showToast(`⚠️ ${err.message || 'Reset failed'}`);
-    }
+    });
   };
 
   useEffect(() => {
@@ -266,18 +279,43 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
     }
   };
 
-  // Delete from Directory
-  const handleDeleteItem = async (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to remove ${name} from your directory?`)) return;
-    try {
-      const res = await api.delete(`/influencer-directory/${id}`);
-      if (res.success) {
-        showToast(`Removed ${name} from directory.`);
-        fetchDirectory();
+  // Delete Confirmation Panel State
+  const [deleteModalState, setDeleteModalState] = useState<{
+    isOpen: boolean;
+    title?: string;
+    itemType?: string;
+    itemName?: string;
+    warningMessage?: string;
+    loading: boolean;
+    onConfirm: () => Promise<void>;
+  }>({
+    isOpen: false,
+    title: 'Confirm Remove Influencer',
+    loading: false,
+    onConfirm: async () => {}
+  });
+
+  const requestDeleteItem = (item: InfluencerDirectoryItem) => {
+    setDeleteModalState({
+      isOpen: true,
+      itemName: `${item.name} (${item.instagramHandle})`,
+      loading: false,
+      onConfirm: async () => {
+        setDeleteModalState(prev => ({ ...prev, loading: true }));
+        try {
+          const res = await api.delete(`/influencer-directory/${item._id}`);
+          if (res.success) {
+            setDeleteModalState(prev => ({ ...prev, isOpen: false }));
+            showToast(`Removed ${item.name} from directory.`);
+            fetchDirectory();
+          }
+        } catch (err: any) {
+          showToast(`Error deleting: ${err.message}`);
+        } finally {
+          setDeleteModalState(prev => ({ ...prev, loading: false }));
+        }
       }
-    } catch (err: any) {
-      showToast(`Error deleting: ${err.message}`);
-    }
+    });
   };
 
   // Single Influencer Instagram Sync Handler
@@ -699,7 +737,7 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
                             <button onClick={() => openEditModal(item)} className="p-1.5 text-purple-600 hover:bg-purple-100 rounded-lg cursor-pointer">
                               <Edit2 size={14} />
                             </button>
-                            <button onClick={() => handleDeleteItem(item._id!, item.name)} className="p-1.5 text-rose-600 hover:bg-rose-100 rounded-lg cursor-pointer">
+                            <button onClick={() => requestDeleteItem(item)} className="p-1.5 text-rose-600 hover:bg-rose-100 rounded-lg cursor-pointer" title="Delete from Directory">
                               <Trash2 size={14} />
                             </button>
                           </div>
@@ -1236,6 +1274,18 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
           </div>
         ) : null}
       </Modal>
+
+      {/* REUSABLE DELETE CONFIRMATION MODAL PANEL */}
+      <ConfirmDeleteModal
+        isOpen={deleteModalState.isOpen}
+        onClose={() => setDeleteModalState(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={deleteModalState.onConfirm}
+        title={deleteModalState.title || 'Confirm Remove Influencer'}
+        itemType={deleteModalState.itemType || 'influencer'}
+        itemName={deleteModalState.itemName}
+        warningMessage={deleteModalState.warningMessage}
+        loading={deleteModalState.loading}
+      />
     </div>
   );
 };

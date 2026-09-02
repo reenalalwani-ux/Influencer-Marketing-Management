@@ -9,7 +9,7 @@ const router = Router();
 // GET /api/v1/employee-brands
 router.get('/', authenticateToken, checkPermission('brand.view'), async (req: AuthRequest, res: Response) => {
   const { employeeId, brandId, status } = req.query;
-  const filter: any = {};
+  const filter: any = { isDeleted: { $ne: true } };
   if (employeeId) filter.employeeId = employeeId;
   if (brandId) filter.brandId = brandId;
   if (status) filter.status = status;
@@ -293,7 +293,10 @@ router.post('/transfer', authenticateToken, checkPermission('brand.assign'), asy
 // DELETE /api/v1/employee-brands/employee/:employeeId
 router.delete('/employee/:employeeId', authenticateToken, checkPermission('brand.assign'), async (req: AuthRequest, res: Response) => {
   try {
-    await EmployeeBrand.deleteMany({ employeeId: req.params.employeeId });
+    await EmployeeBrand.updateMany(
+      { employeeId: req.params.employeeId },
+      { status: 'Removed', isDeleted: true, deletedAt: new Date(), deletedBy: req.user?._id }
+    );
     return res.status(200).json({ success: true, message: 'All brand assignments removed for employee' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to delete assignments', error });

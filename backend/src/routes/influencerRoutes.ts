@@ -37,7 +37,7 @@ const cleanInstagramHandleAndLink = (inputHandle?: string, inputLink?: string) =
 // Helper to keep active targets in sync with transactions
 const triggerTargetSync = async () => {
   try {
-    const targets = await Target.find({ status: 'Active', autoSync: true });
+    const targets = await Target.find({ status: 'Active', autoSync: true, isDeleted: { $ne: true } });
     for (const target of targets) {
       const now = new Date();
       const startDate = target.startDate || new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
@@ -46,6 +46,7 @@ const triggerTargetSync = async () => {
       if (target.targetType === 'Barter') {
         const count = await Influencer.countDocuments({
           category: 'Barter',
+          isDeleted: { $ne: true },
           status: { $in: ['Completed', 'Approved', 'Settled', 'completed', 'approved', 'settled'] },
           transactionDate: { $gte: startDate, $lte: endDate }
         });
@@ -54,6 +55,7 @@ const triggerTargetSync = async () => {
       } else {
         const paidRecords = await Influencer.find({
           category: 'Paid',
+          isDeleted: { $ne: true },
           status: { $in: ['Completed', 'Approved', 'Settled', 'completed', 'approved', 'settled'] },
           transactionDate: { $gte: startDate, $lte: endDate }
         });
@@ -70,7 +72,7 @@ const triggerTargetSync = async () => {
 router.get('/', authenticateToken, checkPermission('influencer.view'), async (req: AuthRequest, res: Response) => {
   try {
     const { category, timeframe, year, month, search } = req.query;
-    const filter: any = {};
+    const filter: any = { isDeleted: { $ne: true } };
 
 
     // 0. Employee Role Scoping (Only show data where employee is the assigned manager/executive)
@@ -449,10 +451,15 @@ router.put('/:id', authenticateToken, checkPermission('influencer.update'), asyn
 // DELETE /api/v1/influencers/:id
 router.delete('/:id', authenticateToken, checkPermission('influencer.delete'), async (req: AuthRequest, res: Response) => {
   try {
-    const record = await Influencer.findByIdAndDelete(req.params.id);
-    if (!record) {
+    const record = await Influencer.findById(req.params.id);
+    if (!record || record.isDeleted) {
       return res.status(404).json({ success: false, message: 'No record exists for this influencer' });
     }
+
+    record.isDeleted = true;
+    record.deletedAt = new Date();
+    record.deletedBy = req.user?._id;
+    await record.save();
 
     await logActivity({
       userId: req.user?._id,
@@ -478,7 +485,7 @@ router.delete('/:id', authenticateToken, checkPermission('influencer.delete'), a
 router.get('/payment-logs', authenticateToken, checkPermission('influencer.view'), async (req: AuthRequest, res: Response) => {
   try {
     const { type, timeframe, year, month, search } = req.query;
-    const filter: any = {};
+    const filter: any = { isDeleted: { $ne: true } };
 
     if (type && type !== 'All') {
       filter.type = type;
@@ -625,10 +632,15 @@ router.post('/payment-logs', authenticateToken, checkPermission('influencer.crea
 // DELETE /api/v1/influencers/payment-logs/:id
 router.delete('/payment-logs/:id', authenticateToken, checkPermission('influencer.delete'), async (req: AuthRequest, res: Response) => {
   try {
-    const deleted = await PaymentLog.findByIdAndDelete(req.params.id);
-    if (!deleted) {
+    const deleted = await PaymentLog.findById(req.params.id);
+    if (!deleted || deleted.isDeleted) {
       return res.status(404).json({ success: false, message: 'No record exists for this payment log' });
     }
+    deleted.isDeleted = true;
+    deleted.deletedAt = new Date();
+    deleted.deletedBy = req.user?._id;
+    await deleted.save();
+
     return res.status(200).json({ success: true, message: 'Payment log deleted successfully' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error deleting payment log', error });

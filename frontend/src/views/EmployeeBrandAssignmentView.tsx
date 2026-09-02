@@ -3,6 +3,7 @@ import { UserCheck, Plus, Trash2, Edit2, Briefcase, User as UserIcon, CheckSquar
 import { api } from '../services/api';
 import { Employee, Brand, EmployeeBrandAssignment, User } from '../types';
 import { Modal } from '../components/Modal';
+import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { InlineLoader } from '../components/PageLoader';
 import { DataTable, DataTableColumn } from '../components/DataTable';
 
@@ -262,16 +263,38 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
     }
   };
 
-  const handleRemoveAllForEmployee = async (employeeId: string) => {
-    if (!confirm('Are you sure you want to remove all brand assignments for this employee?')) return;
-    try {
-      const res = await api.delete(`/employee-brands/employee/${employeeId}`);
-      if (res.success) {
-        fetchData();
+  // Delete Confirmation Panel State
+  const [deleteModalState, setDeleteModalState] = useState<{
+    isOpen: boolean;
+    itemName?: string;
+    loading: boolean;
+    onConfirm: () => Promise<void>;
+  }>({
+    isOpen: false,
+    loading: false,
+    onConfirm: async () => {}
+  });
+
+  const requestRemoveAllForEmployee = (group: GroupedAssignment) => {
+    setDeleteModalState({
+      isOpen: true,
+      itemName: `${group.employee?.name || 'Executive'} (${group.brands.length} assigned brands)`,
+      loading: false,
+      onConfirm: async () => {
+        setDeleteModalState(prev => ({ ...prev, loading: true }));
+        try {
+          const res = await api.delete(`/employee-brands/employee/${group.employeeId}`);
+          if (res.success) {
+            setDeleteModalState(prev => ({ ...prev, isOpen: false }));
+            fetchData();
+          }
+        } catch (err: any) {
+          alert(err.message || 'Failed to delete assignments');
+        } finally {
+          setDeleteModalState(prev => ({ ...prev, loading: false }));
+        }
       }
-    } catch (err: any) {
-      alert(err.message || 'Failed to delete assignments');
-    }
+    });
   };
 
   const handleToggleStatus = async (group: GroupedAssignment) => {
@@ -409,7 +432,7 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
                 <Edit2 size={15} />
               </button>
               <button
-                onClick={() => handleRemoveAllForEmployee(row.employeeId)}
+                onClick={() => requestRemoveAllForEmployee(row)}
                 className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition cursor-pointer"
                 title="Remove All Assignments"
               >
@@ -1056,6 +1079,18 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
           </div>
         </Modal>
       )}
+
+      {/* REUSABLE DELETE CONFIRMATION MODAL PANEL */}
+      <ConfirmDeleteModal
+        isOpen={deleteModalState.isOpen}
+        onClose={() => setDeleteModalState(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={deleteModalState.onConfirm}
+        title="Confirm Remove All Brand Assignments"
+        itemType="executive brand assignments for"
+        itemName={deleteModalState.itemName}
+        warningMessage="This will deactivate all brand assignments currently assigned to this executive."
+        loading={deleteModalState.loading}
+      />
     </div>
   );
 };

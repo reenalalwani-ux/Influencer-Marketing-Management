@@ -10,6 +10,7 @@ import {
 import { api } from '../services/api';
 import { InfluencerTransaction, Brand, PaymentLogItem, TargetItem, TeamTargetBreakdown, MemberTargetItem, AuditLogItem } from '../types';
 import { Modal } from '../components/Modal';
+import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { Pagination } from '../components/Pagination';
 import { InlineLoader } from '../components/PageLoader';
 import { MonthDatePicker } from '../components/MonthDatePicker';
@@ -835,19 +836,6 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     }
   };
 
-  const handleDeleteTarget = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this target record?')) return;
-    try {
-      const res = await api.delete(`/targets/${id}`);
-      if (res.success) {
-        fetchTargets();
-        if (onTargetUpdated) onTargetUpdated();
-      }
-    } catch (err: any) {
-      alert(err.message || 'Failed to delete target');
-    }
-  };
-
   // Influencer Record Handlers
   const openAddModal = (defaultCategory: 'Paid' | 'Barter' = 'Barter') => {
     setEditingItem(null);
@@ -997,18 +985,94 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     }
   };
 
-  const handleDeleteInfluencer = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this influencer record?')) return;
-    try {
-      const res = await api.delete(`/influencers/${id}`);
-      if (res.success) {
-        fetchInfluencers();
-        fetchTargets();
-        if (onTargetUpdated) onTargetUpdated();
+  // Delete Confirmation Panel State
+  const [deleteModalState, setDeleteModalState] = useState<{
+    isOpen: boolean;
+    title: string;
+    itemType: string;
+    itemName?: string;
+    warningMessage?: string;
+    loading: boolean;
+    onConfirm: () => Promise<void>;
+  }>({
+    isOpen: false,
+    title: 'Confirm Delete',
+    itemType: 'record',
+    loading: false,
+    onConfirm: async () => {}
+  });
+
+  const requestDeleteTarget = (t: TargetItem) => {
+    setDeleteModalState({
+      isOpen: true,
+      title: 'Delete Target',
+      itemType: 'Target Record',
+      itemName: `${t.title} (${t.period || ''})`,
+      loading: false,
+      onConfirm: async () => {
+        setDeleteModalState(prev => ({ ...prev, loading: true }));
+        try {
+          const res = await api.delete(`/targets/${t._id}`);
+          if (res.success) {
+            setDeleteModalState(prev => ({ ...prev, isOpen: false }));
+            fetchTargets();
+            if (onTargetUpdated) onTargetUpdated();
+          }
+        } catch (err: any) {
+          alert(err.message || 'Failed to delete target');
+        } finally {
+          setDeleteModalState(prev => ({ ...prev, loading: false }));
+        }
       }
-    } catch (err: any) {
-      alert(err.message || 'Failed to delete record');
-    }
+    });
+  };
+
+  const requestDeleteInfluencer = (item: InfluencerTransaction) => {
+    setDeleteModalState({
+      isOpen: true,
+      title: 'Delete Collaboration Record',
+      itemType: `${item.category || 'Influencer'} Collaboration`,
+      itemName: `${item.brandName || 'Brand'} — ${item.influencerName || item.influencerInstagramId || 'Creator'}`,
+      loading: false,
+      onConfirm: async () => {
+        setDeleteModalState(prev => ({ ...prev, loading: true }));
+        try {
+          const res = await api.delete(`/influencers/${item._id}`);
+          if (res.success) {
+            setDeleteModalState(prev => ({ ...prev, isOpen: false }));
+            fetchInfluencers();
+            fetchTargets();
+            if (onTargetUpdated) onTargetUpdated();
+          }
+        } catch (err: any) {
+          alert(err.message || 'Failed to delete record');
+        } finally {
+          setDeleteModalState(prev => ({ ...prev, loading: false }));
+        }
+      }
+    });
+  };
+
+  const requestDeletePaymentLog = (log: PaymentLogItem) => {
+    setDeleteModalState({
+      isOpen: true,
+      title: 'Delete Payment Audit Log',
+      itemType: 'Payment Audit Log',
+      itemName: `${log.type === 'IN' ? 'Inward' : 'Outward'} Payment of ₹${(log.amount || 0).toLocaleString()} (${log.brandName} - ${log.influencerName})`,
+      loading: false,
+      onConfirm: async () => {
+        setDeleteModalState(prev => ({ ...prev, loading: true }));
+        try {
+          await api.delete(`/influencers/payment-logs/${log._id}`);
+          setDeleteModalState(prev => ({ ...prev, isOpen: false }));
+          fetchPaymentLogs();
+        } catch (err: any) {
+          alert(err.message || 'Failed to delete log');
+        } finally {
+          setDeleteModalState(prev => ({ ...prev, loading: false }));
+        }
+      }
+    });
   };
 
   // Payment Log Handlers
@@ -1048,16 +1112,6 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
       alert(err.message || 'Failed to log payment entry');
     } finally {
       setSavingPayLog(false);
-    }
-  };
-
-  const handleDeletePaymentLog = async (id: string) => {
-    if (!window.confirm('Delete this payment audit log?')) return;
-    try {
-      await api.delete(`/influencers/payment-logs/${id}`);
-      fetchPaymentLogs();
-    } catch (err: any) {
-      alert(err.message || 'Failed to delete log');
     }
   };
 
@@ -1952,7 +2006,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                                     <Edit2 size={14} />
                                   </button>
                                   <button
-                                    onClick={() => handleDeleteTarget(t._id)}
+                                    onClick={() => requestDeleteTarget(t)}
                                     className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition cursor-pointer"
                                     title="Delete Target"
                                   >
@@ -2661,7 +2715,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                               <Edit2 size={14} />
                             </button>
                             <button
-                              onClick={() => handleDeleteInfluencer(item._id)}
+                              onClick={() => requestDeleteInfluencer(item)}
                               className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 transition"
                               title="Delete Record"
                             >
@@ -2794,7 +2848,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
 
                       <td className="p-3 text-center">
                         <button
-                          onClick={() => handleDeletePaymentLog(log._id)}
+                          onClick={() => requestDeletePaymentLog(log)}
                           className="p-1 rounded-lg text-red-600 hover:bg-red-50 transition"
                           title="Delete Audit Log"
                         >
@@ -4250,6 +4304,18 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
           </div>
         )}
       </Modal>
+
+      {/* REUSABLE DELETE CONFIRMATION MODAL PANEL */}
+      <ConfirmDeleteModal
+        isOpen={deleteModalState.isOpen}
+        onClose={() => setDeleteModalState(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={deleteModalState.onConfirm}
+        title={deleteModalState.title}
+        itemType={deleteModalState.itemType}
+        itemName={deleteModalState.itemName}
+        warningMessage={deleteModalState.warningMessage}
+        loading={deleteModalState.loading}
+      />
     </div>
   );
 };

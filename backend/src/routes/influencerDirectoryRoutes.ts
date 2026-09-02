@@ -188,7 +188,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
     }
 
     // Query with filters
-    const filter: any = {};
+    const filter: any = { isDeleted: { $ne: true } };
     if (category && category !== 'All') filter.category = category;
     if (status && status !== 'All') filter.status = status;
     if (rating) filter.rating = { $gte: Number(rating) };
@@ -691,8 +691,13 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res: Response) =>
 router.delete('/:id', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const item = await InfluencerDirectory.findByIdAndDelete(id);
-    if (!item) return res.status(404).json({ success: false, message: 'Influencer not found' });
+    const item = await InfluencerDirectory.findById(id);
+    if (!item || item.isDeleted) return res.status(404).json({ success: false, message: 'Influencer not found' });
+
+    item.isDeleted = true;
+    item.deletedAt = new Date();
+    item.deletedBy = req.user?._id;
+    await item.save();
 
     await logActivity({
       userId: req.user?._id,

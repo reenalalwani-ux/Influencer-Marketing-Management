@@ -3,6 +3,7 @@ import { Users, Plus, Search, Mail, Eye, Edit2, Trash2, CheckCircle2, Phone, Bri
 import { api } from '../services/api';
 import { Employee, IDepartment } from '../types';
 import { Modal } from '../components/Modal';
+import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { Pagination } from '../components/Pagination';
 import { InlineLoader } from '../components/PageLoader';
 import { DataTable, DataTableColumn } from '../components/DataTable';
@@ -156,17 +157,38 @@ export const EmployeeManagementView: React.FC = () => {
     }
   };
 
-  const handleDeleteEmployee = async (id: string, empName: string) => {
-    if (!window.confirm(`Are you sure you want to delete employee "${empName}"? This action cannot be undone.`)) return;
+  // Delete Confirmation Panel State
+  const [deleteModalState, setDeleteModalState] = useState<{
+    isOpen: boolean;
+    itemName?: string;
+    loading: boolean;
+    onConfirm: () => Promise<void>;
+  }>({
+    isOpen: false,
+    loading: false,
+    onConfirm: async () => {}
+  });
 
-    try {
-      const res = await api.delete(`/employees/${id}`);
-      if (res.success) {
-        fetchEmployees();
+  const requestDeleteEmployee = (emp: Employee) => {
+    setDeleteModalState({
+      isOpen: true,
+      itemName: `${emp.name} (${emp.employeeId || emp.email})`,
+      loading: false,
+      onConfirm: async () => {
+        setDeleteModalState(prev => ({ ...prev, loading: true }));
+        try {
+          const res = await api.delete(`/employees/${emp._id}`);
+          if (res.success) {
+            setDeleteModalState(prev => ({ ...prev, isOpen: false }));
+            fetchEmployees();
+          }
+        } catch (err: any) {
+          alert(err.message || 'Failed to delete employee');
+        } finally {
+          setDeleteModalState(prev => ({ ...prev, loading: false }));
+        }
       }
-    } catch (err: any) {
-      alert(err.message || 'Failed to delete employee');
-    }
+    });
   };
 
   const filteredEmployees = employees.filter(e =>
@@ -269,7 +291,7 @@ export const EmployeeManagementView: React.FC = () => {
             <Edit2 size={14} />
           </button>
           <button
-            onClick={() => handleDeleteEmployee(row._id, row.name)}
+            onClick={() => requestDeleteEmployee(row)}
             className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition cursor-pointer"
             title="Delete Employee"
           >
@@ -681,6 +703,18 @@ export const EmployeeManagementView: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      {/* REUSABLE DELETE CONFIRMATION MODAL PANEL */}
+      <ConfirmDeleteModal
+        isOpen={deleteModalState.isOpen}
+        onClose={() => setDeleteModalState(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={deleteModalState.onConfirm}
+        title="Confirm Delete Employee"
+        itemType="employee member"
+        itemName={deleteModalState.itemName}
+        warningMessage="Deleting this employee will deactivate their login access and brand assignments."
+        loading={deleteModalState.loading}
+      />
     </div>
   );
 };

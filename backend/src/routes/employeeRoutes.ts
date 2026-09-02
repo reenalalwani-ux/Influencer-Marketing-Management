@@ -10,11 +10,12 @@ const router = Router();
 // GET /api/v1/employees
 router.get('/', authenticateToken, checkPermission('employee.view'), async (req: AuthRequest, res: Response) => {
   try {
-    const totalCount = await Employee.countDocuments();
+    const filter = { isDeleted: { $ne: true } };
+    const totalCount = await Employee.countDocuments(filter);
     const pageNum = req.query.page ? Math.max(1, Number(req.query.page)) : undefined;
     const limitNum = req.query.limit ? Math.max(1, Number(req.query.limit)) : 10;
 
-    let query = Employee.find()
+    let query = Employee.find(filter)
       .populate('reportingManagerId', 'name employeeId designation')
       .populate('department', 'name code description status')
       .sort({ createdAt: -1 });
@@ -48,15 +49,12 @@ router.get('/pending-approvals', authenticateToken, checkPermission('employee.vi
     await User.updateMany({ status: 'Active', isApproved: false }, { isApproved: true });
     await Employee.updateMany({ status: 'Active', isApproved: false }, { isApproved: true });
 
-    // Debug: count all non-approved employees
-    const allNonApproved = await Employee.find({ isApproved: false }, { name: 1, email: 1, status: 1 }).lean();
-    console.log('[Pending Approvals Debug] All non-approved employees:', allNonApproved.map(e => `${e.name}|${e.email}|${e.status}`));
-
     // Find ONLY employees who have completed email OTP verification and are awaiting manager approval
     const pendingEmployees = await Employee.find({
       isApproved: false,
       emailVerified: true,
-      status: 'Pending Approval'
+      status: 'Pending Approval',
+      isDeleted: { $ne: true }
     }).populate('department', 'name code description status').sort({ createdAt: -1 });
 
     console.log('[Pending Approvals Debug] Matched verified pending:', pendingEmployees.length);
@@ -209,10 +207,15 @@ router.put('/:id', authenticateToken, checkPermission('employee.update'), async 
 router.delete('/:id', authenticateToken, checkPermission('employee.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const employee = await Employee.findById(req.params.id);
-    if (!employee) return res.status(404).json({ success: false, message: 'No record exists for this employee' });
+    if (!employee || employee.isDeleted) return res.status(404).json({ success: false, message: 'No record exists for this employee' });
 
-    await User.findOneAndDelete({ email: employee.email });
-    await Employee.findByIdAndDelete(req.params.id);
+    employee.isDeleted = true;
+    employee.deletedAt = new Date();
+    employee.deletedBy = req.user?._id;
+    employee.status = 'Inactive';
+    await employee.save();
+
+    await User.updateOne({ email: employee.email }, { status: 'Inactive' });
 
     await logActivity({
       userId: req.user?._id,

@@ -3,6 +3,7 @@ import { CheckSquare, Plus, Send, ExternalLink, ChevronDown, ChevronRight, Layer
 import { api } from '../services/api';
 import { TaskItem, Employee, Brand, User, EmployeeBrandAssignment } from '../types';
 import { Modal } from '../components/Modal';
+import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { Pagination } from '../components/Pagination';
 import { InlineLoader } from '../components/PageLoader';
 
@@ -260,20 +261,45 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
     }
   };
 
-  const handleDeleteTask = async (id: string, isMain: boolean) => {
-    const msg = isMain
-      ? 'Deleting this Brand Task will also delete all associated sub-tasks. Are you sure?'
-      : 'Are you sure you want to delete this sub-task?';
-    if (!window.confirm(msg)) return;
+  // Delete Confirmation Panel State
+  const [deleteModalState, setDeleteModalState] = useState<{
+    isOpen: boolean;
+    title: string;
+    itemName?: string;
+    itemType?: string;
+    warningMessage?: string;
+    loading: boolean;
+    onConfirm: () => Promise<void>;
+  }>({
+    isOpen: false,
+    title: 'Confirm Delete Task',
+    loading: false,
+    onConfirm: async () => {}
+  });
 
-    try {
-      const res = await api.delete(`/tasks/${id}`);
-      if (res.success) {
-        fetchData();
+  const requestDeleteTask = (task: TaskItem, isMain: boolean) => {
+    setDeleteModalState({
+      isOpen: true,
+      title: isMain ? 'Confirm Delete Brand Task' : 'Confirm Delete Sub-Task',
+      itemType: isMain ? 'main task' : 'deliverable task',
+      itemName: `${task.taskId} - ${task.title}`,
+      warningMessage: isMain ? 'Deleting this Brand Task will also delete and deactivate all associated sub-tasks.' : undefined,
+      loading: false,
+      onConfirm: async () => {
+        setDeleteModalState(prev => ({ ...prev, loading: true }));
+        try {
+          const res = await api.delete(`/tasks/${task._id}`);
+          if (res.success) {
+            setDeleteModalState(prev => ({ ...prev, isOpen: false }));
+            fetchData();
+          }
+        } catch (err: any) {
+          alert(err.message || 'Failed to delete task');
+        } finally {
+          setDeleteModalState(prev => ({ ...prev, loading: false }));
+        }
       }
-    } catch (err: any) {
-      alert(err.message || 'Failed to delete task');
-    }
+    });
   };
 
   const handleQuickCompleteTask = async (taskId: string) => {
@@ -515,7 +541,7 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleDeleteTask(mainTask._id, true);
+                                  requestDeleteTask(mainTask, true);
                                 }}
                                 className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-red-50 text-red-600 transition cursor-pointer"
                                 title="Delete Task"
@@ -687,7 +713,7 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
                                           type="button"
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            handleDeleteTask(sub._id, false);
+                                            requestDeleteTask(sub, false);
                                           }}
                                           className="p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition cursor-pointer"
                                           title="Delete Deliverable"
@@ -1492,6 +1518,18 @@ export const TaskManagementView: React.FC<TaskManagementViewProps> = ({ currentU
           </div>
         )}
       </Modal>
+
+      {/* REUSABLE DELETE CONFIRMATION MODAL PANEL */}
+      <ConfirmDeleteModal
+        isOpen={deleteModalState.isOpen}
+        onClose={() => setDeleteModalState(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={deleteModalState.onConfirm}
+        title={deleteModalState.title}
+        itemType={deleteModalState.itemType}
+        itemName={deleteModalState.itemName}
+        warningMessage={deleteModalState.warningMessage}
+        loading={deleteModalState.loading}
+      />
     </div>
   );
 };

@@ -100,6 +100,9 @@ export interface IEmployee extends Document {
   status: 'Pending Verification' | 'Pending Approval' | 'Active' | 'Inactive';
   emailVerified?: boolean;
   isApproved?: boolean;
+  isDeleted?: boolean;
+  deletedAt?: Date;
+  deletedBy?: mongoose.Types.ObjectId;
 }
 
 const EmployeeSchema = new Schema<IEmployee>({
@@ -116,7 +119,10 @@ const EmployeeSchema = new Schema<IEmployee>({
   joiningDate: { type: Date, default: Date.now },
   status: { type: String, enum: ['Pending Verification', 'Pending Approval', 'Active', 'Inactive'], default: 'Pending Verification' },
   emailVerified: { type: Boolean, default: false },
-  isApproved: { type: Boolean, default: false }
+  isApproved: { type: Boolean, default: false },
+  isDeleted: { type: Boolean, default: false },
+  deletedAt: { type: Date },
+  deletedBy: { type: Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
 // 5. Brand Schema
@@ -136,6 +142,9 @@ export interface IBrand extends Document {
   targetPaidCollabs: number;
   targetTotalCollabs: number;
   notes?: string;
+  isDeleted?: boolean;
+  deletedAt?: Date;
+  deletedBy?: mongoose.Types.ObjectId;
 }
 
 const BrandSchema = new Schema<IBrand>({
@@ -153,7 +162,10 @@ const BrandSchema = new Schema<IBrand>({
   targetBarterCollabs: { type: Number, default: 7 },
   targetPaidCollabs: { type: Number, default: 3 },
   targetTotalCollabs: { type: Number, default: 10 },
-  notes: { type: String }
+  notes: { type: String },
+  isDeleted: { type: Boolean, default: false },
+  deletedAt: { type: Date },
+  deletedBy: { type: Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
 // 6. EmployeeBrand Relationship Schema
@@ -166,6 +178,9 @@ export interface IEmployeeBrand extends Document {
   responsibility: string;
   priority: 'Low' | 'Medium' | 'High' | 'Urgent';
   status: 'Active' | 'Completed' | 'Removed';
+  isDeleted?: boolean;
+  deletedAt?: Date;
+  deletedBy?: mongoose.Types.ObjectId;
 }
 
 const EmployeeBrandSchema = new Schema<IEmployeeBrand>({
@@ -176,7 +191,10 @@ const EmployeeBrandSchema = new Schema<IEmployeeBrand>({
   endDate: { type: Date },
   responsibility: { type: String, default: 'Brand Management' },
   priority: { type: String, enum: ['Low', 'Medium', 'High', 'Urgent'], default: 'Medium' },
-  status: { type: String, enum: ['Active', 'Completed', 'Removed'], default: 'Active' }
+  status: { type: String, enum: ['Active', 'Completed', 'Removed'], default: 'Active' },
+  isDeleted: { type: Boolean, default: false },
+  deletedAt: { type: Date },
+  deletedBy: { type: Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
 EmployeeBrandSchema.index({ employeeId: 1, status: 1 });
@@ -208,6 +226,9 @@ export interface ITask extends Document {
   parentTaskId?: mongoose.Types.ObjectId;
   clientApprovalStatus?: 'Pending' | 'Approved' | 'Revision Requested';
   clientComments?: string;
+  isDeleted?: boolean;
+  deletedAt?: Date;
+  deletedBy?: mongoose.Types.ObjectId;
 }
 
 const TaskSchema = new Schema<ITask>({
@@ -242,7 +263,10 @@ const TaskSchema = new Schema<ITask>({
   isMainTask: { type: Boolean, default: false },
   parentTaskId: { type: Schema.Types.ObjectId, ref: 'Task' },
   clientApprovalStatus: { type: String, enum: ['Pending', 'Approved', 'Revision Requested'], default: 'Pending' },
-  clientComments: { type: String, default: '' }
+  clientComments: { type: String, default: '' },
+  isDeleted: { type: Boolean, default: false },
+  deletedAt: { type: Date },
+  deletedBy: { type: Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
 TaskSchema.index({ scheduledDate: 1, status: 1 });
@@ -339,6 +363,9 @@ export interface ITarget extends Document {
   autoSync: boolean;
   description?: string;
   createdBy?: mongoose.Types.ObjectId;
+  isDeleted?: boolean;
+  deletedAt?: Date;
+  deletedBy?: mongoose.Types.ObjectId;
 }
 
 const TargetSchema = new Schema<ITarget>({
@@ -357,7 +384,10 @@ const TargetSchema = new Schema<ITarget>({
   isActive: { type: Boolean, default: true },
   autoSync: { type: Boolean, default: true },
   description: { type: String },
-  createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
+  createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  isDeleted: { type: Boolean, default: false },
+  deletedAt: { type: Date },
+  deletedBy: { type: Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
 TargetSchema.index({ isActive: 1, status: 1 });
@@ -416,6 +446,9 @@ export interface IInfluencer extends Document {
   sheetRowIndex?: number;
   googleSheetId?: string;
   createdBy?: mongoose.Types.ObjectId;
+  isDeleted?: boolean;
+  deletedAt?: Date;
+  deletedBy?: mongoose.Types.ObjectId;
 }
 
 const InfluencerSchema = new Schema<IInfluencer>({
@@ -468,11 +501,15 @@ const InfluencerSchema = new Schema<IInfluencer>({
   remark: { type: String, default: '' },
   sheetRowIndex: { type: Number },
   googleSheetId: { type: String, default: '' },
-  createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
+  createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  isDeleted: { type: Boolean, default: false },
+  deletedAt: { type: Date },
+  deletedBy: { type: Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
 InfluencerSchema.index({ category: 1, status: 1, transactionDate: -1 });
 InfluencerSchema.index({ brandName: 1 });
+InfluencerSchema.index({ isDeleted: 1 });
 
 export interface IPaymentLog extends Document {
   influencerId?: mongoose.Types.ObjectId;
@@ -493,6 +530,9 @@ export interface IPaymentLog extends Document {
   createdBy?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
+  isDeleted?: boolean;
+  deletedAt?: Date;
+  deletedBy?: mongoose.Types.ObjectId;
 }
 
 export const PaymentLogSchema = new Schema<IPaymentLog>({
@@ -511,7 +551,10 @@ export const PaymentLogSchema = new Schema<IPaymentLog>({
   handledBy: { type: String, default: '' },
   notes: { type: String, default: '' },
   transactionDate: { type: Date, default: Date.now },
-  createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
+  createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  isDeleted: { type: Boolean, default: false },
+  deletedAt: { type: Date },
+  deletedBy: { type: Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
 export interface IContentCalendar extends Document {
@@ -534,6 +577,9 @@ export interface IContentCalendar extends Document {
   createdBy?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
+  isDeleted?: boolean;
+  deletedAt?: Date;
+  deletedBy?: mongoose.Types.ObjectId;
 }
 
 export const ContentCalendarSchema = new Schema<IContentCalendar>({
@@ -553,7 +599,10 @@ export const ContentCalendarSchema = new Schema<IContentCalendar>({
   cycleTitle: { type: String, default: '' },
   clientApprovalStatus: { type: String, enum: ['Pending', 'Approved', 'Revision Requested'], default: 'Pending' },
   clientComments: { type: String, default: '' },
-  createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
+  createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  isDeleted: { type: Boolean, default: false },
+  deletedAt: { type: Date },
+  deletedBy: { type: Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
 // Export Models
@@ -609,6 +658,9 @@ export interface IInfluencerDirectory extends Document {
   createdBy?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
+  isDeleted?: boolean;
+  deletedAt?: Date;
+  deletedBy?: mongoose.Types.ObjectId;
 }
 
 export const InfluencerDirectorySchema = new Schema<IInfluencerDirectory>({
@@ -643,7 +695,10 @@ export const InfluencerDirectorySchema = new Schema<IInfluencerDirectory>({
   },
   externalId: { type: String, default: '' },
   pastCollabsCount: { type: Number, default: 0 },
-  createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
+  createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  isDeleted: { type: Boolean, default: false },
+  deletedAt: { type: Date },
+  deletedBy: { type: Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
 InfluencerDirectorySchema.index({ category: 1, followersCount: -1 });

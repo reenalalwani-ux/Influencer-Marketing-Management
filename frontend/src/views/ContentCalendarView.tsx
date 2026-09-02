@@ -3,6 +3,7 @@ import { Calendar as CalendarIcon, Sparkles, Plus, Search, Filter, Link2, Video,
 import { api } from '../services/api';
 import { ContentCalendarItem, Brand, Employee } from '../types';
 import { Modal } from '../components/Modal';
+import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 
 // Custom Searchable Brand Dropdown with Search Bar
 const SearchableBrandDropdown: React.FC<{
@@ -1107,16 +1108,38 @@ export const ContentCalendarView: React.FC<ContentCalendarViewProps> = ({ curren
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this calendar entry?')) return;
-    try {
-      const res = await api.delete(`/content-calendar/${id}`);
-      if (res.success) {
-        fetchCalendarEntries();
+  // Delete Confirmation Panel State
+  const [deleteModalState, setDeleteModalState] = useState<{
+    isOpen: boolean;
+    itemName?: string;
+    loading: boolean;
+    onConfirm: () => Promise<void>;
+  }>({
+    isOpen: false,
+    loading: false,
+    onConfirm: async () => {}
+  });
+
+  const requestDelete = (item: ContentCalendarItem) => {
+    setDeleteModalState({
+      isOpen: true,
+      itemName: `${item.brandName || 'Brand'} — ${item.typeOfPost || 'Post'} (${new Date(item.postDate).toLocaleDateString()})`,
+      loading: false,
+      onConfirm: async () => {
+        setDeleteModalState(prev => ({ ...prev, loading: true }));
+        try {
+          const res = await api.delete(`/content-calendar/${item._id}`);
+          if (res.success) {
+            setDeleteModalState(prev => ({ ...prev, isOpen: false }));
+            fetchCalendarEntries();
+          }
+        } catch (err: any) {
+          alert(err.message || 'Failed to delete entry');
+        } finally {
+          setDeleteModalState(prev => ({ ...prev, loading: false }));
+        }
       }
-    } catch (err: any) {
-      alert(err.message || 'Failed to delete entry');
-    }
+    });
   };
 
   const handleInlineStatusChange = async (id: string, newStatus?: any, extraFields?: Record<string, any>) => {
@@ -1616,7 +1639,7 @@ export const ContentCalendarView: React.FC<ContentCalendarViewProps> = ({ curren
                                 <button onClick={() => openEditModal(item)} className="p-1 hover:bg-purple-100 text-purple-600 rounded" title="Edit entry">
                                   <Edit2 size={13} />
                                 </button>
-                                <button onClick={() => handleDelete(item._id)} className="p-1 hover:bg-rose-100 text-rose-600 rounded" title="Delete entry">
+                                <button onClick={() => requestDelete(item)} className="p-1 hover:bg-rose-100 text-rose-600 rounded" title="Delete entry">
                                   <Trash2 size={13} />
                                 </button>
                               </div>
@@ -1699,7 +1722,7 @@ export const ContentCalendarView: React.FC<ContentCalendarViewProps> = ({ curren
                             <button onClick={() => openEditModal(item)} className="p-1 hover:bg-purple-100 text-purple-600 rounded">
                               <Edit2 size={14} />
                             </button>
-                            <button onClick={() => handleDelete(item._id)} className="p-1 hover:bg-rose-100 text-rose-600 rounded">
+                            <button onClick={() => requestDelete(item)} className="p-1 hover:bg-rose-100 text-rose-600 rounded">
                               <Trash2 size={14} />
                             </button>
                           </td>
@@ -2266,6 +2289,17 @@ export const ContentCalendarView: React.FC<ContentCalendarViewProps> = ({ curren
           </div>
         </form>
       </Modal>
+
+      {/* REUSABLE DELETE CONFIRMATION MODAL PANEL */}
+      <ConfirmDeleteModal
+        isOpen={deleteModalState.isOpen}
+        onClose={() => setDeleteModalState(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={deleteModalState.onConfirm}
+        title="Confirm Delete Calendar Entry"
+        itemType="calendar entry"
+        itemName={deleteModalState.itemName}
+        loading={deleteModalState.loading}
+      />
     </div>
   );
 };

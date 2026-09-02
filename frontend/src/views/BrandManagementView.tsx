@@ -3,6 +3,7 @@ import { Briefcase, Plus, Globe, Mail, Phone, ExternalLink, Search, Users, Eye, 
 import { api } from '../services/api';
 import { Brand } from '../types';
 import { Modal } from '../components/Modal';
+import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { Pagination } from '../components/Pagination';
 import { InlineLoader } from '../components/PageLoader';
 import { DataTable, DataTableColumn } from '../components/DataTable';
@@ -250,16 +251,38 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
     }
   };
 
-  const handleDeleteBrand = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this brand record?')) return;
-    try {
-      const res = await api.delete(`/brands/${id}`);
-      if (res.success) {
-        fetchBrands();
+  // Delete Confirmation Panel State
+  const [deleteModalState, setDeleteModalState] = useState<{
+    isOpen: boolean;
+    itemName?: string;
+    loading: boolean;
+    onConfirm: () => Promise<void>;
+  }>({
+    isOpen: false,
+    loading: false,
+    onConfirm: async () => {}
+  });
+
+  const requestDeleteBrand = (brand: Brand) => {
+    setDeleteModalState({
+      isOpen: true,
+      itemName: brand.brandName,
+      loading: false,
+      onConfirm: async () => {
+        setDeleteModalState(prev => ({ ...prev, loading: true }));
+        try {
+          const res = await api.delete(`/brands/${brand._id}`);
+          if (res.success) {
+            setDeleteModalState(prev => ({ ...prev, isOpen: false }));
+            fetchBrands();
+          }
+        } catch (err: any) {
+          alert(err.message || 'Failed to delete brand');
+        } finally {
+          setDeleteModalState(prev => ({ ...prev, loading: false }));
+        }
       }
-    } catch (err: any) {
-      alert(err.message || 'Failed to delete brand');
-    }
+    });
   };
 
   const handleToggleStatus = async (brand: Brand) => {
@@ -490,7 +513,7 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
             <Edit2 size={15} />
           </button>
           <button
-            onClick={() => handleDeleteBrand(row._id)}
+            onClick={() => requestDeleteBrand(row)}
             className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 transition"
             title="Delete Brand"
           >
@@ -1031,6 +1054,18 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
           </div>
         </form>
       </Modal>
+
+      {/* REUSABLE DELETE CONFIRMATION MODAL PANEL */}
+      <ConfirmDeleteModal
+        isOpen={deleteModalState.isOpen}
+        onClose={() => setDeleteModalState(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={deleteModalState.onConfirm}
+        title="Confirm Delete Brand"
+        itemType="brand"
+        itemName={deleteModalState.itemName}
+        warningMessage="Deleting this brand will also deactivate associated executive brand assignments."
+        loading={deleteModalState.loading}
+      />
     </div>
   );
 };

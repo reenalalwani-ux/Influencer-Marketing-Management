@@ -22,7 +22,7 @@ export const detectPlatform = (url: string): string => {
 // GET /api/v1/tasks
 router.get('/', authenticateToken, checkPermission('task.view'), async (req: AuthRequest, res: Response) => {
   const { employeeId, brandId, status, platform, date, verificationStatus, excludeMatrix } = req.query;
-  const filter: any = {};
+  const filter: any = { isDeleted: { $ne: true } };
 
   if (employeeId) filter.employeeId = employeeId;
   if (brandId) filter.brandId = brandId;
@@ -94,7 +94,7 @@ router.get('/:id', authenticateToken, checkPermission('task.view'), async (req: 
       .populate('verifiedBy', 'name email role')
       .populate('parentTaskId', 'taskId title brandId platform contentType');
 
-    if (!task) return res.status(404).json({ success: false, message: 'No record exists for this task' });
+    if (!task || task.isDeleted) return res.status(404).json({ success: false, message: 'No record exists for this task' });
     return res.status(200).json({ success: true, data: task, message: 'Task fetched successfully' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to fetch task', error });
@@ -325,14 +325,20 @@ router.put('/:id/status', authenticateToken, async (req: AuthRequest, res: Respo
 router.delete('/:id', authenticateToken, checkPermission('task.delete'), async (req: AuthRequest, res: Response) => {
   try {
     const task = await Task.findById(req.params.id);
-    if (!task) return res.status(404).json({ success: false, message: 'No record exists for this task' });
+    if (!task || task.isDeleted) return res.status(404).json({ success: false, message: 'No record exists for this task' });
 
-    // Delete sub-tasks if main task
+    task.isDeleted = true;
+    task.deletedAt = new Date();
+    task.deletedBy = req.user?._id;
+    await task.save();
+
+    // Soft delete sub-tasks if main task
     if (task.isMainTask) {
-      await Task.deleteMany({ parentTaskId: task._id });
+      await Task.updateMany(
+        { parentTaskId: task._id },
+        { isDeleted: true, deletedAt: new Date(), deletedBy: req.user?._id }
+      );
     }
-
-    await Task.findByIdAndDelete(req.params.id);
 
     await logActivity({
       userId: req.user?._id,

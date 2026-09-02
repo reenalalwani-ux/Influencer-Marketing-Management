@@ -11,7 +11,7 @@ const router = Router();
 // GET /api/v1/brands
 router.get('/', authenticateToken, checkPermission('brand.view'), async (req: AuthRequest, res: Response) => {
   try {
-    let filter: any = {};
+    let filter: any = { isDeleted: { $ne: true } };
 
     // Filter brands to ONLY those assigned if the user is an employee or member
     const userRole = (req.user?.role || '').toLowerCase();
@@ -19,11 +19,11 @@ router.get('/', authenticateToken, checkPermission('brand.view'), async (req: Au
     if (isScopedRole) {
       const emp = await getEmployeeForAuthUser(req.user);
       if (emp) {
-        const assignments = await EmployeeBrand.find({ employeeId: emp._id, status: 'Active' });
+        const assignments = await EmployeeBrand.find({ employeeId: emp._id, status: 'Active', isDeleted: { $ne: true } });
         const assignedBrandIds = assignments.map(a => a.brandId);
-        filter = { _id: { $in: assignedBrandIds } };
+        filter._id = { $in: assignedBrandIds };
       } else {
-        filter = { _id: { $in: [] } };
+        filter._id = { $in: [] };
       }
     }
 
@@ -74,10 +74,10 @@ router.get('/', authenticateToken, checkPermission('brand.view'), async (req: Au
 router.get('/:id', authenticateToken, checkPermission('brand.view'), async (req: AuthRequest, res: Response) => {
   try {
     const brand = await Brand.findById(req.params.id);
-    if (!brand) return res.status(404).json({ success: false, message: 'No record exists for this brand' });
+    if (!brand || brand.isDeleted) return res.status(404).json({ success: false, message: 'No record exists for this brand' });
 
     // Fetch assigned employees via relationship collection
-    const assignedEmployees = await EmployeeBrand.find({ brandId: brand._id, status: 'Active' })
+    const assignedEmployees = await EmployeeBrand.find({ brandId: brand._id, status: 'Active', isDeleted: { $ne: true } })
       .populate('employeeId', 'name employeeId email designation department phone');
 
     return res.status(200).json({
@@ -200,10 +200,19 @@ router.put('/:id', authenticateToken, checkPermission('brand.update'), async (re
 // DELETE /api/v1/brands/:id
 router.delete('/:id', authenticateToken, checkPermission('brand.delete'), async (req: AuthRequest, res: Response) => {
   try {
-    const brand = await Brand.findByIdAndDelete(req.params.id);
-    if (!brand) return res.status(404).json({ success: false, message: 'No record exists for this brand' });
+    const brand = await Brand.findById(req.params.id);
+    if (!brand || brand.isDeleted) return res.status(404).json({ success: false, message: 'No record exists for this brand' });
 
-    await EmployeeBrand.deleteMany({ brandId: req.params.id });
+    brand.isDeleted = true;
+    brand.deletedAt = new Date();
+    brand.deletedBy = req.user?._id;
+    brand.status = 'Inactive';
+    await brand.save();
+
+    await EmployeeBrand.updateMany(
+      { brandId: req.params.id },
+      { status: 'Removed', isDeleted: true, deletedAt: new Date(), deletedBy: req.user?._id }
+    );
 
     await logActivity({
       userId: req.user?._id,

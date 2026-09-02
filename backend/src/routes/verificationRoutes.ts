@@ -9,11 +9,12 @@ const router = Router();
 // GET /api/v1/verification/pending
 router.get('/pending', authenticateToken, checkPermission('task.verify'), async (req: AuthRequest, res: Response) => {
   try {
-    const totalCount = await Task.countDocuments({ verificationStatus: 'Pending Verification' });
+    const filter = { verificationStatus: 'Pending Verification', isDeleted: { $ne: true } };
+    const totalCount = await Task.countDocuments(filter);
     const pageNum = req.query.page ? Math.max(1, Number(req.query.page)) : undefined;
     const limitNum = req.query.limit ? Math.max(1, Number(req.query.limit)) : 10;
 
-    let query = Task.find({ verificationStatus: 'Pending Verification' })
+    let query = Task.find(filter)
       .populate('employeeId', 'name employeeId email designation department')
       .populate('brandId', 'brandName brandId logo industry')
       .sort({ publishedDate: -1 });

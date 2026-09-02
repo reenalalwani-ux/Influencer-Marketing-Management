@@ -361,7 +361,7 @@ router.get('/', authenticateToken, checkPermission('target.view'), async (req: A
     const { timeframe, year, month } = req.query;
     const dateFilter = buildDateFilter(timeframe as string, year as string, month as string);
 
-    const targets = await Target.find().sort({ createdAt: -1 }).populate('createdBy', 'name email role');
+    const targets = await Target.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 }).populate('createdBy', 'name email role');
     for (const target of targets) {
       await recalculateTargetProgress(target, dateFilter);
     }
@@ -382,11 +382,11 @@ router.get('/active', authenticateToken, checkPermission('target.view'), cacheMi
     const { timeframe, year, month } = req.query;
     const dateFilter = buildDateFilter(timeframe as string, year as string, month as string);
 
-    let activeTarget = await Target.findOne({ isActive: true, status: 'Active' }).sort({ updatedAt: -1 }).populate('createdBy', 'name email role');
+    let activeTarget = await Target.findOne({ isActive: true, status: 'Active', isDeleted: { $ne: true } }).sort({ updatedAt: -1 }).populate('createdBy', 'name email role');
     
     // Fallback: If no target is explicitly marked isActive, pick the most recent Active target
     if (!activeTarget) {
-      activeTarget = await Target.findOne({ status: 'Active' }).sort({ createdAt: -1 }).populate('createdBy', 'name email role');
+      activeTarget = await Target.findOne({ status: 'Active', isDeleted: { $ne: true } }).sort({ createdAt: -1 }).populate('createdBy', 'name email role');
     }
 
     if (activeTarget) {
@@ -533,8 +533,14 @@ router.patch('/:id/active', authenticateToken, checkPermission('target.update'),
 // DELETE /api/v1/targets/:id - Delete target
 router.delete('/:id', authenticateToken, checkPermission('target.delete'), async (req: AuthRequest, res: Response) => {
   try {
-    const target = await Target.findByIdAndDelete(req.params.id);
-    if (!target) return res.status(404).json({ success: false, message: 'No record exists for this target' });
+    const target = await Target.findById(req.params.id);
+    if (!target || target.isDeleted) return res.status(404).json({ success: false, message: 'No record exists for this target' });
+
+    target.isDeleted = true;
+    target.deletedAt = new Date();
+    target.deletedBy = req.user?._id;
+    target.isActive = false;
+    await target.save();
 
     await logActivity({
       userId: req.user?._id,

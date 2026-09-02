@@ -11,7 +11,7 @@ const router = Router();
 router.get('/', authenticateToken, checkPermission('task.view'), async (req: AuthRequest, res: Response) => {
   try {
     const { brandId, brandName, year, month, search, designer, fortnight } = req.query;
-    const filter: any = {};
+    const filter: any = { isDeleted: { $ne: true } };
 
     // 0. Employee / Member Role Brand Filtering
     const userRole = (req.user?.role || '').toLowerCase();
@@ -19,7 +19,7 @@ router.get('/', authenticateToken, checkPermission('task.view'), async (req: Aut
     if (isScopedRole) {
       const emp = await getEmployeeForAuthUser(req.user);
       if (emp) {
-        const assignments = await EmployeeBrand.find({ employeeId: emp._id, status: 'Active' }).populate('brandId');
+        const assignments = await EmployeeBrand.find({ employeeId: emp._id, status: 'Active', isDeleted: { $ne: true } }).populate('brandId');
         const assignedBrandIds = assignments.map(a => a.brandId?._id || a.brandId);
         const assignedBrandNames = assignments.map(a => (a.brandId as any)?.brandName).filter(Boolean);
 
@@ -95,7 +95,7 @@ router.delete('/clear-all', authenticateToken, checkPermission('task.delete'), a
     const currentYear = Number(year) || now.getFullYear();
     const currentMonth = month !== undefined ? Number(month) - 1 : now.getMonth();
 
-    const filter: any = {};
+    const filter: any = { isDeleted: { $ne: true } };
     if (cycleId && cycleId !== 'All') {
       filter.cycleId = cycleId;
     } else {
@@ -117,7 +117,11 @@ router.delete('/clear-all', authenticateToken, checkPermission('task.delete'), a
       }
     }
 
-    const result = await ContentCalendar.deleteMany(filter);
+    const result = await ContentCalendar.updateMany(filter, {
+      isDeleted: true,
+      deletedAt: new Date(),
+      deletedBy: req.user?._id
+    });
 
     await logActivity({
       userId: req.user?._id,
@@ -125,13 +129,13 @@ router.delete('/clear-all', authenticateToken, checkPermission('task.delete'), a
       action: 'CLEAR_ALL_CONTENT_CALENDAR',
       module: 'Content Calendar Module',
       entity: 'ContentCalendar',
-      newValue: { brandName, cycleId, deletedCount: result.deletedCount, year: currentYear, month: currentMonth + 1 }
+      newValue: { brandName, cycleId, deletedCount: result.modifiedCount, year: currentYear, month: currentMonth + 1 }
     });
 
     return res.status(200).json({
       success: true,
-      message: result.deletedCount === 0 ? 'No records found to delete' : `Successfully deleted ${result.deletedCount} content calendar entries`,
-      deletedCount: result.deletedCount
+      message: result.modifiedCount === 0 ? 'No records found to delete' : `Successfully deleted ${result.modifiedCount} content calendar entries`,
+      deletedCount: result.modifiedCount
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error clearing content calendar', error });
@@ -337,10 +341,15 @@ router.put('/:id', authenticateToken, checkPermission('task.update'), async (req
 // DELETE /api/v1/content-calendar/:id
 router.delete('/:id', authenticateToken, checkPermission('task.delete'), async (req: AuthRequest, res: Response) => {
   try {
-    const deleted = await ContentCalendar.findByIdAndDelete(req.params.id);
-    if (!deleted) {
+    const deleted = await ContentCalendar.findById(req.params.id);
+    if (!deleted || deleted.isDeleted) {
       return res.status(404).json({ success: false, message: 'No record exists for this content calendar entry' });
     }
+    deleted.isDeleted = true;
+    deleted.deletedAt = new Date();
+    deleted.deletedBy = req.user?._id;
+    await deleted.save();
+
     return res.status(200).json({ success: true, message: 'Content calendar entry deleted successfully' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error deleting content calendar entry', error });
@@ -396,7 +405,8 @@ router.get('/public/:token', async (req, res: Response) => {
 
     const query: any = {
       brandName: { $regex: new RegExp(`^${brandName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-      postDate: { $gte: startOfMonth, $lte: endOfMonth }
+      postDate: { $gte: startOfMonth, $lte: endOfMonth },
+      isDeleted: { $ne: true }
     };
 
     if (cycleId && cycleId !== 'All') {
