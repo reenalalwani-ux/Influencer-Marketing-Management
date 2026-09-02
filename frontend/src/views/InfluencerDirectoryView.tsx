@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import {
   Users, Search, Filter, Plus, ExternalLink, Instagram, Phone, Mail,
-  Star, Award, TrendingUp, Sparkles, CheckCircle2, Bookmark, Check,
+  Star, Award, TrendingUp, Sparkles, CheckCircle2, Bookmark, Check, X,
   Trash2, Edit2, ShieldCheck, MapPin, MessageSquare, Layers, Eye, RefreshCw, Briefcase,
   Heart, MessageCircle, BarChart2, Globe, SlidersHorizontal, UserCheck, AlertCircle, Grid, Table as TableIcon
 } from 'lucide-react';
 import { api } from '../services/api';
-import { InfluencerDirectoryItem, DiscoveredInfluencer } from '../types';
+import { InfluencerDirectoryItem } from '../types';
 import { Modal } from '../components/Modal';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
-import { Pagination } from '../components/Pagination';
+import { DataTable, DataTableColumn } from '../components/DataTable';
 
 interface InfluencerDirectoryViewProps {
   userRole?: string;
@@ -29,8 +29,6 @@ const CATEGORIES = [
 ];
 
 export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = ({ userRole, currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'directory' | 'discover'>('directory');
-  
   // Database Directory State & Pagination
   const [directoryItems, setDirectoryItems] = useState<InfluencerDirectoryItem[]>([]);
   const [loadingDirectory, setLoadingDirectory] = useState(false);
@@ -46,19 +44,12 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
   const [totalPages, setTotalPages] = useState(1);
   const [pageSize] = useState(12);
 
-  // Discovery State
-  const [discoveredItems, setDiscoveredItems] = useState<DiscoveredInfluencer[]>([]);
-  const [loadingDiscovery, setLoadingDiscovery] = useState(false);
-  const [discoveryCategory, setDiscoveryCategory] = useState('Fashion');
-  const [discoveryQuery, setDiscoveryQuery] = useState('');
-  const [discoveryMinFollowers, setDiscoveryMinFollowers] = useState<number>(0);
-  const [discoveryMaxFollowers, setDiscoveryMaxFollowers] = useState<number>(10000000);
-  const [discoveryMinEngagement, setDiscoveryMinEngagement] = useState<number>(0);
-  const [discoveryPage, setDiscoveryPage] = useState(1);
-  const [discoveryTotalPages, setDiscoveryTotalPages] = useState(1);
-  const [discoveryTotalItems, setDiscoveryTotalItems] = useState(0);
-  const [savingHandle, setSavingHandle] = useState<string | null>(null);
-  const [syncingLiveStats, setSyncingLiveStats] = useState(false);
+  // Metrics & Stats
+  const [metrics, setMetrics] = useState({
+    totalCreators: 0,
+    categoriesCount: CATEGORIES.filter(c => c.id !== 'All').length,
+    avgEngagement: 4.8
+  });
 
   // Modal State for Add / Edit
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -68,13 +59,13 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
     name: '',
     avatar: '',
     category: 'Fashion',
-    followersCount: 10000,
-    engagementRate: 4.0,
+    followersCount: undefined,
+    engagementRate: undefined,
     phone: '',
     email: '',
-    location: 'India',
+    location: '',
     profileLink: '',
-    status: 'Available',
+    status: 0,
     rating: 5,
     notes: '',
     bio: ''
@@ -89,11 +80,11 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
   };
 
   // Fetch Saved Database Directory (Fast & Paginated)
-  const fetchDirectory = async (page: number = currentPage, forceSync: boolean = false) => {
+  const fetchDirectory = async (page: number = currentPage, forceSync: boolean = false, query: string = searchQuery) => {
     setLoadingDirectory(true);
     try {
       let url = `/influencer-directory?page=${page}&limit=${pageSize}&category=${encodeURIComponent(selectedCategory)}&status=${encodeURIComponent(selectedStatus)}`;
-      if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
+      if (query && query.trim()) url += `&search=${encodeURIComponent(query.trim())}`;
       if (forceSync) url += `&forceSync=true`;
 
       if (followerTier === 'micro') {
@@ -107,6 +98,9 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
       const res = await api.get(url);
       if (res.success) {
         setDirectoryItems(res.items || []);
+        if (res.stats) {
+          setMetrics(res.stats);
+        }
         if (res.pagination) {
           setTotalItems(res.pagination.total || (res.items || []).length);
           setTotalPages(res.pagination.totalPages || 1);
@@ -120,140 +114,14 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
     }
   };
 
-  // Run Discovery API Search
-  const handleDiscoverSearch = async (overrideCategory?: string, pageNum: number = 1) => {
-    setLoadingDiscovery(true);
-    try {
-      const cat = overrideCategory || discoveryCategory;
-      const res = await api.post('/influencer-directory/discover', {
-        category: cat,
-        query: discoveryQuery,
-        minFollowers: discoveryMinFollowers,
-        maxFollowers: discoveryMaxFollowers,
-        minEngagement: discoveryMinEngagement,
-        page: pageNum,
-        pageSize: 12
-      });
-      if (res.success) {
-        setDiscoveredItems(res.influencers || []);
-        if (res.pagination) {
-          setDiscoveryPage(res.pagination.page || pageNum);
-          setDiscoveryTotalPages(res.pagination.totalPages || 1);
-          setDiscoveryTotalItems(res.pagination.totalItems || (res.influencers || []).length);
-        } else {
-          setDiscoveryPage(pageNum);
-          setDiscoveryTotalPages(1);
-          setDiscoveryTotalItems((res.influencers || []).length);
-        }
-        if ((res.influencers || []).length > 0) {
-          showToast(`✨ Found ${res.pagination?.totalItems || (res.influencers || []).length} database creators!`);
-        }
-      } else {
-        showToast(`⚠️ ${res.message || 'Discovery search failed'}`);
-      }
-    } catch (err: any) {
-      console.error('Discovery search error:', err);
-      showToast(`⚠️ ${err.message || 'Discovery search failed. Please try refreshing.'}`);
-    } finally {
-      setLoadingDiscovery(false);
-    }
-  };
-
-  // Sync Live Instagram Stats via Python IG Scraper for all creators
-  const handleSyncLiveInstagramStats = async () => {
-    setSyncingLiveStats(true);
-    try {
-      const res = await api.post('/influencer-directory/sync-live-instagram', {});
-      if (res.success) {
-        showToast(`✅ ${res.message || 'Synced via Instagram API!'}`);
-        fetchDirectory(currentPage, true);
-      } else {
-        showToast(`⚠️ ${res.message || 'Sync failed'}`);
-      }
-    } catch (err: any) {
-      showToast(`⚠️ ${err.message || 'Failed to sync via Instagram API'}`);
-    } finally {
-      setSyncingLiveStats(false);
-    }
-  };
-
-  // Reset old fake follower data from DB so Instagram API can write real values
-  const handleResetOldData = () => {
-    setDeleteModalState({
-      isOpen: true,
-      title: 'Reset Directory Data',
-      itemType: 'cached follower counts for all creators',
-      warningMessage: 'This will reset follower counts to 0 so the live Instagram API can sync real data.',
-      loading: false,
-      onConfirm: async () => {
-        setDeleteModalState(prev => ({ ...prev, loading: true }));
-        try {
-          const res = await api.post('/influencer-directory/reset-old-data', {});
-          if (res.success) {
-            setDeleteModalState(prev => ({ ...prev, isOpen: false }));
-            showToast(`🗑️ ${res.message}`);
-            fetchDirectory(currentPage, true);
-          }
-        } catch (err: any) {
-          showToast(`⚠️ ${err.message || 'Reset failed'}`);
-        } finally {
-          setDeleteModalState(prev => ({ ...prev, loading: false }));
-        }
-      }
-    });
-  };
-
   useEffect(() => {
-    if (activeTab === 'directory') {
+    const handler = setTimeout(() => {
       setCurrentPage(1);
-      fetchDirectory(1);
-    } else {
-      setDiscoveredItems([]);
-    }
-  }, [activeTab, selectedCategory, selectedStatus, followerTier]);
+      fetchDirectory(1, false, searchQuery);
+    }, 250);
 
-  // Handle Save Discovered Influencer to DB
-  const handleSaveDiscoveredToDb = async (influencer: DiscoveredInfluencer) => {
-    setSavingHandle(influencer.instagramHandle);
-    try {
-      const res = await api.post('/influencer-directory', {
-        instagramHandle: influencer.instagramHandle,
-        name: influencer.name,
-        avatar: influencer.avatar,
-        category: influencer.category,
-        nicheTags: influencer.nicheTags,
-        followersCount: influencer.followersCount,
-        followingCount: influencer.followingCount,
-        postsCount: influencer.postsCount,
-        engagementRate: influencer.engagementRate,
-        avgLikes: influencer.avgLikes,
-        avgComments: influencer.avgComments,
-        bio: influencer.bio,
-        location: influencer.location,
-        email: influencer.email,
-        phone: influencer.phone,
-        profileLink: influencer.profileLink,
-        isVerified: influencer.isVerified,
-        status: 'Available',
-        source: 'API Discovery'
-      });
-
-      if (res.success) {
-        showToast(`Saved @${influencer.instagramHandle.replace('@', '')} to Database Directory!`);
-        // Update local state flag
-        setDiscoveredItems(prev => prev.map(item => {
-          if (item.instagramHandle === influencer.instagramHandle) {
-            return { ...item, isSavedInDb: true, dbId: res.influencer?._id };
-          }
-          return item;
-        }));
-      }
-    } catch (err: any) {
-      showToast(`Error: ${err.message || 'Could not save influencer'}`);
-    } finally {
-      setSavingHandle(null);
-    }
-  };
+    return () => clearTimeout(handler);
+  }, [searchQuery, selectedCategory, selectedStatus, followerTier]);
 
   // Save / Update Form Submission for Saved Directory Modal
   const handleSaveForm = async (e: React.FormEvent) => {
@@ -271,7 +139,8 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
         if (res.success) {
           showToast(`Influencer ${formData.name} saved to directory!`);
           setIsModalOpen(false);
-          fetchDirectory();
+          setCurrentPage(1);
+          fetchDirectory(1);
         }
       }
     } catch (err: any) {
@@ -363,15 +232,15 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
     setFormData({
       instagramHandle: '',
       name: '',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+      avatar: '',
       category: 'Fashion',
-      followersCount: 25000,
-      engagementRate: 4.5,
+      followersCount: undefined,
+      engagementRate: undefined,
       phone: '',
       email: '',
-      location: 'India',
+      location: '',
       profileLink: '',
-      status: 'Available',
+      status: 0,
       rating: 5,
       notes: '',
       bio: ''
@@ -447,6 +316,226 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
     return name;
   };
 
+  const isItemActive = (status?: string | number) => {
+    if (status === undefined || status === null) return true;
+    if (status === 0 || status === '0') return true;
+    if (status === 1 || status === '1') return false;
+    const s = String(status).toLowerCase().trim();
+    return s === 'active' || s === 'available' || s === 'preferred' || s === 'contacted' || s === 'in discussion';
+  };
+
+  const handleToggleStatus = async (item: InfluencerDirectoryItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const currentlyActive = isItemActive(item.status);
+    const newStatus = currentlyActive ? 1 : 0; // 0 for active, 1 for inactive
+
+    // Optimistically update
+    setDirectoryItems(prev => prev.map(d => (d._id === item._id ? { ...d, status: newStatus } : d)));
+
+    try {
+      const res = await api.put(`/influencer-directory/${item._id}`, { status: newStatus });
+      if (res.success) {
+        showToast(`Influencer status updated to ${newStatus === 0 ? 'Active (0)' : 'Inactive (1)'}`);
+      } else {
+        setDirectoryItems(prev => prev.map(d => (d._id === item._id ? { ...d, status: item.status } : d)));
+        showToast(`⚠️ Could not update status`);
+      }
+    } catch (err: any) {
+      setDirectoryItems(prev => prev.map(d => (d._id === item._id ? { ...d, status: item.status } : d)));
+      showToast(`⚠️ Error: ${err.message || 'Status update failed'}`);
+    }
+  };
+
+  const columns: DataTableColumn<InfluencerDirectoryItem>[] = [
+    {
+      key: 'sno',
+      label: 'S.NO',
+      align: 'center',
+      width: '70px',
+      render: (_, __, index) => (
+        <span className="font-bold text-slate-500 text-xs">
+          {(currentPage - 1) * pageSize + index + 1}
+        </span>
+      )
+    },
+    {
+      key: 'name',
+      label: 'CREATOR',
+      sortable: true,
+      render: (_, row) => (
+        <div
+          className="cursor-pointer group py-1"
+          onClick={() => openBrandHistoryModal(row)}
+        >
+          <div className="font-extrabold text-slate-900 group-hover:text-purple-700 transition-colors flex items-center gap-1.5 text-xs sm:text-sm">
+            <span>{getCleanCreatorName(row.name, row.instagramHandle)}</span>
+            {row.nicheTags && row.nicheTags.length > 0 && (
+              <span className="text-[10px] text-purple-700 font-semibold bg-purple-50 border border-purple-200/60 px-1.5 py-0.2 rounded">
+                #{row.nicheTags[0]}
+              </span>
+            )}
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'category',
+      label: 'CATEGORY',
+      sortable: true,
+      render: (_, row) => (
+        <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-bold text-xs">
+          {row.category || 'General'}
+        </span>
+      )
+    },
+    {
+      key: 'followersCount',
+      label: 'FOLLOWERS',
+      sortable: true,
+      render: (_, row) => (
+        <span className="font-extrabold text-slate-900 text-xs">
+          {formatNumber(row.followersCount || 0)}
+        </span>
+      )
+    },
+    {
+      key: 'engagementRate',
+      label: 'ENGAGEMENT',
+      sortable: true,
+      render: (_, row) => (
+        <span className="font-black text-emerald-600 text-xs">
+          {(row.engagementRate || 0) > 0 ? `${row.engagementRate}%` : '—'}
+        </span>
+      )
+    },
+    {
+      key: 'pastCollabsCount',
+      label: 'PAST COLLABS',
+      align: 'center',
+      sortable: true,
+      render: (_, row) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            openBrandHistoryModal(row);
+          }}
+          className="px-2.5 py-1 rounded-full bg-purple-50 hover:bg-purple-100 text-purple-700 font-extrabold text-xs inline-flex items-center gap-1.5 transition cursor-pointer"
+          title="View all brand collaboration records"
+        >
+          <Briefcase size={12} />
+          <span>{row.pastCollabsCount || 0}</span>
+        </button>
+      )
+    },
+    {
+      key: 'status',
+      label: 'STATUS',
+      align: 'center',
+      sortable: true,
+      render: (_, row) => {
+        const active = isItemActive(row.status);
+        return (
+          <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={(e) => handleToggleStatus(row, e)}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                active ? 'bg-emerald-500' : 'bg-slate-300'
+              }`}
+              title={active ? 'Active (0) - Click to mark Inactive (1)' : 'Inactive (1) - Click to mark Active (0)'}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                  active ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'contact',
+      label: 'CONTACT',
+      render: (_, row) => (
+        <div className="flex flex-col gap-1 py-1 text-xs" onClick={(e) => e.stopPropagation()}>
+          {/* Phone */}
+          <div className="flex items-center gap-1.5 text-slate-700">
+            <Phone size={12} className="text-emerald-600 shrink-0" />
+            {row.phone ? (
+              <a
+                href={`https://wa.me/${row.phone.replace(/[^0-9]/g, '')}`}
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold text-slate-800 hover:text-emerald-600 hover:underline"
+              >
+                {row.phone}
+              </a>
+            ) : (
+              <span className="text-slate-400 text-[11px]">—</span>
+            )}
+          </div>
+
+          {/* Instagram */}
+          <div className="flex items-center gap-1.5 text-slate-700">
+            <Instagram size={12} className="text-pink-600 shrink-0" />
+            {row.instagramHandle ? (
+              <a
+                href={getCleanInstagramUrl(row.instagramHandle, row.profileLink)}
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold text-purple-700 hover:underline"
+              >
+                @{row.instagramHandle.replace(/^@/, '')}
+              </a>
+            ) : (
+              <span className="text-slate-400 text-[11px]">—</span>
+            )}
+          </div>
+
+          {/* Email */}
+          <div className="flex items-center gap-1.5 text-slate-700">
+            <Mail size={12} className="text-blue-600 shrink-0" />
+            {row.email ? (
+              <a
+                href={`mailto:${row.email}`}
+                className="font-semibold text-slate-800 hover:text-blue-600 hover:underline truncate max-w-[180px]"
+                title={row.email}
+              >
+                {row.email}
+              </a>
+            ) : (
+              <span className="text-slate-400 text-[11px]">—</span>
+            )}
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'actions',
+      label: 'ACTIONS',
+      align: 'center',
+      render: (_, row) => (
+        <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => openEditModal(row)}
+            className="p-1.5 text-purple-600 hover:bg-purple-100 rounded-lg cursor-pointer transition"
+            title="Edit Influencer"
+          >
+            <Edit2 size={15} />
+          </button>
+          <button
+            onClick={() => requestDeleteItem(row)}
+            className="p-1.5 text-rose-600 hover:bg-rose-100 rounded-lg cursor-pointer transition"
+            title="Delete from Directory"
+          >
+            <Trash2 size={15} />
+          </button>
+        </div>
+      )
+    }
+  ];
+
   return (
     <div className="space-y-6 pb-12">
       {/* Toast Alert Notification */}
@@ -466,10 +555,10 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
               <Sparkles size={14} className="text-purple-600" /> Influencer Operations Hub
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
-              Influencer Directory & Discovery
+              Influencer Directory
             </h1>
             <p className="text-slate-500 text-sm mt-1.5 max-w-2xl font-medium">
-              Access your database of influencers from past Barter & Paid collabs, or discover new Instagram creators filtered by category, followers, and engagement.
+              Access and manage your database of influencers from past Barter &amp; Paid collaborations.
             </p>
           </div>
 
@@ -481,555 +570,126 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
             </div>
             <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-3.5 text-center shadow-2xs">
               <div className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Categories</div>
-              <div className="text-2xl font-black text-slate-900 mt-0.5">8+</div>
+              <div className="text-2xl font-black text-slate-900 mt-0.5">{metrics.categoriesCount || CATEGORIES.filter(c => c.id !== 'All').length}</div>
             </div>
             <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-3.5 text-center shadow-2xs">
               <div className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Avg Engagement</div>
-              <div className="text-2xl font-black text-emerald-600 mt-0.5">4.8%</div>
+              <div className="text-2xl font-black text-emerald-600 mt-0.5">{metrics.avgEngagement || 4.8}%</div>
             </div>
-          </div>
-        </div>
-
-        {/* Sub-module Navigation Tabs & Action Bar */}
-        <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-0">
-          {/* Tabs */}
-          <div className="flex items-center gap-2 overflow-x-auto">
-            <button
-              onClick={() => setActiveTab('directory')}
-              className={`px-5 py-3 font-extrabold text-sm rounded-t-2xl transition-all duration-200 flex items-center gap-2 border-b-2 cursor-pointer ${
-                activeTab === 'directory'
-                  ? 'bg-purple-600 border-purple-600 text-white shadow-md shadow-purple-500/20'
-                  : 'border-transparent bg-slate-50 text-slate-600 hover:text-purple-700 hover:bg-purple-50/70'
-              }`}
-            >
-              <Bookmark size={17} className={activeTab === 'directory' ? 'text-white' : 'text-slate-400'} />
-              My Influencer Database
-              <span className={`ml-1 px-2.5 py-0.5 rounded-full text-xs font-black ${
-                activeTab === 'directory' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-              }`}>
-                {totalItems}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('discover')}
-              className={`px-5 py-3 font-extrabold text-sm rounded-t-2xl transition-all duration-200 flex items-center gap-2 border-b-2 cursor-pointer ${
-                activeTab === 'discover'
-                  ? 'bg-purple-600 border-purple-600 text-white shadow-md shadow-purple-500/20'
-                  : 'border-transparent bg-slate-50 text-slate-600 hover:text-purple-700 hover:bg-purple-50/70'
-              }`}
-            >
-              <Search size={17} className={activeTab === 'discover' ? 'text-white' : 'text-slate-400'} />
-              Discover Instagram Creators
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                activeTab === 'discover' ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-700'
-              }`}>
-                DIRECTORY
-              </span>
-            </button>
-          </div>
-
-          {/* Repositioned Action Buttons (Single Solid Shade) */}
-          <div className="flex items-center gap-2.5 pb-2.5">
-            <button
-              onClick={handleSyncLiveInstagramStats}
-              disabled={syncingLiveStats}
-              className="px-4 py-2.5 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-sm shrink-0 disabled:opacity-50"
-              title="Fetch real follower counts, engagement rates & profile pictures from Instagram for all creators"
-            >
-              <Sparkles size={14} className={syncingLiveStats ? 'animate-spin' : ''} />
-              <span>{syncingLiveStats ? 'Syncing Instagram...' : '⚡ Sync Live IG Data'}</span>
-            </button>
-
-            <button
-              onClick={handleResetOldData}
-              className="px-4 py-2.5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-sm shrink-0"
-              title="Clear old fake follower counts from DB so live Instagram sync can write real data"
-            >
-              <span>🗑️ Reset Fake Data</span>
-            </button>
-
-            <button
-              onClick={() => fetchDirectory(1, true)}
-              disabled={loadingDirectory}
-              className="px-4 py-2.5 rounded-2xl bg-slate-700 hover:bg-slate-800 text-white font-extrabold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-sm shrink-0"
-              title="Refresh Database"
-            >
-              <RefreshCw size={14} className={loadingDirectory ? 'animate-spin text-purple-300' : ''} />
-              <span>Refresh</span>
-            </button>
           </div>
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* SUB-PART 1: DATABASE DIRECTORY VIEW ("MY INFLUENCERS")                   */}
-      {/* ========================================================================= */}
-      {activeTab === 'directory' && (
-        <div className="space-y-5">
-          {/* Directory Toolbar / Filters */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-            {/* Search Input */}
-            <div className="relative flex-1 max-w-md">
-              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && fetchDirectory()}
-                placeholder="Search by name, handle, bio, or location..."
-                className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500 bg-slate-50/50"
-              />
-            </div>
-
-            {/* Filter Dropdowns */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              {/* Category */}
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white cursor-pointer hover:border-purple-300"
-              >
-                {CATEGORIES.map(c => (
-                  <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
-                ))}
-              </select>
-
-              {/* Status */}
-              <select
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white cursor-pointer hover:border-purple-300"
-              >
-                <option value="All">All Statuses</option>
-                <option value="Available">Available</option>
-                <option value="Contacted">Contacted</option>
-                <option value="In Discussion">In Discussion</option>
-                <option value="Preferred">Preferred</option>
-                <option value="Blacklisted">Blacklisted</option>
-              </select>
-
-              {/* Follower Tier */}
-              <select
-                value={followerTier}
-                onChange={(e) => setFollowerTier(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white cursor-pointer hover:border-purple-300"
-              >
-                <option value="All">All Follower Counts</option>
-                <option value="micro">Micro (10K - 50K)</option>
-                <option value="mid">Mid-Tier (50K - 500K)</option>
-                <option value="macro">Macro (500K+)</option>
-              </select>
-
-              {/* Add New Influencer Button */}
+      {/* Directory Content Area */}
+      <div className="space-y-5">
+        {/* Directory Toolbar / Filters */}
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* Search Input */}
+          <div className="relative flex-1 max-w-md">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name, @handle, phone, email, bio..."
+              className="w-full pl-10 pr-9 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500 bg-slate-50/50"
+            />
+            {searchQuery && (
               <button
-                onClick={openAddModal}
-                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-purple-500/20 transition-all cursor-pointer"
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full cursor-pointer transition"
+                title="Clear search"
               >
-                <Plus size={16} /> Add Influencer
+                <X size={14} />
               </button>
-            </div>
+            )}
           </div>
 
-          {/* Directory Content List / Grid */}
-          {loadingDirectory ? (
-            <div className="py-16 text-center bg-white rounded-3xl border border-slate-200">
-              <RefreshCw className="animate-spin text-purple-600 mx-auto mb-3" size={28} />
-              <p className="text-sm font-bold text-slate-600">Loading your saved influencers...</p>
-            </div>
-          ) : directoryItems.length === 0 ? (
-            <div className="py-16 text-center bg-white rounded-3xl border border-slate-200 shadow-xs p-6">
-              <Users size={40} className="text-slate-300 mx-auto mb-3" />
-              <h3 className="text-lg font-bold text-slate-800">No Saved Influencers Found</h3>
-              <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                No creators matched your current search filters or category. Add influencers manually or use the Discovery tab to save new creators!
-              </p>
-              <button
-                onClick={openAddModal}
-                className="mt-4 px-4 py-2 rounded-xl bg-purple-600 text-white font-bold text-xs inline-flex items-center gap-1.5"
-              >
-                <Plus size={15} /> Add First Influencer
-              </button>
-            </div>
-          ) : (
-            /* COMPACT TABLE VIEW */
-            <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xs">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-                      <th className="py-3.5 px-4">Creator</th>
-                      <th className="py-3.5 px-4">Category</th>
-                      <th className="py-3.5 px-4 text-right">Followers</th>
-                      <th className="py-3.5 px-4 text-right">Engagement</th>
-                      <th className="py-3.5 px-4 text-center">Past Collabs</th>
-                      <th className="py-3.5 px-4">Status</th>
-                      <th className="py-3.5 px-4">Contact</th>
-                      <th className="py-3.5 px-4 text-center">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
-                    {directoryItems.map((item) => (
-                      <tr key={item._id} className="hover:bg-purple-50/40 transition-colors">
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={getCreatorAvatar(item.avatar, item.instagramHandle, item.name)}
-                              alt=""
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                const cleanHandle = (item.instagramHandle || '').replace(/^@/, '').replace(/\s+/g, '').trim();
-                                if (!target.src.includes('unavatar.io') && cleanHandle) {
-                                  target.src = `https://unavatar.io/instagram/${cleanHandle}`;
-                                } else {
-                                  target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || cleanHandle || 'Creator')}&background=7c3aed&color=fff`;
-                                }
-                              }}
-                              className="w-10 h-10 rounded-xl object-cover border border-slate-200 shrink-0"
-                            />
-                            <div>
-                              <div className="font-extrabold text-slate-900 text-sm">{item.name}</div>
-                              <a
-                                href={getCleanInstagramUrl(item.instagramHandle, item.profileLink)}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-purple-600 font-bold hover:underline inline-flex items-center gap-1 text-[11px]"
-                              >
-                                {item.instagramHandle} <ExternalLink size={10} />
-                              </a>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 font-bold text-slate-800">{item.category}</td>
-                        <td className="py-3 px-4 text-right font-black text-slate-900">{formatNumber(item.followersCount)}</td>
-                        <td className="py-3 px-4 text-right font-black text-emerald-600">{item.engagementRate}%</td>
-                        <td className="py-3 px-4 text-center font-extrabold text-purple-700">
-                          <span className="px-2 py-0.5 rounded-lg bg-purple-100 text-purple-800">
-                            {item.pastCollabsCount || 0}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                            item.status === 'Preferred' ? 'bg-emerald-100 text-emerald-800' :
-                            item.status === 'Blacklisted' ? 'bg-rose-100 text-rose-800' :
-                            item.status === 'In Discussion' ? 'bg-amber-100 text-amber-800' :
-                            'bg-slate-100 text-slate-800'
-                          }`}>
-                            {item.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            {item.phone && (
-                              <a href={`https://wa.me/${item.phone}`} target="_blank" rel="noreferrer" className="text-emerald-600 hover:underline">
-                                WhatsApp
-                              </a>
-                            )}
-                            {item.email && (
-                              <a href={`mailto:${item.email}`} className="text-blue-600 hover:underline">
-                                Email
-                              </a>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            <button onClick={() => openEditModal(item)} className="p-1.5 text-purple-600 hover:bg-purple-100 rounded-lg cursor-pointer">
-                              <Edit2 size={14} />
-                            </button>
-                            <button onClick={() => requestDeleteItem(item)} className="p-1.5 text-rose-600 hover:bg-rose-100 rounded-lg cursor-pointer" title="Delete from Directory">
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Pagination Controls */}
-          {directoryItems.length > 0 && (
-            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs">
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                totalItems={totalItems}
-                itemsPerPage={pageSize}
-                onPageChange={(p) => {
-                  setCurrentPage(p);
-                  fetchDirectory(p);
-                }}
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* SUB-PART 2: DISCOVER INSTAGRAM INFLUENCERS (THIRD-PARTY API INTEGRATION)   */}
-      {/* ========================================================================= */}
-      {activeTab === 'discover' && (
-        <div className="space-y-6">
-          {/* Category Filter Pills Bar */}
-          <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-sm space-y-4">
-            <div className="text-xs font-black uppercase tracking-wider text-purple-700 flex items-center gap-1.5">
-              <Sparkles size={14} /> Browse Creators by Niche / Category
-            </div>
-
-            <div className="flex flex-wrap gap-2.5">
-              {CATEGORIES.filter(c => c.id !== 'All').map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => {
-                    setDiscoveryCategory(cat.id);
-                    handleDiscoverSearch(cat.id);
-                  }}
-                  className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all duration-200 flex items-center gap-2 cursor-pointer ${
-                    discoveryCategory === cat.id
-                      ? 'bg-purple-600 text-white shadow-md shadow-purple-500/25 scale-105'
-                      : 'bg-slate-100 hover:bg-purple-50 text-slate-700 hover:text-purple-700 border border-transparent'
-                  }`}
-                >
-                  <span className="text-base">{cat.icon}</span>
-                  <span>{cat.label}</span>
-                </button>
+          {/* Filter Dropdowns & Actions */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Category */}
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white cursor-pointer hover:border-purple-300"
+            >
+              {CATEGORIES.map(c => (
+                <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
               ))}
-            </div>
+            </select>
 
-            {/* Advanced Search & Metrics Filter Inputs */}
-            <div className="pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {/* Keyword Query Search Bar */}
-              <div className="relative">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={discoveryQuery}
-                  onChange={(e) => setDiscoveryQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleDiscoverSearch()}
-                  placeholder="e.g. fashion content, luxury..."
-                  className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
+            {/* Status */}
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white cursor-pointer hover:border-purple-300"
+            >
+              <option value="All">All Statuses</option>
+              <option value="0">Active (0)</option>
+              <option value="1">Inactive (1)</option>
+            </select>
 
-              {/* Follower Range Filter */}
-              <select
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === 'micro') {
-                    setDiscoveryMinFollowers(10000); setDiscoveryMaxFollowers(100000);
-                  } else if (val === 'mid') {
-                    setDiscoveryMinFollowers(100000); setDiscoveryMaxFollowers(500000);
-                  } else if (val === 'macro') {
-                    setDiscoveryMinFollowers(500000); setDiscoveryMaxFollowers(10000000);
-                  } else {
-                    setDiscoveryMinFollowers(0); setDiscoveryMaxFollowers(10000000);
-                  }
-                }}
-                className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white cursor-pointer"
-              >
-                <option value="all">Any Followers Count</option>
-                <option value="micro">Micro (10K - 100K)</option>
-                <option value="mid">Mid-Tier (100K - 500K)</option>
-                <option value="macro">Macro (500K+)</option>
-              </select>
+            {/* Follower Tier */}
+            <select
+              value={followerTier}
+              onChange={(e) => setFollowerTier(e.target.value)}
+              className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white cursor-pointer hover:border-purple-300"
+            >
+              <option value="All">All Follower Counts</option>
+              <option value="micro">Micro (10K - 50K)</option>
+              <option value="mid">Mid-Tier (50K - 500K)</option>
+              <option value="macro">Macro (500K+)</option>
+            </select>
 
-              {/* Min Engagement Rate */}
-              <select
-                onChange={(e) => setDiscoveryMinEngagement(Number(e.target.value))}
-                className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white cursor-pointer"
-              >
-                <option value="0">Any Engagement Rate</option>
-                <option value="3">&gt; 3.0% Engagement</option>
-                <option value="5">&gt; 5.0% High Engagement</option>
-              </select>
+            {/* Refresh Button */}
+            <button
+              onClick={() => fetchDirectory(1, true)}
+              disabled={loadingDirectory}
+              className="px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              title="Refresh Directory"
+            >
+              <RefreshCw size={14} className={loadingDirectory ? 'animate-spin text-purple-600' : ''} />
+              <span>Refresh</span>
+            </button>
 
-              {/* Search API Trigger Button */}
-              <button
-                onClick={() => handleDiscoverSearch()}
-                disabled={loadingDiscovery}
-                className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-md shadow-purple-500/20 cursor-pointer disabled:opacity-50"
-              >
-                {loadingDiscovery ? (
-                  <>
-                    <RefreshCw className="animate-spin" size={15} /> Fetching Instagram API...
-                  </>
-                ) : (
-                  <>
-                    <Search size={15} /> Discover Creators
-                  </>
-                )}
-              </button>
-            </div>
+            {/* Add New Influencer Button */}
+            <button
+              onClick={openAddModal}
+              className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-purple-500/20 transition-all cursor-pointer"
+            >
+              <Plus size={16} /> Add Influencer
+            </button>
           </div>
-
-          {/* Discovered Creators Grid */}
-          {loadingDiscovery ? (
-            <div className="py-20 text-center bg-white rounded-3xl border border-slate-200 shadow-sm">
-              <RefreshCw className="animate-spin text-purple-600 mx-auto mb-3" size={32} />
-              <h3 className="text-base font-extrabold text-slate-800">Fetching Database Creators...</h3>
-              <p className="text-xs text-slate-500 mt-1">Searching creators matching "{discoveryCategory}" content</p>
-            </div>
-          ) : discoveredItems.length === 0 ? (
-            <div className="py-20 text-center bg-white rounded-3xl border border-slate-200 p-8 shadow-xs">
-              <div className="w-14 h-14 bg-purple-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-purple-100">
-                <Sparkles size={28} className="text-purple-600" />
-              </div>
-              <h3 className="text-base font-extrabold text-slate-800">Instagram Creator Discovery Module</h3>
-              <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                Live creator discovery functionality is currently paused. Please use <span className="font-bold text-purple-700">"My Influencer Database"</span> to view, search, and manage your saved influencers.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {discoveredItems.map((creator) => (
-                <div
-                  key={creator.instagramHandle}
-                  className="bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group relative"
-                >
-                  {/* Card Header & Category Badge */}
-                  <div className="p-5 border-b border-slate-100 flex items-start justify-between gap-3 bg-gradient-to-br from-slate-50 to-purple-50/30">
-                    <div className="flex items-center gap-3.5">
-                      <div className="relative">
-                        <img
-                          src={creator.avatar}
-                          alt={creator.name}
-                          referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            const cleanHandle = (creator.instagramHandle || '').replace(/^@/, '').replace(/\s+/g, '').trim();
-                            target.src = `https://unavatar.io/instagram/${cleanHandle}`;
-                          }}
-                          className="w-14 h-14 rounded-2xl object-cover border-2 border-white shadow-md bg-slate-200"
-                        />
-                        {creator.isVerified && (
-                          <CheckCircle2 size={16} className="absolute -bottom-1 -right-1 text-purple-600 fill-purple-100 bg-white rounded-full" />
-                        )}
-                      </div>
-                      <div>
-                        <h4 className="font-extrabold text-slate-900 text-sm group-hover:text-purple-700 transition-colors">
-                          {creator.name}
-                        </h4>
-                        <a
-                          href={getCleanInstagramUrl(creator.instagramHandle, creator.profileLink)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs font-bold text-purple-600 hover:underline flex items-center gap-1 mt-0.5"
-                        >
-                          @{creator.instagramHandle.replace(/^@/, '')} <ExternalLink size={11} />
-                        </a>
-                      </div>
-                    </div>
-
-                    <span className="px-2.5 py-1 rounded-xl bg-purple-100 text-purple-800 text-[10px] font-black uppercase tracking-wider">
-                      {creator.category}
-                    </span>
-                  </div>
-
-                  {/* Body Info & Bio */}
-                  <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                    {/* Bio */}
-                    {creator.bio && (
-                      <p className="text-xs text-slate-600 line-clamp-2 italic bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                        "{creator.bio}"
-                      </p>
-                    )}
-
-                    {/* Key Creator Metrics */}
-                    <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50/80 rounded-2xl border border-slate-100 text-center">
-                      <div>
-                        <div className="text-[10px] text-slate-400 font-bold uppercase">Followers</div>
-                        <div className="text-xs font-black text-slate-900 mt-0.5">{formatNumber(creator.followersCount)}</div>
-                      </div>
-                      <div>
-                        <div className="text-[10px] text-slate-400 font-bold uppercase">Engagement</div>
-                        <div className="text-xs font-black text-emerald-600 mt-0.5">{creator.engagementRate}%</div>
-                      </div>
-                      <div>
-                        <div className="text-[10px] text-slate-400 font-bold uppercase">Avg Likes</div>
-                        <div className="text-xs font-black text-purple-900 mt-0.5">{formatNumber(creator.avgLikes)}</div>
-                      </div>
-                    </div>
-
-                    {/* Est Rate per Post */}
-                    {creator.estRatePerPost && (
-                      <div className="flex items-center justify-between text-xs px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200/60 text-amber-900">
-                        <span className="font-semibold text-[11px]">Est. Reel / Post Rate:</span>
-                        <span className="font-extrabold text-amber-800">{creator.estRatePerPost}</span>
-                      </div>
-                    )}
-
-                    {/* Recent Content Preview Thumbnails */}
-                    {creator.recentPosts && creator.recentPosts.length > 0 && (
-                      <div>
-                        <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                          <Eye size={12} /> Content Preview
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          {creator.recentPosts.map((post, idx) => (
-                            <div key={idx} className="relative rounded-xl overflow-hidden group/post h-24 border border-slate-200">
-                              <img src={post.image} alt="" className="w-full h-full object-cover group-hover/post:scale-110 transition-transform duration-300" />
-                              <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover/post:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white text-[10px] font-bold">
-                                <span className="flex items-center gap-0.5"><Heart size={10} className="fill-white" /> {formatNumber(post.likes)}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* SAVE TO DATABASE BUTTON */}
-                    <div className="pt-2">
-                      {creator.isSavedInDb ? (
-                        <div className="w-full py-2.5 px-4 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs">
-                          <CheckCircle2 size={16} className="text-emerald-600" /> Saved in Database Directory
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => handleSaveDiscoveredToDb(creator)}
-                          disabled={savingHandle === creator.instagramHandle}
-                          className="w-full py-2.5 px-4 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-purple-500/20 transition-all cursor-pointer disabled:opacity-50"
-                        >
-                          {savingHandle === creator.instagramHandle ? (
-                            <>
-                              <RefreshCw className="animate-spin" size={15} /> Saving to Database...
-                            </>
-                          ) : (
-                            <>
-                              <Plus size={16} /> Save to Database Directory
-                            </>
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Discovery Pagination Controls */}
-          {discoveredItems.length > 0 && (
-            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs">
-              <Pagination
-                currentPage={discoveryPage}
-                totalPages={discoveryTotalPages}
-                totalItems={discoveryTotalItems}
-                itemsPerPage={12}
-                onPageChange={(p) => {
-                  setDiscoveryPage(p);
-                  handleDiscoverSearch(undefined, p);
-                }}
-              />
-            </div>
-          )}
         </div>
-      )}
 
-      {/* ========================================================================= */}
-      {/* ADD / EDIT INFLUENCER MODAL                                              */}
+        {/* Directory Content List */}
+        {loadingDirectory ? (
+          <div className="py-16 text-center bg-white rounded-3xl border border-slate-200">
+            <RefreshCw className="animate-spin text-purple-600 mx-auto mb-3" size={28} />
+            <p className="text-sm font-bold text-slate-600">Loading your saved influencers...</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden p-2">
+            <DataTable
+              columns={columns}
+              data={directoryItems}
+              rowKey={(row) => row._id || row.instagramHandle}
+              emptyMessage="No saved influencers found matching your current filters."
+              pagination={true}
+              itemsPerPage={pageSize}
+              currentPage={currentPage}
+              totalItems={totalItems}
+              totalPages={totalPages}
+              onPageChange={(p) => {
+                setCurrentPage(p);
+                fetchDirectory(p);
+              }}
+            />
+          </div>
+        )}
+      </div>
+
       {/* ========================================================================= */}
       {isModalOpen && (
         <Modal
@@ -1075,34 +735,17 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
               <p className="text-[10px] text-slate-400 mt-1 font-medium">Leave blank to automatically load live Instagram profile picture for this handle.</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Category / Niche *</label>
-                <select
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white"
-                >
-                  {CATEGORIES.filter(c => c.id !== 'All').map(c => (
-                    <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Status</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white"
-                >
-                  <option value="Available">Available</option>
-                  <option value="Contacted">Contacted</option>
-                  <option value="In Discussion">In Discussion</option>
-                  <option value="Preferred">Preferred</option>
-                  <option value="Blacklisted">Blacklisted</option>
-                </select>
-              </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Category / Niche *</label>
+              <select
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white"
+              >
+                {CATEGORIES.filter(c => c.id !== 'All').map(c => (
+                  <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
+                ))}
+              </select>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1110,8 +753,9 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
                 <label className="block text-xs font-bold text-slate-700 mb-1">Followers Count</label>
                 <input
                   type="number"
-                  value={formData.followersCount}
-                  onChange={(e) => setFormData({ ...formData, followersCount: Number(e.target.value) })}
+                  value={formData.followersCount ?? ''}
+                  onChange={(e) => setFormData({ ...formData, followersCount: e.target.value === '' ? undefined : Number(e.target.value) })}
+                  placeholder="e.g. 25000"
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold"
                 />
               </div>
@@ -1120,8 +764,9 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
                 <input
                   type="number"
                   step="0.1"
-                  value={formData.engagementRate}
-                  onChange={(e) => setFormData({ ...formData, engagementRate: Number(e.target.value) })}
+                  value={formData.engagementRate ?? ''}
+                  onChange={(e) => setFormData({ ...formData, engagementRate: e.target.value === '' ? undefined : Number(e.target.value) })}
+                  placeholder="e.g. 4.5"
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold"
                 />
               </div>
@@ -1195,15 +840,13 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
             {/* Influencer Summary Header */}
             <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-50 via-indigo-50 to-slate-50 border border-purple-200/80 text-slate-900 flex items-center justify-between gap-4 shadow-sm">
               <div className="flex items-center gap-3">
-                <img
-                  src={getCreatorAvatar(selectedBrandHistory.influencer?.avatar, selectedBrandHistory.influencer?.instagramHandle, selectedBrandHistory.influencer?.name)}
-                  alt={selectedBrandHistory.influencer?.name}
-                  className="w-14 h-14 rounded-xl object-cover border-2 border-purple-200 shadow-sm bg-purple-100"
-                />
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-black text-lg flex items-center justify-center shadow-md shrink-0">
+                  {getCleanCreatorName(selectedBrandHistory.influencer?.name || 'C').charAt(0).toUpperCase()}
+                </div>
                 <div>
-                  <h3 className="font-extrabold text-slate-900 text-base leading-snug">{selectedBrandHistory.influencer?.name}</h3>
+                  <h3 className="font-extrabold text-slate-900 text-base leading-snug">{getCleanCreatorName(selectedBrandHistory.influencer?.name, selectedBrandHistory.influencer?.instagramHandle)}</h3>
                   <div className="text-xs text-slate-600 font-medium flex items-center gap-1.5 mt-0.5">
-                    <span className="font-bold text-purple-700">{selectedBrandHistory.influencer?.instagramHandle}</span>
+                    <span className="font-bold text-purple-700">@{selectedBrandHistory.influencer?.instagramHandle?.replace(/^@/, '')}</span>
                     <span>•</span>
                     <span className="bg-purple-100 text-purple-900 px-2 py-0.5 rounded-full text-[10px] font-bold">{selectedBrandHistory.influencer?.category || 'Fashion'}</span>
                   </div>
@@ -1212,7 +855,7 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
               <div className="flex items-center gap-3 text-right">
                 <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs">
                   <div className="text-[10px] uppercase font-extrabold text-slate-500 tracking-wider">Total Collabs</div>
-                  <div className="text-base font-black text-amber-600">{selectedBrandHistory.totalCollabs} Deals</div>
+                  <div className="text-base font-black text-purple-700">{selectedBrandHistory.totalCollabs} Deals</div>
                 </div>
                 <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs">
                   <div className="text-[10px] uppercase font-extrabold text-slate-500 tracking-wider">Unique Brands</div>
@@ -1266,8 +909,16 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
                   </div>
                 ))
               ) : (
-                <div className="py-8 text-center text-slate-500 text-sm font-medium">
-                  No past brand collaboration records found for this influencer.
+                <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 text-center space-y-2">
+                  <div className="text-purple-700 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5">
+                    <Briefcase size={14} /> Database Collaboration Record
+                  </div>
+                  <p className="text-xs text-slate-800 font-bold">
+                    {selectedBrandHistory.influencer?.notes || `Recorded ${selectedBrandHistory.totalCollabs || 0} past collaboration(s) in system.`}
+                  </p>
+                  <p className="text-[11px] text-slate-500 max-w-md mx-auto">
+                    Individual video deliverables, views, and order receipts will be listed here as new brand deals are assigned to this creator.
+                  </p>
                 </div>
               )}
             </div>

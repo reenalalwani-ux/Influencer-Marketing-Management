@@ -649,12 +649,13 @@ export interface IInfluencerDirectory extends Document {
   phone?: string;
   profileLink?: string;
   isVerified?: boolean;
-  status: 'Available' | 'Contacted' | 'In Discussion' | 'Blacklisted' | 'Preferred';
+  status: number | string;
   rating?: number;
   notes?: string;
-  source?: 'Manual' | 'API Discovery' | 'Past Collab' | 'Sheet Sync';
+  source?: 'Manual' | 'Manual Add' | 'API Discovery' | 'Past Collab' | 'Sheet Sync';
   externalId?: string;
   pastCollabsCount?: number;
+  brandsWorkedWith?: string[];
   createdBy?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
@@ -682,19 +683,19 @@ export const InfluencerDirectorySchema = new Schema<IInfluencerDirectory>({
   profileLink: { type: String, default: '' },
   isVerified: { type: Boolean, default: false },
   status: { 
-    type: String, 
-    enum: ['Available', 'Contacted', 'In Discussion', 'Blacklisted', 'Preferred'], 
-    default: 'Available' 
+    type: Schema.Types.Mixed, 
+    default: 0 
   },
   rating: { type: Number, default: 5 },
   notes: { type: String, default: '' },
   source: { 
     type: String, 
-    enum: ['Manual', 'API Discovery', 'Past Collab', 'Sheet Sync'], 
+    enum: ['Manual', 'Manual Add', 'API Discovery', 'Past Collab', 'Sheet Sync'], 
     default: 'Manual' 
   },
-  externalId: { type: String, default: '' },
+  externalId: { type: String },
   pastCollabsCount: { type: Number, default: 0 },
+  brandsWorkedWith: [{ type: String }],
   createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
   isDeleted: { type: Boolean, default: false },
   deletedAt: { type: Date },

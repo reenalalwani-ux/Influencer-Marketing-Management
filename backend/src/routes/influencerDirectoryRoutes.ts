@@ -190,7 +190,15 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
     // Query with filters
     const filter: any = { isDeleted: { $ne: true } };
     if (category && category !== 'All') filter.category = category;
-    if (status && status !== 'All') filter.status = status;
+    if (status && status !== 'All') {
+      if (status === '0' || status === 'Active' || status === 'Available') {
+        filter.status = { $in: [0, '0', 'Active', 'Available', null] };
+      } else if (status === '1' || status === 'Inactive' || status === 'Blacklisted') {
+        filter.status = { $in: [1, '1', 'Inactive', 'Blacklisted'] };
+      } else {
+        filter.status = status;
+      }
+    }
     if (rating) filter.rating = { $gte: Number(rating) };
     if (minFollowers || maxFollowers) {
       filter.followersCount = {};
@@ -198,10 +206,14 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       if (maxFollowers) filter.followersCount.$lte = Number(maxFollowers);
     }
     if (search && typeof search === 'string' && search.trim()) {
-      const searchRegex = new RegExp(search.trim(), 'i');
+      const cleanSearch = search.trim().replace(/^@/, '');
+      const escaped = cleanSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = new RegExp(escaped, 'i');
       filter.$or = [
         { name: searchRegex },
         { instagramHandle: searchRegex },
+        { phone: searchRegex },
+        { email: searchRegex },
         { bio: searchRegex },
         { location: searchRegex },
         { nicheTags: { $in: [searchRegex] } }
@@ -212,9 +224,9 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
     const limitNum = Math.min(100, Math.max(1, Number(limit)));
     const skip = (pageNum - 1) * limitNum;
 
-    const [items, total, collabCounts] = await Promise.all([
+    const [items, total, collabCounts, uniqueCategories, avgEngagementAgg] = await Promise.all([
       InfluencerDirectory.find(filter)
-        .sort({ pastCollabsCount: -1, createdAt: -1 })
+        .sort({ createdAt: -1, updatedAt: -1 })
         .skip(skip)
         .limit(limitNum)
         .lean(),
@@ -227,6 +239,11 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
             brands: { $addToSet: '$brandName' }
           }
         }
+      ]),
+      InfluencerDirectory.distinct('category', { isDeleted: { $ne: true } }),
+      InfluencerDirectory.aggregate([
+        { $match: { isDeleted: { $ne: true }, engagementRate: { $gt: 0 } } },
+        { $group: { _id: null, avgRate: { $avg: '$engagementRate' } } }
       ])
     ]);
 
@@ -266,9 +283,17 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       };
     });
 
+    const totalCategoriesCount = uniqueCategories.filter(Boolean).length || 8;
+    const avgEngagement = avgEngagementAgg[0]?.avgRate ? Number(avgEngagementAgg[0].avgRate.toFixed(1)) : 4.8;
+
     res.json({
       success: true,
       items: enhancedItems,
+      stats: {
+        totalCreators: total,
+        categoriesCount: totalCategoriesCount,
+        avgEngagement
+      },
       pagination: {
         total,
         page: pageNum,
@@ -292,20 +317,41 @@ router.get('/:id/brands', authenticateToken, async (req: AuthRequest, res: Respo
       return res.status(404).json({ success: false, message: 'Influencer not found' });
     }
 
-    const cleanHandle = dirDoc.instagramHandle.replace(/^@/, '').trim();
-    const cleanName = dirDoc.name.trim();
+    const rawHandle = (dirDoc.instagramHandle || '').replace(/^@/, '').replace(/\s+/g, '').replace(/https?:\/\/(www\.)?instagram\.com\//i, '').replace(/\/.*$/, '').trim();
+    const rawName = (dirDoc.name || '').trim();
+    const plainName = rawName.replace(/[^\w\s]/gi, '').trim();
 
-    const collabs = await Influencer.find({
-      $or: [
-        { influencerInstagramId: new RegExp(`^@?${cleanHandle}$`, 'i') },
-        { influencerName: new RegExp(`^${cleanName}$`, 'i') }
-      ]
-    }).sort({ createdAt: -1 }).lean();
+    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    const queryOr: any[] = [];
+    if (rawHandle) {
+      queryOr.push({ influencerInstagramId: new RegExp(escapeRegex(rawHandle), 'i') });
+      queryOr.push({ profileLink: new RegExp(escapeRegex(rawHandle), 'i') });
+    }
+    if (rawName) {
+      queryOr.push({ influencerName: new RegExp(escapeRegex(rawName), 'i') });
+    }
+    if (plainName && plainName.length >= 3 && plainName !== rawName) {
+      queryOr.push({ influencerName: new RegExp(escapeRegex(plainName), 'i') });
+    }
+    if (dirDoc.phone && dirDoc.phone.trim()) {
+      const cleanPhone = dirDoc.phone.replace(/[^0-9]/g, '');
+      if (cleanPhone.length >= 7) {
+        queryOr.push({ phone: new RegExp(cleanPhone) });
+      }
+    }
+    if (dirDoc.email && dirDoc.email.trim()) {
+      queryOr.push({ email: dirDoc.email.trim().toLowerCase() });
+    }
+
+    let collabs = queryOr.length > 0
+      ? await Influencer.find({ $or: queryOr, isDeleted: { $ne: true } }).sort({ transactionDate: -1, createdAt: -1 }).lean()
+      : [];
 
     // Group by brand
     const brandMap = new Map<string, { brandName: string; count: number; categories: Set<string>; deals: any[] }>();
     collabs.forEach(c => {
-      const bName = (c.brandName || 'General Collab').trim();
+      const bName = (c.brandName || 'Collaborations').trim();
       if (!brandMap.has(bName)) {
         brandMap.set(bName, { brandName: bName, count: 0, categories: new Set(), deals: [] });
       }
@@ -331,6 +377,8 @@ router.get('/:id/brands', authenticateToken, async (req: AuthRequest, res: Respo
       deals: b.deals
     }));
 
+    const totalCollabsCount = collabs.length > 0 ? collabs.length : (dirDoc.pastCollabsCount || 0);
+
     res.json({
       success: true,
       influencer: {
@@ -342,9 +390,12 @@ router.get('/:id/brands', authenticateToken, async (req: AuthRequest, res: Respo
         email: dirDoc.email,
         status: dirDoc.status,
         rating: dirDoc.rating,
-        category: dirDoc.category
+        category: dirDoc.category,
+        pastCollabsCount: totalCollabsCount,
+        notes: dirDoc.notes || '',
+        source: dirDoc.source || 'Past Collab'
       },
-      totalCollabs: collabs.length,
+      totalCollabs: totalCollabsCount,
       uniqueBrandsCount: brandSummary.length,
       brands: brandSummary,
       allCollabs: collabs
@@ -631,7 +682,7 @@ router.post('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       phone: phone || '',
       profileLink: `https://www.instagram.com/${cleanHandle}/`,
       isVerified: liveProfile?.isVerified || Boolean(isVerified),
-      status: status || 'Available',
+      status: status !== undefined ? status : 0,
       rating: Number(rating) || 5,
       notes: notes || '',
       source: source || 'Manual Add',

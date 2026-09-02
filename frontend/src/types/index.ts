@@ -419,7 +419,7 @@ export interface InfluencerDirectoryItem {
   phone?: string;
   profileLink?: string;
   isVerified?: boolean;
-  status: 'Available' | 'Contacted' | 'In Discussion' | 'Blacklisted' | 'Preferred';
+  status?: 0 | 1 | string | number;
   rating?: number;
   notes?: string;
   source?: 'Manual' | 'API Discovery' | 'Past Collab' | 'Sheet Sync';
