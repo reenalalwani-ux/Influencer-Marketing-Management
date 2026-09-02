@@ -885,7 +885,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     setInfluencerManager(item.influencerManager || '');
     setBrandManagerTeam(item.brandManagerTeam || '');
     setInfluencerName(item.influencerName || '');
-    setInfluencerInstagramId(item.influencerInstagramId || '');
+    setInfluencerInstagramId(item.influencerInstagramId || item.profileLink || '');
     setSelectedBrandId(typeof item.brandId === 'object' ? item.brandId?._id : item.brandId || '');
     setCustomBrandName(item.brandName);
     setPhone(item.phone || '');
@@ -930,7 +930,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
       const cleanHandle = influencerInstagramId.trim();
       const cleanProfileLink = cleanHandle
         ? (cleanHandle.startsWith('http') ? cleanHandle : `https://instagram.com/${cleanHandle.replace(/^@/, '')}`)
-        : (profileLink.trim() || '');
+        : '';
 
       const payload = {
         influencerManager,
