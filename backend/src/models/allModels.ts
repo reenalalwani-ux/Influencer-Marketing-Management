@@ -414,6 +414,7 @@ export interface IInfluencer extends Document {
   moneyReceivedBy?: string;
   paymentDoneBy?: string;
   sheetRowIndex?: number;
+  googleSheetId?: string;
   createdBy?: mongoose.Types.ObjectId;
 }
 
@@ -426,7 +427,7 @@ const InfluencerSchema = new Schema<IInfluencer>({
   assignedExecutive: { type: String, default: '' },
   brandId: { type: Schema.Types.ObjectId, ref: 'Brand' },
   brandName: { type: String, required: true },
-  influencerName: { type: String, required: true },
+  influencerName: { type: String, default: '' },
   influencerInstagramId: { type: String, default: '' },
   phone: { type: String, default: '' },
   profileLink: { type: String, default: '' },
@@ -466,6 +467,7 @@ const InfluencerSchema = new Schema<IInfluencer>({
   notes: { type: String, default: '' },
   remark: { type: String, default: '' },
   sheetRowIndex: { type: Number },
+  googleSheetId: { type: String, default: '' },
   createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 

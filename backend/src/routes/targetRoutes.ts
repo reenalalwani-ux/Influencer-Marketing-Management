@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { Target, Influencer, Employee, EmployeeBrand, Brand } from '../models/allModels';
+import { Target, Influencer, Employee, EmployeeBrand, Brand, Department } from '../models/allModels';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 import { logActivity } from '../middleware/auditLog';
@@ -9,10 +9,23 @@ const router = Router();
 
 // Helper to get active team members in Influencer Marketing
 export const getActiveInfluencerMembers = async () => {
-  return await Employee.find({
+  const dept = await Department.findOne({ name: /influencer/i });
+  const deptIds: any[] = ['Influencer Marketing', 'Influencer'];
+  if (dept) deptIds.push(dept._id);
+
+  let members = await Employee.find({
     status: 'Active',
-    department: 'Influencer Marketing'
+    $or: [
+      { department: { $in: deptIds } },
+      { role: { $in: ['Employee', 'Influencer Executive', 'Team Leader', 'Influencer Marketer'] } }
+    ]
   }).sort({ employeeId: 1, name: 1 });
+
+  if (members.length === 0) {
+    members = await Employee.find({ status: 'Active' }).sort({ employeeId: 1, name: 1 });
+  }
+
+  return members;
 };
 
 // Helper to build date range filter from timeframe, year, month, or target period

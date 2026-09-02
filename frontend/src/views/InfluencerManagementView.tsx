@@ -2477,15 +2477,18 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                           <td className="p-3 border-r border-slate-100 min-w-[140px]">
                             {(() => {
                               const rawName = item.influencerName || '';
-                              // Clean name by removing (Barter) or (Paid) suffix from import
-                              const cleanName = rawName.replace(/\s*\((Barter|Paid)\)\s*/gi, '').trim() || rawName;
+                              const cleanName = rawName.replace(/\s*\((Barter|Paid)\)\s*/gi, '').trim();
                               const rawInsta = item.influencerInstagramId || (rawName.startsWith('@') ? rawName : item.profileLink) || '';
                               const instaHandle = rawInsta ? (rawInsta.startsWith('@') ? rawInsta : `@${rawInsta.replace(/https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/$/, '')}`) : '';
-                              const instaUrl = item.profileLink || (rawInsta.startsWith('http') ? rawInsta : `https://instagram.com/${rawInsta.replace(/^@/, '')}`);
+                              const instaUrl = item.profileLink || (rawInsta.startsWith('http') ? rawInsta : (rawInsta ? `https://instagram.com/${rawInsta.replace(/^@/, '')}` : ''));
+
+                              if (!cleanName && !instaHandle && !item.phone) {
+                                return <span className="text-slate-400 font-semibold text-[11px]">—</span>;
+                              }
 
                               return (
                                 <div>
-                                  <div className="font-extrabold text-slate-900 text-xs">{cleanName}</div>
+                                  {cleanName && <div className="font-extrabold text-slate-900 text-xs">{cleanName}</div>}
                                   {instaHandle && (
                                     <a
                                       href={instaUrl}
@@ -2596,7 +2599,11 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                               </td>
 
                               <td className="p-3 border-r border-slate-100 text-right font-bold text-slate-700">
-                                <div>{item.viewsCount || 0} views / {orders} orders</div>
+                                {item.viewsCount || orders ? (
+                                  <div>{item.viewsCount || 0} views / {orders} orders</div>
+                                ) : (
+                                  <span className="text-slate-400 font-semibold text-[11px]">—</span>
+                                )}
                                 {item.orderDate && (
                                   <div className="text-[10px] text-slate-400 font-normal">Order Date: {new Date(item.orderDate).toLocaleDateString()}</div>
                                 )}
@@ -2834,10 +2841,9 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-slate-700 mb-1 font-bold">Influencer Name *</label>
+                <label className="block text-slate-700 mb-1 font-bold">Influencer Name (Optional)</label>
                 <input
                   type="text"
-                  required
                   placeholder="e.g. Rahul Sharma"
                   value={influencerName}
                   onChange={(e) => setInfluencerName(e.target.value)}
@@ -2914,7 +2920,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-slate-700 mb-1 font-extrabold text-purple-900">Connection Date *</label>
+                <label className="block text-slate-700 mb-1 font-extrabold text-purple-900">Connection Date</label>
                 <input
                   type="date"
                   value={connectedDate}

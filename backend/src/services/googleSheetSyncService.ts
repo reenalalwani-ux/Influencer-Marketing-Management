@@ -106,7 +106,7 @@ function parseCSVLine(line: string): string[] {
 }
 
 // Core function to insert / upsert Barter records from row objects
-export async function processBarterRows(rows: Record<string, string>[]): Promise<number> {
+export async function processBarterRows(rows: Record<string, string>[], currentSheetId: string = ''): Promise<number> {
   let syncedCount = 0;
   const syncedDocIds: any[] = [];
 
@@ -136,11 +136,11 @@ export async function processBarterRows(rows: Record<string, string>[]): Promise
     const rawAssignee = getCol('Assigne', 'Assignee', 'Assigned To');
     const rawManager = getCol('BRAND MANAGER', 'Brand Manager', 'Manager Name', 'Manager');
     const rawTeam = getCol('Brand Manager Team', 'Manager Team', 'Team');
-    const categoryCol = getCol('Column 20', 'Category', 'TYPE', 'Type') || '';
-    const productLink = getCol('PRODUCT LINK', 'Product Link') || '';
-    const videoType = getCol('Type of Video', 'Video Type') || 'Single Product Video';
+    const categoryCol = getCol('Collab Type', 'Column 20', 'Category', 'TYPE', 'Type') || '';
+    const productLink = getCol('PRODUCT LINK', 'Product Link', 'Product link') || '';
+    const videoType = getCol('Type of Video', 'Type Of Video', 'Video Type') || 'Single Product Video';
     const videoDescription = getCol('video description', 'Video Description') || '';
-    const refVideoLink = getCol('REFRENCE VIDEO LINK', 'Reference Video Link', 'Ref Link') || '';
+    const refVideoLink = getCol('ReferanceVideo Link', 'Referance Video Link', 'REFRENCE VIDEO LINK', 'Reference Video Link', 'Ref Link') || '';
     const orderId = getCol('Order ID', 'OrderID', 'Order Id') || '';
 
     // Skip empty rows that have neither brandName, influencer name, orderId, productLink, nor videoDescription
@@ -162,13 +162,13 @@ export async function processBarterRows(rows: Record<string, string>[]): Promise
       }
     }
 
-    const managerName = matchedMemberName;
-    const managerTeam = matchedMemberName ? (rawTeam || rawManager) : '';
+    const managerName = rawAssignee || matchedMemberName || '';
+    const managerTeam = (rawAssignee && rawManager) ? rawManager : (rawTeam || rawManager || '');
 
-    const finalInfName = rawInfName || (orderId ? `Creator #${orderId}` : (brandName ? `${brandName} Creator` : 'Barter Creator'));
+    const finalInfName = rawInfName || '';
     const contentLink = getCol('CONTENT LINK', 'Content Link') || '';
     const adsCode = getCol('ADS CODE', 'Ads Code') || '';
-    const approvalRaw = getCol('Approved or not', 'Approved Or Not', 'Approval Status') || 'Pending';
+    const approvalRaw = getCol('Approved or not', 'Approved Or Not', 'Approval Status') || '';
     const reason = getCol('Reason', 'REASON', 'Remarks') || '';
     const remarkRaw = getCol('REMARK/ACCOUNT OWNER NAME', 'REMARK / ACCOUNT OWNER NAME', 'Account Owner Name', 'REMARK', 'Remark', 'Remarks') || '';
     const inAmtRaw = Number(getCol('IN', 'In', 'Brand Price', 'Brand Onboarding')) || 0;
@@ -176,9 +176,9 @@ export async function processBarterRows(rows: Record<string, string>[]): Promise
 
     const { moneyReceivedBy, paymentDoneBy } = parseAccountOwnerDetails(remarkRaw, inAmtRaw, outAmtRaw);
 
-    // Clean influencer name
-    const cleanInfName = finalInfName.replace(/\s*\((Barter|Paid)\)\s*/gi, '').trim() || finalInfName;
-    const instaId = finalInfName.startsWith('@') ? finalInfName : parseInstagramHandle(finalInfName);
+    // Clean influencer name (strictly from sheet only)
+    const cleanInfName = finalInfName.replace(/\s*\((Barter|Paid)\)\s*/gi, '').trim() || '';
+    const instaId = finalInfName ? (finalInfName.startsWith('@') ? finalInfName : parseInstagramHandle(finalInfName)) : '';
 
     const parsedRowDate = rowDateStr ? parseSheetDate(rowDateStr) : undefined;
     const transactionDate = parsedRowDate || new Date();
@@ -192,7 +192,7 @@ export async function processBarterRows(rows: Record<string, string>[]): Promise
     }
 
     // Map status
-    const statusRaw = getCol('STATUS', 'Status') || 'Pending';
+    const statusRaw = getCol('STATUS', 'Status') || '';
     let finalStatus: 'Pending' | 'In Discussion' | 'Parcel Sent' | 'Under Review' | 'Completed' | 'Settled' | 'Approved' = 'Pending';
     const lowerStat = statusRaw.toLowerCase();
     if (lowerStat.includes('completed') || lowerStat.includes('done')) finalStatus = 'Completed';
@@ -202,24 +202,28 @@ export async function processBarterRows(rows: Record<string, string>[]): Promise
     else if (lowerStat.includes('parcel') || lowerStat.includes('sent') || lowerStat.includes('dispatch')) finalStatus = 'Parcel Sent';
     else if (lowerStat.includes('discuss') || lowerStat.includes('talk') || lowerStat.includes('connect')) finalStatus = 'In Discussion';
 
-    // Unique match query per sheet row to prevent collapsing multiple deals of the same brand or shared order ID
     let existing: any = null;
-    existing = await Influencer.findOne({ category: 'Barter', sheetRowIndex: idx });
-    if (!existing && orderId && !orderId.toLowerCase().includes('directly')) {
-      existing = await Influencer.findOne({ category: 'Barter', orderId, brandName, productLink });
-    }
+    existing = await Influencer.findOne({ category: 'Barter', googleSheetId: currentSheetId, sheetRowIndex: idx });
 
     if (existing) {
-      existing.influencerManager = managerName || existing.influencerManager;
-      existing.brandManagerTeam = managerTeam || existing.brandManagerTeam;
-      existing.productLink = productLink || existing.productLink;
-      existing.videoType = videoType || existing.videoType;
-      existing.videoDescription = videoDescription || existing.videoDescription;
-      existing.refVideoLink = refVideoLink || existing.refVideoLink;
-      if (parsedRowDate) existing.orderDate = parsedRowDate;
+      existing.brandName = brandName || existing.brandName;
+      existing.influencerName = cleanInfName;
+      existing.influencerInstagramId = instaId;
+      existing.profileLink = instaId ? (instaId.startsWith('http') ? instaId : `https://instagram.com/${instaId.replace(/^@/, '')}`) : '';
+      existing.influencerManager = managerName;
+      existing.brandManagerTeam = managerTeam;
+      existing.productLink = productLink;
+      existing.videoType = videoType;
+      existing.videoDescription = videoDescription;
+      existing.refVideoLink = refVideoLink;
+      existing.orderId = orderId;
+      existing.orderDate = orderId && parsedRowDate ? parsedRowDate : undefined;
+      existing.viewsCount = 0;
+      existing.ordersCount = 0;
+      existing.ordersGenerated = 0;
+      existing.googleSheetId = currentSheetId;
       if (parsedRowDate) existing.transactionDate = parsedRowDate;
 
-      // PRESERVE PANEL STATUS: If team member updated status in our panel (e.g. Completed, Under Review, Settled), DO NOT overwrite back to Pending unless Google Sheet explicitly specifies "Done" or "Completed"
       if (finalStatus === 'Completed' || finalStatus === 'Approved') {
         existing.status = finalStatus;
         existing.isApproved = true;
@@ -227,18 +231,12 @@ export async function processBarterRows(rows: Record<string, string>[]): Promise
         existing.status = finalStatus;
       }
 
-      // PRESERVE CREATOR HANDLE: If team member entered a real Instagram handle or custom creator name, KEEP IT!
-      if (cleanInfName && !cleanInfName.endsWith('Creator') && !cleanInfName.startsWith('Creator #')) {
-        existing.influencerName = cleanInfName;
-        if (instaId) existing.influencerInstagramId = instaId;
-      }
-
-      if (contentLink) existing.contentLink = contentLink;
-      if (adsCode) existing.adsCode = adsCode;
-      if (reason) existing.reason = reason;
-      if (moneyReceivedBy) existing.moneyReceivedBy = moneyReceivedBy;
-      if (paymentDoneBy) existing.paymentDoneBy = paymentDoneBy;
-      if (remarkRaw) existing.remark = remarkRaw;
+      existing.contentLink = contentLink;
+      existing.adsCode = adsCode;
+      existing.reason = reason;
+      existing.moneyReceivedBy = moneyReceivedBy;
+      existing.paymentDoneBy = paymentDoneBy;
+      existing.remark = remarkRaw;
       existing.sheetRowIndex = idx;
 
       await existing.save();
@@ -254,7 +252,7 @@ export async function processBarterRows(rows: Record<string, string>[]): Promise
         brandName,
         influencerName: cleanInfName,
         influencerInstagramId: instaId,
-        profileLink: instaId.startsWith('http') ? instaId : (instaId ? `https://instagram.com/${instaId.replace(/^@/, '')}` : ''),
+        profileLink: instaId ? (instaId.startsWith('http') ? instaId : `https://instagram.com/${instaId.replace(/^@/, '')}`) : '',
         influencerManager: managerName,
         brandManagerTeam: managerTeam,
         productLink,
@@ -262,7 +260,7 @@ export async function processBarterRows(rows: Record<string, string>[]): Promise
         videoDescription,
         refVideoLink,
         orderId,
-        orderDate: parsedRowDate,
+        orderDate: orderId && parsedRowDate ? parsedRowDate : undefined,
         status: finalStatus,
         contentLink,
         adsCode,
@@ -273,6 +271,10 @@ export async function processBarterRows(rows: Record<string, string>[]): Promise
         paymentDoneBy,
         remark: remarkRaw,
         sheetRowIndex: idx,
+        googleSheetId: currentSheetId,
+        viewsCount: 0,
+        ordersCount: 0,
+        ordersGenerated: 0,
         brandOnboardingAmt: 0,
         brandReceivedAmt: 0,
         brandPendingAmt: 0,
@@ -289,15 +291,13 @@ export async function processBarterRows(rows: Record<string, string>[]): Promise
     }
   }
 
-  // Automatically remove older / dummy Barter records that do not exist in the Google Sheet
-  if (syncedDocIds.length > 0) {
-    const deleteResult = await Influencer.deleteMany({
+  // Scoped cleanup: Only remove stale rows belonging strictly to THIS specific Google Sheet ID
+  if (currentSheetId && syncedDocIds.length > 0) {
+    await Influencer.deleteMany({
       category: 'Barter',
+      googleSheetId: currentSheetId,
       _id: { $nin: syncedDocIds }
     });
-    if (deleteResult.deletedCount > 0) {
-      console.log(`[GoogleSheetSync] 🧹 Cleaned up ${deleteResult.deletedCount} old/unmatched Barter records.`);
-    }
   }
 
   return syncedCount;
@@ -350,8 +350,7 @@ export async function syncBarterFromGoogleSheet(): Promise<{
 }> {
   try {
     let config = await GoogleSheetConfig.findOne();
-    const FULL_VERIFIED_URL = 'https://script.google.com/macros/s/AKfycbwNv3pDStT-kRQ4zlQ9bB0snEfxqgZ--6BNarou3RNR3KWY6qebp4Uq94jerw7_5xJHaw/exec';
-    const defaultUrl = process.env.GOOGLE_SHEET_BARTER_URL || process.env.GOOGLE_SCRIPT_URL || process.env.GOOGLE_SHEET_CSV_URL || FULL_VERIFIED_URL;
+    const defaultUrl = process.env.GOOGLE_SHEET_BARTER_URL || process.env.GOOGLE_SCRIPT_URL || process.env.GOOGLE_SHEET_CSV_URL || '';
 
     if (!config) {
       config = await GoogleSheetConfig.create({
@@ -362,16 +361,20 @@ export async function syncBarterFromGoogleSheet(): Promise<{
       });
     }
 
-    // Auto-Fix: Overwrite broken/truncated URL (e.g. AKfycbzAbg) or docs.google.com link with verified full Apps Script URL
-    if (!config.sheetUrl || config.sheetUrl.includes('AKfycbzAbg') || config.sheetUrl.length < 50 || config.sheetUrl.includes('docs.google.com')) {
-      console.log('[GoogleSheetSync] Auto-correcting database sheetUrl to verified Google Script Web App URL...');
-      config.sheetUrl = defaultUrl.length > 50 ? defaultUrl : FULL_VERIFIED_URL;
-      await config.save();
-    }
-
-    const targetUrl = (config && config.sheetUrl && config.sheetUrl.trim().length > 40 && !config.sheetUrl.includes('AKfycbzAbg'))
+    const targetUrl = (config && config.sheetUrl && config.sheetUrl.trim().length > 10)
       ? config.sheetUrl.trim()
-      : FULL_VERIFIED_URL;
+      : defaultUrl;
+
+    if (!targetUrl || targetUrl.includes('AKfycbwNv3pDStT-kRQ4zlQ9bB0snEfxqgZ--6BNarou3RNR3KWY6qebp4Uq94jerw7_5xJHaw')) {
+      config.lastSyncStatus = 'IDLE';
+      config.lastSyncMessage = 'Waiting for new Google Sheet URL to be configured.';
+      await config.save();
+      return {
+        success: false,
+        syncedCount: 0,
+        message: 'No active Google Sheet URL configured. Please provide the new sheet URL.'
+      };
+    }
 
     // Check if Google Service Account is configured in backend/.env for PRIVATE Sheets!
     const sheetIdMatch = targetUrl ? targetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/) : null;
@@ -402,16 +405,15 @@ export async function syncBarterFromGoogleSheet(): Promise<{
       };
     }
 
+    let sheetId = '1efFGd5tlXCcqz-pS60Tz5jAkK70qttgd6OGUhi1TBdg';
     let fetchUrl = targetUrl;
     if (targetUrl.includes('docs.google.com/spreadsheets/d/')) {
       const matches = targetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
       if (matches && matches[1]) {
-        const sheetId = matches[1];
-        fetchUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+        sheetId = matches[1];
+        fetchUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=0`;
       }
     }
-
-
 
     console.log(`[GoogleSheetSync] Fetching Barter data from URL (${fetchUrl.slice(0, 45)}...)...`);
     
@@ -422,7 +424,6 @@ export async function syncBarterFromGoogleSheet(): Promise<{
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         response = await axios.get(fetchUrl, {
-          httpsAgent,
           timeout: 30000,
           maxRedirects: 10,
           headers: {
@@ -466,7 +467,7 @@ export async function syncBarterFromGoogleSheet(): Promise<{
       return { success: true, syncedCount: 0, message: 'Google Sheet checked (0 records)' };
     }
 
-    const syncedCount = await processBarterRows(rows);
+    const syncedCount = await processBarterRows(rows, sheetId);
 
     config.lastSyncedAt = new Date();
     config.lastSyncedCount = syncedCount;
