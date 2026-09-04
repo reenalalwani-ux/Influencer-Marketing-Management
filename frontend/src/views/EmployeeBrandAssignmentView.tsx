@@ -1,5 +1,5 @@
 import React, { useState, useEffect, FormEvent } from 'react';
-import { UserCheck, Plus, Trash2, Edit2, Briefcase, User as UserIcon, CheckSquare, Square, Search, X, Eye, Loader2, ArrowRightLeft, ChevronDown } from 'lucide-react';
+import { UserCheck, Plus, Trash2, Edit2, Briefcase, User as UserIcon, CheckSquare, Square, Search, X, Eye, Loader2, ArrowRightLeft, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { api } from '../services/api';
 import { Employee, Brand, EmployeeBrandAssignment, User } from '../types';
 import { Modal } from '../components/Modal';
@@ -34,6 +34,19 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
   const [savingAssignments, setSavingAssignments] = useState(false);
   const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
   const [viewingGroup, setViewingGroup] = useState<GroupedAssignment | null>(null);
+  const [expandedMemberIds, setExpandedMemberIds] = useState<Set<string>>(new Set());
+
+  const toggleExpandBrands = (employeeId: string) => {
+    setExpandedMemberIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(employeeId)) {
+        next.delete(employeeId);
+      } else {
+        next.add(employeeId);
+      }
+      return next;
+    });
+  };
 
   // Form states
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
@@ -297,15 +310,41 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
     });
   };
 
-  const handleToggleStatus = async (group: GroupedAssignment) => {
+  // Status Change Confirmation Modal State
+  const [statusModalState, setStatusModalState] = useState<{
+    isOpen: boolean;
+    group: GroupedAssignment | null;
+    loading: boolean;
+  }>({
+    isOpen: false,
+    group: null,
+    loading: false
+  });
+
+  const requestToggleStatus = (group: GroupedAssignment) => {
+    setStatusModalState({
+      isOpen: true,
+      group,
+      loading: false
+    });
+  };
+
+  const confirmToggleStatus = async () => {
+    if (!statusModalState.group) return;
+    const group = statusModalState.group;
     const newStatus = group.status === 'Active' ? 'Removed' : 'Active';
+
+    setStatusModalState(prev => ({ ...prev, loading: true }));
     try {
       await Promise.all(
         group.assignments.map(a => api.put(`/employee-brands/${a._id}`, { status: newStatus }))
       );
+      setStatusModalState({ isOpen: false, group: null, loading: false });
       fetchData();
     } catch (err: any) {
       console.error('Failed to update status', err);
+      alert(err.message || 'Failed to update status');
+      setStatusModalState(prev => ({ ...prev, loading: false }));
     }
   };
 
@@ -330,6 +369,15 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
 
   const columns: DataTableColumn<GroupedAssignment>[] = [
     {
+      key: 'sno',
+      label: 'S.No',
+      width: 'w-14',
+      align: 'center',
+      render: (_, __, idx) => (
+        <span className="font-bold text-slate-400 text-xs">{idx + 1}</span>
+      ),
+    },
+    {
       key: 'employee',
       label: 'Member',
       sortable: true,
@@ -349,27 +397,58 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
       key: 'brands',
       label: 'Assigned Brands',
       sortable: false,
-      render: (_, row) => (
-        <div className="flex flex-wrap items-center gap-1.5 py-1">
-          {row.brands.map((b) => (
-            <span
-              key={b._id}
-              onClick={() => !isEmployeeRole && openTransferModal(b._id, row.employeeId)}
-              className={`px-2.5 py-1 rounded-xl text-xs font-extrabold bg-purple-50 text-purple-800 border border-purple-200 flex items-center gap-1.5 shadow-2xs ${!isEmployeeRole ? 'cursor-pointer hover:bg-purple-100 hover:border-purple-300 transition' : ''}`}
-              title={!isEmployeeRole ? `Click to Transfer "${b.brandName}" to another member` : undefined}
-            >
-              <Briefcase size={12} className="text-purple-600 shrink-0" />
-              <span>{b.brandName}</span>
-              {!isEmployeeRole && (
-                <ArrowRightLeft size={11} className="text-purple-400 hover:text-purple-700 ml-0.5" />
-              )}
-            </span>
-          ))}
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-100 text-slate-500 border border-slate-200">
-            {row.brands.length} {row.brands.length === 1 ? 'Brand' : 'Brands'}
-          </span>
-        </div>
-      ),
+      render: (_, row) => {
+        if (!row.brands || row.brands.length === 0) {
+          return <span className="text-slate-400 text-xs italic">No brands assigned</span>;
+        }
+
+        const isExpanded = expandedMemberIds.has(row.employeeId);
+        const MAX_PREVIEW = 3;
+        const hasMore = row.brands.length > MAX_PREVIEW;
+        const visibleBrands = hasMore && !isExpanded ? row.brands.slice(0, MAX_PREVIEW) : row.brands;
+        const remainingCount = row.brands.length - MAX_PREVIEW;
+
+        return (
+          <div className="flex flex-wrap items-center gap-1.5 py-1">
+            {visibleBrands.map((b) => (
+              <span
+                key={b._id}
+                onClick={() => !isEmployeeRole && openTransferModal(b._id, row.employeeId)}
+                className={`group/badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-50 hover:bg-purple-50 text-slate-700 hover:text-purple-800 border border-slate-200/90 hover:border-purple-300 transition-all shadow-2xs ${
+                  !isEmployeeRole ? 'cursor-pointer' : ''
+                }`}
+                title={!isEmployeeRole ? `Click to Transfer "${b.brandName}" to another member` : b.brandName}
+              >
+                <Briefcase size={11} className="text-purple-600 shrink-0 opacity-80 group-hover/badge:opacity-100" />
+                <span className="max-w-[130px] truncate">{b.brandName}</span>
+                {!isEmployeeRole && (
+                  <ArrowRightLeft size={10} className="text-slate-400 group-hover/badge:text-purple-600 shrink-0 transition" />
+                )}
+              </span>
+            ))}
+
+            {hasMore && (
+              <button
+                type="button"
+                onClick={() => toggleExpandBrands(row.employeeId)}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs border ${
+                  isExpanded
+                    ? 'bg-purple-100 hover:bg-purple-200 text-purple-800 border-purple-300'
+                    : 'bg-slate-100 hover:bg-purple-100 text-slate-600 hover:text-purple-800 border-slate-200 hover:border-purple-300'
+                }`}
+                title={isExpanded ? 'Show less brands' : `Show ${remainingCount} more brands`}
+              >
+                <span>{isExpanded ? 'Show Less' : `+${remainingCount} More`}</span>
+                {isExpanded ? (
+                  <ChevronUp size={12} className="text-purple-700" />
+                ) : (
+                  <ChevronDown size={12} className="text-slate-500" />
+                )}
+              </button>
+            )}
+          </div>
+        );
+      },
     },
     { key: 'responsibility', label: 'Responsibility', sortable: false },
     {
@@ -393,12 +472,12 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
         return (
           <button
             type="button"
-            onClick={() => handleToggleStatus(row)}
+            onClick={() => requestToggleStatus(row)}
             className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isActive ? 'bg-teal-600' : 'bg-slate-300'
               }`}
             role="switch"
             aria-checked={isActive}
-            title={isActive ? 'Active (Click to disable)' : 'Removed (Click to enable)'}
+            title={isActive ? 'Active (Click to deactivate)' : 'Deactivated (Click to activate)'}
           >
             <span
               className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${isActive ? 'translate-x-5' : 'translate-x-0'
@@ -1091,6 +1170,94 @@ export const EmployeeBrandAssignmentView: React.FC<EmployeeBrandAssignmentViewPr
         warningMessage="This will deactivate all brand assignments currently assigned to this executive."
         loading={deleteModalState.loading}
       />
+
+      {/* STATUS CHANGE CONFIRMATION MODAL PANEL */}
+      <Modal
+        isOpen={statusModalState.isOpen}
+        onClose={() => {
+          if (!statusModalState.loading) {
+            setStatusModalState({ isOpen: false, group: null, loading: false });
+          }
+        }}
+        title={statusModalState.group?.status === 'Active' ? 'Confirm Deactivation' : 'Confirm Activation'}
+        maxWidth="max-w-md"
+      >
+        {statusModalState.group && (
+          <div className="space-y-4 text-xs">
+            {statusModalState.group.status === 'Active' ? (
+              <div className="flex items-start space-x-3.5 p-4 bg-amber-50/80 border border-amber-200/80 rounded-2xl">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center font-bold shrink-0 shadow-2xs">
+                  <AlertTriangle size={20} className="text-amber-600" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-extrabold text-slate-900 text-sm">Deactivate Brand Assignments?</h4>
+                  <p className="text-slate-600 font-medium leading-relaxed">
+                    Are you sure you want to deactivate brand assignments for{' '}
+                    <strong className="text-slate-900 font-bold">{statusModalState.group.employee?.name || 'Member'}</strong>
+                    {statusModalState.group.brands.length > 0 && (
+                      <> ({statusModalState.group.brands.length} assigned {statusModalState.group.brands.length === 1 ? 'brand' : 'brands'})</>
+                    )}?
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start space-x-3.5 p-4 bg-teal-50/80 border border-teal-200/80 rounded-2xl">
+                <div className="w-10 h-10 rounded-2xl bg-teal-100 text-teal-600 flex items-center justify-center font-bold shrink-0 shadow-2xs">
+                  <CheckCircle2 size={20} className="text-teal-600" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-extrabold text-slate-900 text-sm">Activate Brand Assignments?</h4>
+                  <p className="text-slate-600 font-medium leading-relaxed">
+                    Are you sure you want to activate brand assignments for{' '}
+                    <strong className="text-slate-900 font-bold">{statusModalState.group.employee?.name || 'Member'}</strong>
+                    {statusModalState.group.brands.length > 0 && (
+                      <> ({statusModalState.group.brands.length} assigned {statusModalState.group.brands.length === 1 ? 'brand' : 'brands'})</>
+                    )}?
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 font-medium text-[11px]">
+              {statusModalState.group.status === 'Active'
+                ? 'This will pause active brand assignments for this team member. You can reactivate them at any time.'
+                : 'This will restore active brand assignments and operational access for this team member.'}
+            </div>
+
+            <div className="flex justify-end items-center space-x-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setStatusModalState({ isOpen: false, group: null, loading: false })}
+                disabled={statusModalState.loading}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition text-xs border border-slate-200 cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmToggleStatus}
+                disabled={statusModalState.loading}
+                className={`px-5 py-2 text-white rounded-xl font-bold transition text-xs shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer ${
+                  statusModalState.group.status === 'Active'
+                    ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/20'
+                    : 'bg-teal-600 hover:bg-teal-700 shadow-teal-600/20'
+                }`}
+              >
+                {statusModalState.loading ? (
+                  <>
+                    <Loader2 size={13} className="animate-spin" />
+                    <span>Updating...</span>
+                  </>
+                ) : (
+                  <span>
+                    {statusModalState.group.status === 'Active' ? 'Yes, Deactivate' : 'Yes, Activate'}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };
