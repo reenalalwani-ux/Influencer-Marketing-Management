@@ -135,8 +135,10 @@ router.get('/matrix', authenticateToken, checkPermission('posting.view'), async 
     const endOfMonth = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59);
     const daysInMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
 
-    // Fetch active employees
-    const employees = await Employee.find({ status: 'Active' }).sort({ name: 1 });
+    // Fetch active employees with department populated
+    const employees = await Employee.find({ status: 'Active', isDeleted: { $ne: true } })
+      .populate('department', 'name code description status')
+      .sort({ name: 1 });
 
     // Determine target employee
     let targetEmployeeId = employeeId as string;

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   Users, Search, Filter, Plus, ExternalLink, Instagram, Phone, Mail,
   Star, Award, TrendingUp, Sparkles, CheckCircle2, Bookmark, Check, X,
@@ -187,6 +187,77 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
     });
   };
 
+  // Multi-Select & Bulk Delete State
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectAllFiltered, setSelectAllFiltered] = useState<boolean>(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState<boolean>(false);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState<boolean>(false);
+
+  const allPageIds = useMemo(() => {
+    return directoryItems.map(d => d._id).filter(Boolean) as string[];
+  }, [directoryItems]);
+
+  const isAllPageSelected = useMemo(() => {
+    if (allPageIds.length === 0) return false;
+    return allPageIds.every(id => selectedIds.includes(id));
+  }, [allPageIds, selectedIds]);
+
+  const isSomePageSelected = useMemo(() => {
+    if (allPageIds.length === 0) return false;
+    return allPageIds.some(id => selectedIds.includes(id)) && !isAllPageSelected;
+  }, [allPageIds, selectedIds, isAllPageSelected]);
+
+  const handleSelectAllOnPage = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(prev => Array.from(new Set([...prev, ...allPageIds])));
+    } else {
+      setSelectedIds(prev => prev.filter(id => !allPageIds.includes(id)));
+      setSelectAllFiltered(false);
+    }
+  };
+
+  const handleToggleSelectRow = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedIds(prev => {
+      if (prev.includes(id)) {
+        setSelectAllFiltered(false);
+        return prev.filter(x => x !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
+  };
+
+  const handleClearSelection = () => {
+    setSelectedIds([]);
+    setSelectAllFiltered(false);
+  };
+
+  const handleSelectAllMatching = () => {
+    setSelectAllFiltered(true);
+  };
+
+  const handleConfirmBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    setIsBulkDeleting(true);
+    try {
+      const res = await api.post('/influencer-directory/bulk-delete', { ids: selectedIds });
+      if (res.success) {
+        showToast(`Successfully deleted ${res.deletedCount || selectedIds.length} creator(s) from directory.`);
+        setSelectedIds([]);
+        setSelectAllFiltered(false);
+        setShowBulkDeleteModal(false);
+        fetchDirectory();
+      } else {
+        showToast(`Error: ${res.message || 'Failed to delete'}`);
+      }
+    } catch (err: any) {
+      showToast(`Error: ${err.message || 'Failed to delete selected creators'}`);
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   // Single Influencer Instagram Sync Handler
   const [syncingId, setSyncingId] = useState<string | null>(null);
 
@@ -348,10 +419,39 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
 
   const columns: DataTableColumn<InfluencerDirectoryItem>[] = [
     {
+      key: 'select',
+      label: (
+        <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={isAllPageSelected}
+            ref={(el) => {
+              if (el) el.indeterminate = isSomePageSelected;
+            }}
+            onChange={(e) => handleSelectAllOnPage(e.target.checked)}
+            className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500 cursor-pointer transition accent-purple-600"
+            title={isAllPageSelected ? 'Deselect all on this page' : 'Select all on this page'}
+          />
+        </div>
+      ),
+      align: 'center',
+      width: '46px',
+      render: (_, row) => (
+        <div className="flex items-center justify-center py-1" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={selectedIds.includes(row._id || '')}
+            onChange={() => handleToggleSelectRow(row._id || '')}
+            className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500 cursor-pointer transition accent-purple-600"
+          />
+        </div>
+      )
+    },
+    {
       key: 'sno',
       label: 'S.NO',
       align: 'center',
-      width: '70px',
+      width: '60px',
       render: (_, __, index) => (
         <span className="font-bold text-slate-500 text-xs">
           {(currentPage - 1) * pageSize + index + 1}
@@ -663,6 +763,53 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
           </div>
         </div>
 
+        {/* Light Themed Bulk Action Toolbar */}
+        {selectedIds.length > 0 && (
+          <div className="sticky top-4 z-30 mb-2 bg-purple-50/95 backdrop-blur-md border border-purple-200/90 rounded-2xl p-3 shadow-md flex flex-wrap items-center justify-between gap-3 animate-fade-in transition-all">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-purple-600 text-white font-black text-xs shadow-2xs">
+                <CheckCircle2 size={14} />
+                <span>{selectAllFiltered ? totalItems : selectedIds.length} Selected</span>
+              </div>
+
+              {totalItems > directoryItems.length && !selectAllFiltered && (
+                <button
+                  type="button"
+                  onClick={handleSelectAllMatching}
+                  className="text-xs font-extrabold text-purple-700 hover:text-purple-900 underline hover:no-underline cursor-pointer transition"
+                >
+                  Select all {totalItems} creators
+                </button>
+              )}
+
+              {selectAllFiltered && (
+                <span className="text-xs font-bold text-purple-700">
+                  All {totalItems} creators across all pages selected
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleClearSelection}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs cursor-pointer transition shadow-2xs"
+              >
+                Clear Selection
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowBulkDeleteModal(true)}
+                className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs inline-flex items-center gap-1.5 shadow-sm shadow-rose-600/20 cursor-pointer transition"
+              >
+                <Trash2 size={14} />
+                <span>Delete Selected ({selectAllFiltered ? totalItems : selectedIds.length})</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Directory Content List */}
         {loadingDirectory ? (
           <div className="py-16 text-center bg-white rounded-3xl border border-slate-200">
@@ -936,6 +1083,18 @@ export const InfluencerDirectoryView: React.FC<InfluencerDirectoryViewProps> = (
         itemName={deleteModalState.itemName}
         warningMessage={deleteModalState.warningMessage}
         loading={deleteModalState.loading}
+      />
+
+      {/* BULK DELETE CONFIRMATION MODAL */}
+      <ConfirmDeleteModal
+        isOpen={showBulkDeleteModal}
+        onClose={() => setShowBulkDeleteModal(false)}
+        onConfirm={handleConfirmBulkDelete}
+        title="Bulk Remove Influencers"
+        itemType="influencer(s)"
+        itemName={`${selectAllFiltered ? totalItems : selectedIds.length} selected creator(s)`}
+        warningMessage="These creator profiles will be soft-deleted and removed from the active influencer directory."
+        loading={isBulkDeleting}
       />
     </div>
   );

@@ -85,7 +85,7 @@ export const buildDateFilter = (timeframe?: string, year?: string | number, mont
 export const recalculateTargetProgress = async (target: any, customDateFilter?: any, shouldSave: boolean = false) => {
   if (!target) return target;
 
-  let filter: any = {};
+  let filter: any = { isDeleted: { $ne: true } };
   if (customDateFilter && customDateFilter.transactionDate) {
     filter.transactionDate = customDateFilter.transactionDate;
   } else if (customDateFilter && customDateFilter.$and) {
@@ -193,8 +193,8 @@ router.get('/team-breakdown', authenticateToken, checkPermission('target.view'),
       Target.findOne({ isActive: true, status: 'Active', targetType: 'Paid' }).sort({ updatedAt: -1 }).lean(),
       Brand.find().lean(),
       EmployeeBrand.find({ status: 'Active' }).lean(),
-      Influencer.find({ category: 'Paid', status: { $in: ['Completed', 'Approved', 'Settled', 'completed', 'approved', 'settled'] }, ...dateFilter }).sort({ transactionDate: -1 }).lean(),
-      Influencer.find({ category: 'Barter', status: { $in: ['Completed', 'Approved', 'Settled', 'completed', 'approved', 'settled'] }, ...dateFilter }).sort({ transactionDate: -1 }).lean()
+      Influencer.find({ category: 'Paid', isDeleted: { $ne: true }, status: { $in: ['Completed', 'Approved', 'Settled', 'completed', 'approved', 'settled'] }, ...dateFilter }).sort({ transactionDate: -1 }).lean(),
+      Influencer.find({ category: 'Barter', isDeleted: { $ne: true }, status: { $in: ['Completed', 'Approved', 'Settled', 'completed', 'approved', 'settled'] }, ...dateFilter }).sort({ transactionDate: -1 }).lean()
     ]);
 
     const teamSize = members.length;

@@ -738,6 +738,96 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res: Response) =>
   }
 });
 
+// POST /api/v1/influencer-directory/bulk-delete
+router.post('/bulk-delete', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, message: 'Please provide an array of influencer IDs to delete' });
+    }
+
+    const records = await InfluencerDirectory.find({ _id: { $in: ids }, isDeleted: { $ne: true } });
+    if (records.length === 0) {
+      return res.status(404).json({ success: false, message: 'No active influencers found matching the provided IDs' });
+    }
+
+    const now = new Date();
+    await InfluencerDirectory.updateMany(
+      { _id: { $in: ids }, isDeleted: { $ne: true } },
+      {
+        $set: {
+          isDeleted: true,
+          deletedAt: now,
+          deletedBy: req.user?._id
+        }
+      }
+    );
+
+    await logActivity({
+      userId: req.user?._id,
+      userName: req.user?.name || 'System User',
+      userRole: req.user?.role,
+      action: 'BULK_DELETE_INFLUENCER_DIRECTORY',
+      module: 'InfluencerDirectory',
+      entity: 'InfluencerDirectory',
+      details: `Soft-deleted ${records.length} influencer(s) from directory`
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully removed ${records.length} influencer(s) from directory`,
+      deletedCount: records.length
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, message: error.message || 'Failed to bulk delete influencers' });
+  }
+});
+
+// DELETE /api/v1/influencer-directory/bulk-delete
+router.delete('/bulk-delete', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, message: 'Please provide an array of influencer IDs to delete' });
+    }
+
+    const records = await InfluencerDirectory.find({ _id: { $in: ids }, isDeleted: { $ne: true } });
+    if (records.length === 0) {
+      return res.status(404).json({ success: false, message: 'No active influencers found matching the provided IDs' });
+    }
+
+    const now = new Date();
+    await InfluencerDirectory.updateMany(
+      { _id: { $in: ids }, isDeleted: { $ne: true } },
+      {
+        $set: {
+          isDeleted: true,
+          deletedAt: now,
+          deletedBy: req.user?._id
+        }
+      }
+    );
+
+    await logActivity({
+      userId: req.user?._id,
+      userName: req.user?.name || 'System User',
+      userRole: req.user?.role,
+      action: 'BULK_DELETE_INFLUENCER_DIRECTORY',
+      module: 'InfluencerDirectory',
+      entity: 'InfluencerDirectory',
+      details: `Soft-deleted ${records.length} influencer(s) from directory`
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully removed ${records.length} influencer(s) from directory`,
+      deletedCount: records.length
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, message: error.message || 'Failed to bulk delete influencers' });
+  }
+});
+
 // DELETE /api/v1/influencer-directory/:id
 router.delete('/:id', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {

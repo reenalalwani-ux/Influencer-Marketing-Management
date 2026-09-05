@@ -27,6 +27,54 @@ router.get('/', authenticateToken, checkPermission('brand.view'), async (req: Au
       }
     }
 
+    // Brand type filtering
+    const brandType = req.query.brandType ? String(req.query.brandType).trim() : '';
+    if (brandType && brandType !== 'All') {
+      filter.brandType = brandType;
+    }
+
+    // Global Search across brandName, brandId, industry, contactPerson, email, phone, website, and assigned executive
+    const search = req.query.search ? String(req.query.search).trim() : '';
+    if (search) {
+      const searchRegex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+
+      // Also search assigned employees matching name or email
+      const matchingEmployees = await Employee.find({
+        $or: [{ name: searchRegex }, { email: searchRegex }],
+        isDeleted: { $ne: true }
+      }, '_id');
+      const matchingEmpIds = matchingEmployees.map(e => e._id);
+      let brandIdsFromEmp: any[] = [];
+      if (matchingEmpIds.length > 0) {
+        const empBrands = await EmployeeBrand.find({ employeeId: { $in: matchingEmpIds }, status: 'Active' });
+        brandIdsFromEmp = empBrands.map(eb => eb.brandId);
+      }
+
+      const orConditions: any[] = [
+        { brandName: searchRegex },
+        { brandId: searchRegex },
+        { industry: searchRegex },
+        { contactPerson: searchRegex },
+        { email: searchRegex },
+        { phone: searchRegex },
+        { website: searchRegex }
+      ];
+
+      if (brandIdsFromEmp.length > 0) {
+        orConditions.push({ _id: { $in: brandIdsFromEmp } });
+      }
+
+      if (filter.$and) {
+        filter.$and.push({ $or: orConditions });
+      } else if (filter._id) {
+        const existingIdFilter = filter._id;
+        delete filter._id;
+        filter.$and = [{ _id: existingIdFilter }, { $or: orConditions }];
+      } else {
+        filter.$or = orConditions;
+      }
+    }
+
     const totalCount = await Brand.countDocuments(filter);
     const pageNum = req.query.page ? Math.max(1, Number(req.query.page)) : undefined;
     const limitNum = req.query.limit ? Math.max(1, Number(req.query.limit)) : 10;

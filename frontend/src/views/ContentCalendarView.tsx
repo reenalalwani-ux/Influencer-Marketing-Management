@@ -124,16 +124,17 @@ const CustomMonthDropdown: React.FC<{
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const months = [
-    { value: 7, label: 'July 2026' },
-    { value: 8, label: 'August 2026' },
-    { value: 9, label: 'September 2026' },
-    { value: 10, label: 'October 2026' },
-    { value: 11, label: 'November 2026' },
-    { value: 12, label: 'December 2026' },
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
-  const activeMonthLabel = months.find(m => m.value === currentMonth)?.label || `${currentMonth}/${currentYear}`;
+  const months = monthNames.map((name, index) => ({
+    value: index + 1,
+    label: `${name} ${currentYear}`
+  }));
+
+  const activeMonthLabel = months.find(m => m.value === currentMonth)?.label || `${monthNames[currentMonth - 1] || currentMonth} ${currentYear}`;
 
   return (
     <div className="relative inline-block text-left" ref={dropdownRef}>
@@ -643,8 +644,9 @@ export const ContentCalendarView: React.FC<ContentCalendarViewProps> = ({ curren
   const [selectedDesignerFilter, setSelectedDesignerFilter] = useState<string>('All');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('All');
   const [selectedFortnight, setSelectedFortnight] = useState<string>('All');
-  const [currentYear, setCurrentYear] = useState<number>(2026);
-  const [currentMonth, setCurrentMonth] = useState<number>(8); // August (1-indexed)
+  const now = new Date();
+  const [currentYear, setCurrentYear] = useState<number>(now.getFullYear());
+  const [currentMonth, setCurrentMonth] = useState<number>(now.getMonth() + 1); // Current Month (1-indexed, e.g. 9 for September)
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [viewMode, setViewMode] = useState<'Spreadsheet Grid' | 'List View'>('Spreadsheet Grid');
 
@@ -659,8 +661,8 @@ export const ContentCalendarView: React.FC<ContentCalendarViewProps> = ({ curren
   const [creatingCycleLoading, setCreatingCycleLoading] = useState(false);
   const [newCalBrandId, setNewCalBrandId] = useState('');
   const [newCalBrandName, setNewCalBrandName] = useState('');
-  const [newCalMonth, setNewCalMonth] = useState(8);
-  const [newCalYear, setNewCalYear] = useState(2026);
+  const [newCalMonth, setNewCalMonth] = useState(now.getMonth() + 1);
+  const [newCalYear, setNewCalYear] = useState(now.getFullYear());
   const [newCalFortnight, setNewCalFortnight] = useState('1st-15th');
   const [newCalTypeOfPost, setNewCalTypeOfPost] = useState('Intro Post');
   const [newCalPlatforms, setNewCalPlatforms] = useState<string[]>(['Instagram']);
@@ -2110,14 +2112,11 @@ export const ContentCalendarView: React.FC<ContentCalendarViewProps> = ({ curren
                 <CustomModalSelect
                   value={newCalMonth}
                   onChange={(val) => { setNewCalMonth(Number(val)); setNewCalCustomDays([]); }}
-                  options={[
-                    { value: 7, label: 'July 2026', icon: '📅' },
-                    { value: 8, label: 'August 2026', icon: '📅' },
-                    { value: 9, label: 'September 2026', icon: '📅' },
-                    { value: 10, label: 'October 2026', icon: '📅' },
-                    { value: 11, label: 'November 2026', icon: '📅' },
-                    { value: 12, label: 'December 2026', icon: '📅' },
-                  ]}
+                  options={Array.from({ length: 12 }, (_, i) => {
+                    const mNum = i + 1;
+                    const mName = new Date(newCalYear, i).toLocaleString('en-US', { month: 'long' });
+                    return { value: mNum, label: `${mName} ${newCalYear}`, icon: '📅' };
+                  })}
                 />
               </div>
             </div>

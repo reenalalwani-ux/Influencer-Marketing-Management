@@ -239,8 +239,10 @@ export const PostingCalendarView: React.FC<PostingCalendarViewProps> = ({ curren
                   <span>{currentUser?.name || 'Gunjan'}</span>
                   <span className="text-[10px] text-purple-700 font-semibold bg-purple-200/80 px-2 py-0.5 rounded-md">
                     {(() => {
-                      const dept = matrixEmployees.find(e => e._id === selectedEmployeeId)?.department;
-                      return typeof dept === 'object' && dept ? (dept as any).name : (dept || 'Influencer Marketing');
+                      const dept: any = matrixEmployees.find(e => e._id === selectedEmployeeId)?.department;
+                      if (dept && typeof dept === 'object') return dept.name || 'Influencer Marketing';
+                      if (typeof dept === 'string' && /^[a-f\d]{24}$/i.test(dept)) return 'Influencer Marketing';
+                      return dept || 'Influencer Marketing';
                     })()}
                   </span>
                 </div>
@@ -252,7 +254,7 @@ export const PostingCalendarView: React.FC<PostingCalendarViewProps> = ({ curren
 
                 <button
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="px-4 py-2 bg-slate-50 border border-slate-200 hover:border-purple-400 rounded-xl text-xs font-bold text-slate-900 flex items-center justify-between gap-3 min-w-[260px] shadow-2xs transition"
+                  className="px-4 py-2 bg-slate-50 border border-slate-200 hover:border-purple-400 rounded-xl text-xs font-bold text-slate-900 flex items-center justify-between gap-3 min-w-[260px] shadow-2xs transition cursor-pointer"
                 >
                   <div className="flex items-center space-x-2 truncate">
                     <span className="truncate">
@@ -261,8 +263,10 @@ export const PostingCalendarView: React.FC<PostingCalendarViewProps> = ({ curren
                     {matrixEmployees.find(e => e._id === selectedEmployeeId) && (
                       <span className="text-[10px] text-purple-600 font-semibold bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200 truncate">
                         {(() => {
-                          const dept = matrixEmployees.find(e => e._id === selectedEmployeeId)?.department;
-                          return typeof dept === 'object' && dept ? (dept as any).name : (dept || 'Staff');
+                          const dept: any = matrixEmployees.find(e => e._id === selectedEmployeeId)?.department;
+                          if (dept && typeof dept === 'object') return dept.name || 'Staff';
+                          if (typeof dept === 'string' && /^[a-f\d]{24}$/i.test(dept)) return 'Influencer Marketing';
+                          return dept || 'Staff';
                         })()}
                       </span>
                     )}
@@ -288,7 +292,8 @@ export const PostingCalendarView: React.FC<PostingCalendarViewProps> = ({ curren
                     {/* Staff List Options */}
                     <div className="max-h-60 overflow-y-auto space-y-1 pr-1">
                       {matrixEmployees.filter(emp => {
-                        const deptName = typeof emp.department === 'object' && emp.department ? (emp.department as any).name : (emp.department || '');
+                        const dept: any = emp.department;
+                        const deptName = dept && typeof dept === 'object' ? (dept.name || '') : (typeof dept === 'string' && /^[a-f\d]{24}$/i.test(dept) ? 'Influencer Marketing' : (dept || ''));
                         return emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
                           deptName.toLowerCase().includes(employeeSearchTerm.toLowerCase());
                       }).length === 0 ? (
@@ -298,32 +303,37 @@ export const PostingCalendarView: React.FC<PostingCalendarViewProps> = ({ curren
                       ) : (
                         matrixEmployees
                           .filter(emp => {
-                            const deptName = typeof emp.department === 'object' && emp.department ? (emp.department as any).name : (emp.department || '');
+                            const dept: any = emp.department;
+                            const deptName = dept && typeof dept === 'object' ? (dept.name || '') : (typeof dept === 'string' && /^[a-f\d]{24}$/i.test(dept) ? 'Influencer Marketing' : (dept || ''));
                             return emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
                               deptName.toLowerCase().includes(employeeSearchTerm.toLowerCase());
                           })
-                          .map((emp) => (
-                            <button
-                              key={emp._id}
-                              onClick={() => {
-                                setSelectedEmployeeId(emp._id);
-                                setIsDropdownOpen(false);
-                                setEmployeeSearchTerm('');
-                              }}
-                              className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition flex items-center justify-between ${
-                                selectedEmployeeId === emp._id
-                                  ? 'bg-purple-600 text-white shadow-xs'
-                                  : 'text-slate-800 hover:bg-purple-50 hover:text-purple-700'
-                              }`}
-                            >
-                              <span className="truncate">{emp.name}</span>
-                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
-                                selectedEmployeeId === emp._id ? 'bg-purple-700 text-purple-100' : 'bg-slate-100 text-slate-500'
-                              }`}>
-                                {typeof emp.department === 'object' && emp.department ? (emp.department as any).name : (emp.department || 'Staff')}
-                              </span>
-                            </button>
-                          ))
+                          .map((emp) => {
+                            const dept: any = emp.department;
+                            const deptLabel = dept && typeof dept === 'object' ? (dept.name || 'Staff') : (typeof dept === 'string' && /^[a-f\d]{24}$/i.test(dept) ? 'Influencer Marketing' : (dept || 'Staff'));
+                            return (
+                              <button
+                                key={emp._id}
+                                onClick={() => {
+                                  setSelectedEmployeeId(emp._id);
+                                  setIsDropdownOpen(false);
+                                  setEmployeeSearchTerm('');
+                                }}
+                                className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition flex items-center justify-between cursor-pointer ${
+                                  selectedEmployeeId === emp._id
+                                    ? 'bg-purple-600 text-white shadow-xs'
+                                    : 'text-slate-800 hover:bg-purple-50 hover:text-purple-700'
+                                }`}
+                              >
+                                <span className="truncate">{emp.name}</span>
+                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
+                                  selectedEmployeeId === emp._id ? 'bg-purple-700 text-purple-100' : 'bg-slate-100 text-slate-500'
+                                }`}>
+                                  {deptLabel}
+                                </span>
+                              </button>
+                            );
+                          })
                       )}
                     </div>
                   </div>

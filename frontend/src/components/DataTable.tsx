@@ -4,7 +4,7 @@ import { Pagination } from './Pagination';
 
 export interface DataTableColumn<T> {
   key: keyof T | string;
-  label: string;
+  label: React.ReactNode;
   sortable?: boolean;
   width?: string;
   align?: 'left' | 'center' | 'right';

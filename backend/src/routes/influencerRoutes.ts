@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
-import { Influencer, Brand, PaymentLog, Employee, EmployeeBrand, Target, InfluencerDirectory } from '../models/allModels';
+import * as XLSX from 'xlsx';
+import { Influencer, Brand, PaymentLog, Employee, EmployeeBrand, Target, InfluencerDirectory, User } from '../models/allModels';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { checkPermission } from '../middleware/rbac';
 import { logActivity } from '../middleware/auditLog';
@@ -9,29 +10,60 @@ const router = Router();
 
 // Helper to sanitize Instagram handle & profile URL
 const cleanInstagramHandleAndLink = (inputHandle?: string, inputLink?: string) => {
-  let raw = (inputHandle || inputLink || '').trim();
-  if (!raw) return { handle: '', link: '' };
+  let raw = (inputHandle || '').trim();
+  if (!raw) return { name: '', handle: '', link: '' };
+
+  const lower = raw.toLowerCase();
+
+  // If raw is a non-instagram website URL (e.g. product link, shopify link, website), keep it completely blank
+  if (lower.startsWith('http://') || lower.startsWith('https://') || lower.startsWith('www.') || lower.startsWith('@http')) {
+    if (!lower.includes('instagram.com/')) {
+      return { name: '', handle: '', link: '' };
+    }
+  }
+
+  // If raw contains domain extensions or web paths without being Instagram
+  if (lower.includes('.com') || lower.includes('.in') || lower.includes('.co') || lower.includes('.store') || lower.includes('.shop') || lower.includes('.org') || lower.includes('.net')) {
+    if (!lower.includes('instagram.com/')) {
+      return { name: '', handle: '', link: '' };
+    }
+  }
 
   // If it's a full Instagram URL e.g. https://www.instagram.com/jaipurfame_creator/?igsh=...
-  if (raw.includes('instagram.com/')) {
+  if (lower.includes('instagram.com/')) {
     const cleanUrl = raw.split('?')[0].split('#')[0];
     const parts = cleanUrl.split('/').filter(Boolean);
     const handleCandidate = parts.pop() || '';
-    if (handleCandidate && handleCandidate !== 'instagram.com' && handleCandidate !== 'www.instagram.com') {
+    if (handleCandidate && handleCandidate !== 'instagram.com' && handleCandidate !== 'www.instagram.com' && handleCandidate !== 'reel' && handleCandidate !== 'p' && handleCandidate !== 'reels') {
       const cleanHandle = handleCandidate.replace(/^@/, '').replace(/\s+/g, '').trim();
       return {
+        name: cleanHandle,
         handle: `@${cleanHandle}`,
         link: `https://instagram.com/${cleanHandle}`
       };
     }
+    return { name: '', handle: '', link: '' };
   }
 
-  // Otherwise, handle string
-  const cleanHandle = raw.replace(/^@/, '').replace(/\s+/g, '').trim();
-  return {
-    handle: cleanHandle ? `@${cleanHandle}` : '',
-    link: cleanHandle ? `https://instagram.com/${cleanHandle}` : (inputLink || '')
-  };
+  // If raw string has slashes
+  if (raw.includes('/')) {
+    return { name: '', handle: '', link: '' };
+  }
+
+  // Clean normal name / handle
+  const clean = raw.replace(/\s*\((Barter|Paid)\)\s*/gi, '').trim();
+  if (!clean) return { name: '', handle: '', link: '' };
+
+  const cleanHandle = clean.replace(/^@/, '').replace(/\s+/g, '').trim();
+  if (cleanHandle.length > 0 && cleanHandle.length < 50) {
+    return {
+      name: clean.startsWith('@') ? cleanHandle : clean,
+      handle: `@${cleanHandle}`,
+      link: `https://instagram.com/${cleanHandle}`
+    };
+  }
+
+  return { name: '', handle: '', link: '' };
 };
 
 // Helper to keep active targets in sync with transactions
@@ -513,6 +545,418 @@ router.put('/:id', authenticateToken, checkPermission('influencer.update'), asyn
     return res.status(200).json({ success: true, message: 'Influencer record updated successfully', data: record });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error updating influencer record', error });
+  }
+});
+
+// Helper to parse dates from various formats (Excel numbers, DD/MM/YYYY, ISO strings, etc.)
+function parseImportDate(val: any, targetMonthStr?: string, targetYearNum?: number): Date {
+  if (!val) {
+    if (targetMonthStr && targetYearNum) {
+      const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+      const mIdx = monthNames.indexOf(targetMonthStr.toLowerCase());
+      if (mIdx !== -1) return new Date(Date.UTC(targetYearNum, mIdx, 15, 12, 0, 0));
+    }
+    return new Date();
+  }
+
+  // If it's already a Date
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    if (val.getFullYear() >= 1990 && val.getFullYear() <= 2100) return val;
+  }
+
+  // Excel serial number as number or numeric string (e.g. 46253 or "46253" for 20/08/2026)
+  const numVal = typeof val === 'number' ? val : (typeof val === 'string' && /^\d{4,6}(\.\d+)?$/.test(val.trim()) ? parseFloat(val.trim()) : null);
+  if (numVal !== null && numVal > 10000 && numVal < 100000) {
+    // Excel base epoch calculation (Jan 1, 1900 with leap year adjustment)
+    const ms = Math.round((numVal - 25569) * 86400 * 1000);
+    const d = new Date(ms);
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  const str = String(val).trim();
+  // Handle DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY (e.g. 20/08/2026)
+  if (/^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/.test(str)) {
+    const parts = str.split(/[\/\-\.]/);
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    let year = parseInt(parts[2], 10);
+    if (year < 100) year += 2000;
+    return new Date(Date.UTC(year, month, day, 12, 0, 0));
+  }
+
+  // Handle YYYY-MM-DD
+  if (/^\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}/.test(str)) {
+    const parts = str.split(/[\/\-\.]/);
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    return new Date(Date.UTC(year, month, day, 12, 0, 0));
+  }
+
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime()) && parsed.getFullYear() >= 1990 && parsed.getFullYear() <= 2100) {
+    return parsed;
+  }
+
+  if (targetMonthStr && targetYearNum) {
+    const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+    const mIdx = monthNames.indexOf(targetMonthStr.toLowerCase());
+    if (mIdx !== -1) return new Date(Date.UTC(targetYearNum, mIdx, 15, 12, 0, 0));
+  }
+  return new Date();
+}
+
+// Helper to normalize Collab Status
+function normalizeCollabStatus(statStr: any): 'Pending' | 'In Discussion' | 'Parcel Sent' | 'Under Review' | 'Completed' | 'Settled' | 'Approved' {
+  if (!statStr) return 'Pending';
+  const s = String(statStr).trim().toLowerCase();
+  if (s.includes('complete') || s === 'done' || s === 'completed') return 'Completed';
+  if (s.includes('approve') || s === 'approved') return 'Approved';
+  if (s.includes('settle') || s === 'settled') return 'Settled';
+  if (s.includes('review') || s === 'under review') return 'Under Review';
+  if (s.includes('parcel') || s.includes('sent') || s.includes('dispatch')) return 'Parcel Sent';
+  if (s.includes('discuss') || s.includes('talk') || s.includes('connect')) return 'In Discussion';
+  return 'Pending';
+}
+
+// Helper to extract column values case-insensitively
+function getColValue(row: Record<string, any>, ...keys: string[]): string {
+  for (const k of keys) {
+    const match = Object.keys(row).find(rk => rk.trim().toLowerCase() === k.toLowerCase());
+    if (match && row[match] !== undefined && row[match] !== null && String(row[match]).trim().length > 0) {
+      return String(row[match]).trim();
+    }
+  }
+  return '';
+}
+
+// Helper to parse file/csv/rows into standard row objects
+function extractRawRows(body: any): Record<string, any>[] {
+  if (body.fileBase64) {
+    const base64Data = String(body.fileBase64).replace(/^data:.*?;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
+    const firstSheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[firstSheetName];
+    return XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+  }
+  if (body.csvText) {
+    const workbook = XLSX.read(body.csvText, { type: 'string', cellDates: true });
+    const firstSheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[firstSheetName];
+    return XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+  }
+  if (Array.isArray(body.rows)) {
+    return body.rows;
+  }
+  return [];
+}
+
+// POST /api/v1/influencers/import-preview - Preview parsed records before committing import
+router.post('/import-preview', authenticateToken, checkPermission('influencer.create'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { targetMonth, targetYear } = req.body;
+    const rawRows = extractRawRows(req.body);
+
+    if (rawRows.length === 0) {
+      return res.status(400).json({ success: false, message: 'No records found in the uploaded file or data.' });
+    }
+
+    const registeredUsers = await User.find({}, 'name email').lean();
+    const registeredEmployees = await Employee.find({}, 'name email').lean();
+    const validMemberNames = Array.from(new Set([
+      ...registeredUsers.map(u => (u.name || '').trim()),
+      ...registeredEmployees.map(e => (e.name || '').trim())
+    ])).filter(name => name.length > 0);
+
+    const matchPanelMember = (nameCandidate: string) => {
+      if (!nameCandidate) return '';
+      const clean = nameCandidate.trim().toLowerCase();
+      const match = validMemberNames.find(m => {
+        const lowM = m.toLowerCase();
+        return lowM === clean || lowM.split(' ')[0] === clean || clean.split(' ')[0] === lowM;
+      });
+      return match || '';
+    };
+
+    const previewList = rawRows.slice(0, 15).map((row, idx) => {
+      const dateVal = getColValue(row, 'Date', 'DATE', 'Transaction Date', 'Order Date', 'Column 1');
+      const parsedDate = parseImportDate(dateVal, targetMonth, targetYear ? Number(targetYear) : undefined);
+      const brandName = getColValue(row, 'Brand Name', 'BRAND NAME', 'Brand', 'BRAND') || 'General';
+      const rawBrandManager = getColValue(row, 'Brand Manager', 'BRAND MANAGER', 'Manager');
+      const rawAssignee = getColValue(row, 'Assigne', 'Assignee', 'ASSIGNEE', 'Assigned To', 'Influencer Manager');
+      const rawTeam = getColValue(row, 'Brand Manager Team', 'Manager Team', 'Team');
+      const collabType = getColValue(row, 'Collab Type', 'COLLAB TYPE', 'Category', 'CATEGORY', 'Type', 'TYPE') || 'Barter';
+      const productLink = getColValue(row, 'Product Link', 'PRODUCT LINK', 'Product link');
+      const videoType = getColValue(row, 'Type Of Video', 'Type of Video', 'TYPE OF VIDEO', 'Video Type') || 'Single Product Video';
+      const refVideoLink = getColValue(row, 'ReferanceVideo Link', 'Referance Video Link', 'Reference Video Link', 'REFRENCE VIDEO LINK', 'Ref Link');
+      const statusRaw = getColValue(row, 'Status', 'STATUS');
+      const status = normalizeCollabStatus(statusRaw);
+      const matchedAssignee = matchPanelMember(rawAssignee);
+      const brandManagerVal = rawBrandManager || rawTeam || '';
+
+      return {
+        rowNumber: idx + 1,
+        date: parsedDate.toISOString().split('T')[0],
+        brandName,
+        brandManager: brandManagerVal,
+        assignee: matchedAssignee,
+        collabType: collabType.toLowerCase().includes('paid') ? 'Paid' : 'Barter',
+        productLink,
+        videoType,
+        refVideoLink,
+        status
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      totalRows: rawRows.length,
+      preview: previewList,
+      sampleHeaders: Object.keys(rawRows[0] || {})
+    });
+  } catch (error) {
+    console.error('Import preview error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to process file preview', error });
+  }
+});
+
+// POST /api/v1/influencers/import - Import historical/previous month collaboration records
+router.post('/import', authenticateToken, checkPermission('influencer.create'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { targetMonth, targetYear } = req.body;
+    const rawRows = extractRawRows(req.body);
+
+    if (rawRows.length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid records found to import.' });
+    }
+
+    // Pre-fetch brands & employees for matching
+    const allBrands = await Brand.find({}).lean();
+    const registeredUsers = await User.find({}, 'name email').lean();
+    const registeredEmployees = await Employee.find({}, 'name email').lean();
+    const validMemberNames = Array.from(new Set([
+      ...registeredUsers.map(u => (u.name || '').trim()),
+      ...registeredEmployees.map(e => (e.name || '').trim())
+    ])).filter(name => name.length > 0);
+
+    const matchPanelMember = (nameCandidate: string) => {
+      if (!nameCandidate) return '';
+      const clean = nameCandidate.trim().toLowerCase();
+      const match = validMemberNames.find(m => {
+        const lowM = m.toLowerCase();
+        return lowM === clean || lowM.split(' ')[0] === clean || clean.split(' ')[0] === lowM;
+      });
+      return match || '';
+    };
+
+    const createdDocs: any[] = [];
+    let currentCount = await Influencer.countDocuments();
+
+    for (let i = 0; i < rawRows.length; i++) {
+      const row = rawRows[i];
+
+      const brandNameRaw = getColValue(row, 'Brand Name', 'BRAND NAME', 'Brand', 'BRAND');
+      const rawInfName = getColValue(row, 'Influencers id', 'INFLUENCERS NAME / Instagram ID', 'Influencer Name', 'Influencer', 'INFLUENCERS NAME', 'Instagram ID');
+      const rawAssignee = getColValue(row, 'Assigne', 'Assignee', 'ASSIGNEE', 'Assigned To', 'Influencer Manager');
+      const rawBrandManager = getColValue(row, 'Brand Manager', 'BRAND MANAGER', 'Manager');
+      const rawTeam = getColValue(row, 'Brand Manager Team', 'Manager Team', 'Team');
+      const categoryRaw = getColValue(row, 'Collab Type', 'COLLAB TYPE', 'Category', 'CATEGORY', 'Type', 'TYPE') || 'Barter';
+      const productLink = getColValue(row, 'Product Link', 'PRODUCT LINK', 'Product link');
+      const videoType = getColValue(row, 'Type Of Video', 'Type of Video', 'TYPE OF VIDEO', 'Video Type') || 'Single Product Video';
+      const videoDescription = getColValue(row, 'video description', 'Video Description', 'Description');
+      const refVideoLink = getColValue(row, 'ReferanceVideo Link', 'Referance Video Link', 'Reference Video Link', 'REFRENCE VIDEO LINK', 'Ref Link');
+      const orderId = getColValue(row, 'Order ID', 'OrderID', 'Order Id');
+      const statusRaw = getColValue(row, 'Status', 'STATUS');
+      const dateVal = getColValue(row, 'Date', 'DATE', 'Transaction Date', 'Order Date', 'Column 1');
+
+      // Skip row if it has no usable information
+      if (!brandNameRaw && !rawInfName && !orderId && !productLink && !videoDescription) {
+        continue;
+      }
+
+      const finalBrandName = brandNameRaw || 'General';
+      const matchedBrand = allBrands.find(b => b.brandName.trim().toLowerCase() === finalBrandName.trim().toLowerCase());
+
+      // Date parsing
+      const transactionDate = parseImportDate(dateVal, targetMonth, targetYear ? Number(targetYear) : undefined);
+
+      // Category
+      const isPaid = categoryRaw.trim().toLowerCase() === 'paid' || categoryRaw.trim().toLowerCase().includes('paid');
+      const category = isPaid ? 'Paid' : 'Barter';
+
+      // Assignee matching: strictly allow ONLY registered panel members
+      const assignedManager = matchPanelMember(rawAssignee) || '';
+      // Brand Manager: can be anyone (external or internal)
+      const brandManager = rawBrandManager || rawTeam || '';
+
+      // Status
+      const finalStatus = normalizeCollabStatus(statusRaw);
+      const isApproved = finalStatus === 'Completed' || finalStatus === 'Approved' || finalStatus === 'Settled';
+
+      // Financials (if Paid)
+      const bOnboard = Number(getColValue(row, 'Brand Price (IN)', 'Brand Price', 'Brand Onboarding Amt', 'inAmount')) || 0;
+      const infOnboard = Number(getColValue(row, 'Creator Price (OUT)', 'Creator Price', 'Influencer Onboarding Amt', 'outAmount')) || 0;
+      const ad2shipMargin = (bOnboard || 0) - (infOnboard || 0);
+
+      // Clean instagram handle & name (do NOT use productLink or non-instagram URLs)
+      const { name: cleanName, handle: instaHandle, link: profileUrl } = cleanInstagramHandleAndLink(rawInfName);
+
+      currentCount++;
+      const doc = await Influencer.create({
+        sNo: currentCount,
+        transactionDate,
+        connectedDate: transactionDate,
+        brandId: matchedBrand ? matchedBrand._id : undefined,
+        brandName: matchedBrand ? matchedBrand.brandName : finalBrandName,
+        influencerManager: assignedManager,
+        brandManagerTeam: brandManager,
+        influencerName: cleanName || '',
+        influencerInstagramId: instaHandle || '',
+        profileLink: profileUrl || '',
+        category,
+        brandOnboardingAmt: bOnboard,
+        brandReceivedAmt: bOnboard,
+        influencerOnboardingAmt: infOnboard,
+        influencerPaidAmt: infOnboard,
+        ad2shipMargin,
+        inAmount: bOnboard,
+        outAmount: infOnboard,
+        productLink,
+        videoType,
+        videoDescription,
+        refVideoLink,
+        orderId,
+        orderDate: orderId ? transactionDate : undefined,
+        status: finalStatus,
+        isApproved,
+        approvalStatus: isApproved ? 'Approved' : 'Pending',
+        googleSheetId: 'manual_import', // Marks record as manually imported so auto-sync poller does NOT overwrite or delete it
+        createdBy: req.user?._id
+      });
+
+      createdDocs.push(doc);
+    }
+
+    // Log Activity
+    await logActivity({
+      userId: req.user?._id,
+      userName: req.user?.name || 'User',
+      userEmail: req.user?.email || '',
+      userRole: req.user?.role || 'Employee',
+      action: 'IMPORT_RECORDS',
+      module: 'Influencer Management',
+      entity: 'Influencer',
+      details: `Imported ${createdDocs.length} collaboration records (Previous/Custom Month Data)`
+    });
+
+    // Recalculate targets
+    await triggerTargetSync();
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully imported ${createdDocs.length} collaboration record(s)!`,
+      count: createdDocs.length
+    });
+  } catch (error) {
+    console.error('Import collaboration error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to import collaboration records', error });
+  }
+});
+
+// POST /api/v1/influencers/bulk-delete - Bulk soft delete records
+router.post('/bulk-delete', authenticateToken, checkPermission('influencer.delete'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, message: 'Please provide an array of record IDs to delete' });
+    }
+
+    const records = await Influencer.find({ _id: { $in: ids }, isDeleted: { $ne: true } });
+    if (records.length === 0) {
+      return res.status(404).json({ success: false, message: 'No active records found matching the provided IDs' });
+    }
+
+    const now = new Date();
+    await Influencer.updateMany(
+      { _id: { $in: ids }, isDeleted: { $ne: true } },
+      {
+        $set: {
+          isDeleted: true,
+          deletedAt: now,
+          deletedBy: req.user?._id
+        }
+      }
+    );
+
+    await logActivity({
+      userId: req.user?._id,
+      userName: req.user?.name || 'User',
+      userEmail: req.user?.email || '',
+      userRole: req.user?.role || 'Employee',
+      action: 'BULK_DELETE_RECORD',
+      module: 'Influencer Management',
+      entity: 'Influencer',
+      details: `Soft-deleted ${records.length} influencer collaboration record(s)`
+    });
+
+    await triggerTargetSync();
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully deleted ${records.length} collaboration record(s)`,
+      deletedCount: records.length
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Error bulk deleting influencer records', error });
+  }
+});
+
+// DELETE /api/v1/influencers/bulk-delete - Also support bulk delete via DELETE method
+router.delete('/bulk-delete', authenticateToken, checkPermission('influencer.delete'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, message: 'Please provide an array of record IDs to delete' });
+    }
+
+    const records = await Influencer.find({ _id: { $in: ids }, isDeleted: { $ne: true } });
+    if (records.length === 0) {
+      return res.status(404).json({ success: false, message: 'No active records found matching the provided IDs' });
+    }
+
+    const now = new Date();
+    await Influencer.updateMany(
+      { _id: { $in: ids }, isDeleted: { $ne: true } },
+      {
+        $set: {
+          isDeleted: true,
+          deletedAt: now,
+          deletedBy: req.user?._id
+        }
+      }
+    );
+
+    await logActivity({
+      userId: req.user?._id,
+      userName: req.user?.name || 'User',
+      userEmail: req.user?.email || '',
+      userRole: req.user?.role || 'Employee',
+      action: 'BULK_DELETE_RECORD',
+      module: 'Influencer Management',
+      entity: 'Influencer',
+      details: `Soft-deleted ${records.length} influencer collaboration record(s)`
+    });
+
+    await triggerTargetSync();
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully deleted ${records.length} collaboration record(s)`,
+      deletedCount: records.length
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Error bulk deleting influencer records', error });
   }
 });
 

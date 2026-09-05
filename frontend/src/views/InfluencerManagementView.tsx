@@ -5,7 +5,8 @@ import {
   Receipt, Eye, ShoppingBag, ChevronUp, ChevronsUpDown, Target, TrendingUp,
   Award, Clock, AlertCircle, CheckCircle2, ShieldCheck, Layers, RefreshCw, Users,
   Calendar, ChevronLeft, ChevronRight, CalendarDays, Loader2, Lock, Settings, X,
-  Activity, Shield, Package, MessageSquare, Info, LayoutGrid, List
+  Activity, Shield, Package, MessageSquare, Info, LayoutGrid, List,
+  Upload, Download, FileSpreadsheet, FileUp
 } from 'lucide-react';
 import { api } from '../services/api';
 import { InfluencerTransaction, Brand, Employee, PaymentLogItem, TargetItem, TeamTargetBreakdown, MemberTargetItem, AuditLogItem } from '../types';
@@ -1067,6 +1068,153 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     onConfirm: async () => {}
   });
 
+  // Multi-Record Selection State for Ledger
+  const [selectedRecordIds, setSelectedRecordIds] = useState<string[]>([]);
+
+  const handleToggleSelectRecord = (id: string) => {
+    setSelectedRecordIds(prev =>
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleClearSelection = () => {
+    setSelectedRecordIds([]);
+  };
+
+  const requestBulkDeleteInfluencers = () => {
+    if (selectedRecordIds.length === 0) return;
+    setDeleteModalState({
+      isOpen: true,
+      title: `Delete ${selectedRecordIds.length} Collaboration Records`,
+      itemType: `${selectedRecordIds.length} Selected Records`,
+      itemName: `${selectedRecordIds.length} collaboration item${selectedRecordIds.length > 1 ? 's' : ''}`,
+      warningMessage: 'These records will be soft-deleted. Monthly targets and revenue margins will recalculate immediately.',
+      loading: false,
+      onConfirm: async () => {
+        setDeleteModalState(prev => ({ ...prev, loading: true }));
+        try {
+          const res = await api.post('/influencers/bulk-delete', { ids: selectedRecordIds });
+          if (res.success) {
+            setDeleteModalState(prev => ({ ...prev, isOpen: false }));
+            setSelectedRecordIds([]);
+            fetchInfluencers();
+            fetchTargets();
+            if (onTargetUpdated) onTargetUpdated();
+          }
+        } catch (err: any) {
+          alert(err.message || 'Failed to delete selected records');
+        } finally {
+          setDeleteModalState(prev => ({ ...prev, loading: false }));
+        }
+      }
+    });
+  };
+
+  // Import Previous Month / Custom Collaborations State
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importFileBase64, setImportFileBase64] = useState<string>('');
+  const [importMonthOverride, setImportMonthOverride] = useState<string>('auto');
+  const [importYearOverride, setImportYearOverride] = useState<number>(new Date().getFullYear());
+  const [importPreviewList, setImportPreviewList] = useState<any[]>([]);
+  const [importTotalRows, setImportTotalRows] = useState<number>(0);
+  const [isReadingFile, setIsReadingFile] = useState(false);
+  const [isSubmittingImport, setIsSubmittingImport] = useState(false);
+  const [importStatusMessage, setImportStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleDownloadSampleTemplate = () => {
+    const csvContent = [
+      'Date,Brand Name,Brand Manager,Assigne,Collab Type,Product Link,Type Of Video,ReferanceVideo Link,Status',
+      '02/09/2026,Morani Boutique,Lakshit,Gunjan,Barter,https://moraniboutique.com/product-1,Voice Over,https://pin.it/sample,Pending',
+      '02/09/2026,Morani Boutique,Lakshit,Gunjan,Barter,https://moraniboutique.com/product-2,Single Product Video,,Pending',
+      '03/09/2026,Walkinwardrobe,Lakshita Jaju,Khushi,Barter,https://walkinwardrobe.in/product-3,Single Product Video,https://pin.it/ref1,Under Review',
+      '03/09/2026,zaliba,Lakshita Jaju,Kajal,Barter,https://zaliba.com/product-4,Single Product Video,,Completed',
+      '03/09/2026,zaliba,Lakshita Jaju,Kajal,Paid,https://zaliba.com/product-5,Single Product Video,,Pending'
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'Ad2Ship_Collaborations_Import_Template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleFileSelected = (file: File) => {
+    setImportFile(file);
+    setImportStatusMessage(null);
+    setIsReadingFile(true);
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const base64Str = e.target?.result as string;
+      setImportFileBase64(base64Str);
+
+      try {
+        const res = await api.post('/influencers/import-preview', {
+          fileBase64: base64Str,
+          targetMonth: importMonthOverride !== 'auto' ? importMonthOverride.split('_')[0] : undefined,
+          targetYear: importYearOverride
+        });
+
+        if (res.success) {
+          setImportPreviewList(res.preview || []);
+          setImportTotalRows(res.totalRows || 0);
+        } else {
+          setImportStatusMessage({ type: 'error', text: res.message || 'Failed to read file preview' });
+        }
+      } catch (err: any) {
+        setImportStatusMessage({ type: 'error', text: err.message || 'Error processing file preview' });
+      } finally {
+        setIsReadingFile(false);
+      }
+    };
+
+    reader.onerror = () => {
+      setIsReadingFile(false);
+      setImportStatusMessage({ type: 'error', text: 'Failed to read the selected file' });
+    };
+
+    reader.readAsDataURL(file);
+  };
+
+  const handleConfirmImport = async () => {
+    if (!importFileBase64) return;
+    setIsSubmittingImport(true);
+    setImportStatusMessage(null);
+
+    try {
+      const res = await api.post('/influencers/import', {
+        fileBase64: importFileBase64,
+        targetMonth: importMonthOverride !== 'auto' ? importMonthOverride.split('_')[0] : undefined,
+        targetYear: importYearOverride
+      });
+
+      if (res.success) {
+        setImportStatusMessage({ type: 'success', text: `Successfully imported ${res.count || 0} collaboration records!` });
+        fetchInfluencers();
+        fetchTargets();
+        if (onTargetUpdated) onTargetUpdated();
+        setTimeout(() => {
+          setIsImportModalOpen(false);
+          setImportFile(null);
+          setImportFileBase64('');
+          setImportPreviewList([]);
+          setImportStatusMessage(null);
+        }, 1600);
+      } else {
+        setImportStatusMessage({ type: 'error', text: res.message || 'Import failed' });
+      }
+    } catch (err: any) {
+      setImportStatusMessage({ type: 'error', text: err.message || 'Failed to submit import' });
+    } finally {
+      setIsSubmittingImport(false);
+    }
+  };
+
   const requestDeleteTarget = (t: TargetItem) => {
     setDeleteModalState({
       isOpen: true,
@@ -1098,6 +1246,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
       title: 'Delete Collaboration Record',
       itemType: `${item.category || 'Influencer'} Collaboration`,
       itemName: `${item.brandName || 'Brand'} — ${item.influencerName || item.influencerInstagramId || 'Creator'}`,
+      warningMessage: 'This record will be soft-deleted. Target achievements and revenue margins will recalculate immediately.',
       loading: false,
       onConfirm: async () => {
         setDeleteModalState(prev => ({ ...prev, loading: true }));
@@ -1105,6 +1254,7 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
           const res = await api.delete(`/influencers/${item._id}`);
           if (res.success) {
             setDeleteModalState(prev => ({ ...prev, isOpen: false }));
+            setSelectedRecordIds(prev => prev.filter(id => id !== item._id));
             fetchInfluencers();
             fetchTargets();
             if (onTargetUpdated) onTargetUpdated();
@@ -1214,6 +1364,12 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
     ...(dbFilterOptions.managers || []),
     ...influencers.map(i => i.influencerManager?.trim()).filter((x): x is string => Boolean(x))
   ])).sort();
+
+  const panelMemberOptions: string[] = Array.from(new Set([
+    ...employees.map(e => e.name?.trim()).filter((x): x is string => Boolean(x)),
+    ...(teamBreakdown?.members?.map(m => m.employee.name?.trim()) || []),
+    ...(dbFilterOptions.managers || [])
+  ])).filter(name => name.length > 0).sort();
 
   const ALL_STATUS_OPTIONS = [
     { label: 'Pending', value: 'Pending', icon: '🟠' },
@@ -1355,6 +1511,28 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
   const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
   const paginatedInfluencers = filteredInfluencers;
 
+  const isAllSelectedOnPage =
+    paginatedInfluencers.length > 0 &&
+    paginatedInfluencers.every(item => selectedRecordIds.includes(item._id));
+
+  const isSomeSelectedOnPage =
+    paginatedInfluencers.some(item => selectedRecordIds.includes(item._id)) && !isAllSelectedOnPage;
+
+  const handleToggleSelectAllPage = () => {
+    if (isAllSelectedOnPage) {
+      const pageIds = new Set(paginatedInfluencers.map(i => i._id));
+      setSelectedRecordIds(prev => prev.filter(id => !pageIds.has(id)));
+    } else {
+      const newIds = new Set(selectedRecordIds);
+      paginatedInfluencers.forEach(i => newIds.add(i._id));
+      setSelectedRecordIds(Array.from(newIds));
+    }
+  };
+
+  const handleSelectAllFiltered = () => {
+    setSelectedRecordIds(filteredInfluencers.map(i => i._id));
+  };
+
   const SortHeader = ({ field, label, align = 'left' }: { field: string; label: string; align?: 'left' | 'right' | 'center' }) => {
     const isSorted = sortKey === field;
     return (
@@ -1401,6 +1579,15 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
               <span>Set Target</span>
             </button>
           )}
+
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="px-4 py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl font-bold text-xs flex items-center space-x-2 transition cursor-pointer"
+            title="Import past or custom month collaboration records from Excel/CSV"
+          >
+            <Upload size={16} />
+            <span>Import Collabs</span>
+          </button>
 
           <button
             onClick={() => openAddModal(viewMode === 'Paid Collaborations' ? 'Paid' : 'Barter')}
@@ -2452,6 +2639,16 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsImportModalOpen(true)}
+                  className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-black flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
+                  title="Import historical or previous month records (.xlsx, .csv)"
+                >
+                  <FileSpreadsheet size={13} className="text-purple-600" />
+                  <span>Import Past Month</span>
+                </button>
+
                 {viewMode === 'Barter Collaborations' && (
                   <div className="flex items-center gap-2 bg-purple-50/80 p-1.5 rounded-xl border border-purple-100">
                     <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 flex items-center gap-1">
@@ -2474,10 +2671,67 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
               </div>
             </div>
 
+            {/* Bulk Selection Action Toolbar - Light Themed */}
+            {selectedRecordIds.length > 0 && (
+              <div className="mx-5 my-3 p-3 bg-purple-50/90 border border-purple-200/80 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-2xs animate-fade-in">
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center justify-center w-7 h-7 rounded-xl bg-purple-600 text-white text-xs font-black shadow-2xs">
+                    {selectedRecordIds.length}
+                  </span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-extrabold text-slate-900">
+                      {selectedRecordIds.length} record{selectedRecordIds.length > 1 ? 's' : ''} selected
+                    </span>
+                    {filteredInfluencers.length > selectedRecordIds.length && (
+                      <button
+                        type="button"
+                        onClick={handleSelectAllFiltered}
+                        className="text-xs text-purple-700 hover:text-purple-900 underline font-bold cursor-pointer transition ml-1"
+                      >
+                        Select all {filteredInfluencers.length} filtered records
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleClearSelection}
+                    className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold transition cursor-pointer border border-slate-200/90 shadow-2xs"
+                  >
+                    Cancel Selection
+                  </button>
+                  <button
+                    type="button"
+                    onClick={requestBulkDeleteInfluencers}
+                    className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black transition flex items-center gap-1.5 shadow-sm shadow-rose-600/25 cursor-pointer active:scale-95"
+                  >
+                    <Trash2 size={13} />
+                    <span>Delete Selected ({selectedRecordIds.length})</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-800 text-slate-200 font-bold">
+                    <th className="p-3 border-b border-r border-slate-700 text-center w-11">
+                      <div className="flex items-center justify-center">
+                        <input
+                          type="checkbox"
+                          checked={isAllSelectedOnPage}
+                          ref={el => {
+                            if (el) el.indeterminate = isSomeSelectedOnPage;
+                          }}
+                          onChange={handleToggleSelectAllPage}
+                          className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-400 cursor-pointer accent-purple-600 transition"
+                          title={isAllSelectedOnPage ? "Deselect all rows on this page" : "Select all rows on this page"}
+                        />
+                      </div>
+                    </th>
                     <SortHeader field="sNo" label="#" align="center" />
                     <SortHeader field="transactionDate" label="Date" />
                     <SortHeader field="influencerManager" label="Assignee" />
@@ -2514,13 +2768,13 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                 <tbody className="divide-y divide-slate-200 font-medium text-slate-800">
                   {loading ? (
                     <tr>
-                      <td colSpan={14} className="p-12 text-center">
+                      <td colSpan={15} className="p-12 text-center">
                         <InlineLoader message="Loading influencer ledger data..." />
                       </td>
                     </tr>
                   ) : paginatedInfluencers.length === 0 ? (
                     <tr>
-                      <td colSpan={14} className="p-12 text-center text-slate-400 font-semibold">
+                      <td colSpan={15} className="p-12 text-center text-slate-400 font-semibold">
                         No collaboration records match the selected filters.
                       </td>
                     </tr>
@@ -2530,9 +2784,21 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                       const margin = (item.brandOnboardingAmt || item.inAmount || 0) - (item.influencerOnboardingAmt || item.outAmount || 0);
                       const orders = item.ordersGenerated !== undefined ? item.ordersGenerated : (item.ordersCount || 0);
                       const isBonusQualified = isPaid && orders >= 100;
+                      const isSelected = selectedRecordIds.includes(item._id);
 
                       return (
-                        <tr key={item._id} className="hover:bg-slate-50 transition">
+                        <tr key={item._id} className={`transition ${isSelected ? 'bg-purple-50/80 hover:bg-purple-100/70 border-l-4 border-l-purple-600' : 'hover:bg-slate-50'}`}>
+                          <td className="p-3 border-r border-slate-100 text-center w-11">
+                            <div className="flex items-center justify-center">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => handleToggleSelectRecord(item._id)}
+                                className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-300 cursor-pointer accent-purple-600 transition"
+                              />
+                            </div>
+                          </td>
+
                           <td className="p-3 border-r border-slate-100 text-center font-extrabold text-slate-500">
                             {(safeCurrentPage - 1) * itemsPerPage + idx + 1}
                           </td>
@@ -2552,8 +2818,13 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                               <>
                                 <div className="font-bold text-slate-800">{item.influencerManager}</div>
                                 {item.brandManagerTeam && (
-                                  <div className="text-[10px] text-purple-700 font-extrabold block">Team: {item.brandManagerTeam}</div>
+                                  <div className="text-[10px] text-purple-700 font-extrabold block">Brand Manager: {item.brandManagerTeam}</div>
                                 )}
+                              </>
+                            ) : item.brandManagerTeam ? (
+                              <>
+                                <span className="text-slate-400 font-semibold text-xs block">Unassigned</span>
+                                <div className="text-[10px] text-purple-700 font-extrabold block">Brand Manager: {item.brandManagerTeam}</div>
                               </>
                             ) : (
                               <span className="text-slate-400 font-semibold">—</span>
@@ -2566,19 +2837,55 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
 
                           <td className="p-3 border-r border-slate-100 min-w-[140px]">
                             {(() => {
-                              const rawName = item.influencerName || '';
-                              const cleanName = rawName.replace(/\s*\((Barter|Paid)\)\s*/gi, '').trim();
-                              const rawInsta = item.influencerInstagramId || (rawName.startsWith('@') ? rawName : item.profileLink) || '';
-                              const instaHandle = rawInsta ? (rawInsta.startsWith('@') ? rawInsta : `@${rawInsta.replace(/https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/$/, '')}`) : '';
-                              const instaUrl = item.profileLink || (rawInsta.startsWith('http') ? rawInsta : (rawInsta ? `https://instagram.com/${rawInsta.replace(/^@/, '')}` : ''));
+                              let rawName = (item.influencerName || '').trim();
+                              let rawInsta = (item.influencerInstagramId || item.profileLink || '').trim();
 
-                              if (!cleanName && !instaHandle && !item.phone) {
+                              const isNonInstaUrl = (s: string) => {
+                                if (!s) return false;
+                                const lower = s.toLowerCase();
+                                if (lower.startsWith('@http') || lower.startsWith('http://') || lower.startsWith('https://') || lower.startsWith('www.')) {
+                                  return !lower.includes('instagram.com/');
+                                }
+                                if (lower.includes('.com') || lower.includes('.in') || lower.includes('.store') || lower.includes('.shop') || lower.includes('.co') || lower.includes('/')) {
+                                  return !lower.includes('instagram.com/');
+                                }
+                                return false;
+                              };
+
+                              if (isNonInstaUrl(rawName)) rawName = '';
+                              if (isNonInstaUrl(rawInsta)) rawInsta = '';
+
+                              const cleanName = rawName.replace(/\s*\((Barter|Paid)\)\s*/gi, '').trim();
+
+                              let instaHandle = '';
+                              let instaUrl = '';
+
+                              if (rawInsta) {
+                                if (rawInsta.toLowerCase().includes('instagram.com/')) {
+                                  const parts = rawInsta.split('?')[0].split('#')[0].split('/').filter(Boolean);
+                                  const handleCandidate = parts.pop() || '';
+                                  if (handleCandidate && handleCandidate !== 'instagram.com' && handleCandidate !== 'www.instagram.com' && handleCandidate !== 'reel' && handleCandidate !== 'p' && handleCandidate !== 'reels') {
+                                    instaHandle = `@${handleCandidate.replace(/^@/, '')}`;
+                                    instaUrl = `https://instagram.com/${handleCandidate.replace(/^@/, '')}`;
+                                  }
+                                } else if (!rawInsta.includes('/') && !rawInsta.includes('.')) {
+                                  const cleanHandle = rawInsta.replace(/^@/, '').replace(/\s+/g, '');
+                                  if (cleanHandle) {
+                                    instaHandle = `@${cleanHandle}`;
+                                    instaUrl = `https://instagram.com/${cleanHandle}`;
+                                  }
+                                }
+                              }
+
+                              const showName = cleanName && (!instaHandle || cleanName.toLowerCase() !== instaHandle.replace(/^@/, '').toLowerCase());
+
+                              if (!showName && !instaHandle && !item.phone) {
                                 return <span className="text-slate-400 font-semibold text-[11px]">—</span>;
                               }
 
                               return (
                                 <div>
-                                  {cleanName && <div className="font-extrabold text-slate-900 text-xs">{cleanName}</div>}
+                                  {showName && <div className="font-extrabold text-slate-900 text-xs">{cleanName}</div>}
                                   {instaHandle && (
                                     <a
                                       href={instaUrl}
@@ -2984,30 +3291,37 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
             </div>
           </div>
 
-          {/* Section 2: Brand Manager & Timeline */}
+          {/* Section 2: Assignment & Brand Management */}
           <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-3">
             <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2 border-b border-slate-100 pb-2">
               <span className="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-black">2</span>
-              <span>Brand Management & Dates</span>
+              <span>Assignment & Brand Management</span>
             </h4>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-slate-700 mb-1 font-bold">Brand Manager</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Lakshita Jaju"
+                <label className="block text-slate-700 mb-1 font-bold">
+                  Assignee (Panel Member) <span className="text-purple-600 font-semibold text-[10px]">(Only Panel Members)</span>
+                </label>
+                <select
                   value={influencerManager}
                   onChange={(e) => setInfluencerManager(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-xs font-semibold text-slate-900 transition"
-                />
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none text-xs font-semibold text-slate-900 bg-white cursor-pointer transition"
+                >
+                  <option value="">-- Select Panel Assignee (Optional) --</option>
+                  {panelMemberOptions.map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
               </div>
 
               <div>
-                <label className="block text-slate-700 mb-1 font-bold">Brand Manager Team</label>
+                <label className="block text-slate-700 mb-1 font-bold">
+                  Brand Manager <span className="text-slate-400 font-normal text-[10px]">(Can be anyone / external)</span>
+                </label>
                 <input
                   type="text"
-                  placeholder="e.g. Dev Sharma / Team"
+                  placeholder="e.g. Manish Jangid, Lakshita Jaju, Vinny"
                   value={brandManagerTeam}
                   onChange={(e) => setBrandManagerTeam(e.target.value)}
                   className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-xs font-semibold text-slate-900 transition"
@@ -4012,9 +4326,9 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
                 <div>
                   <span className="text-slate-400 font-bold block text-[10px]">Assignee (Manager)</span>
-                  <span className="font-black text-slate-800">{selectedViewItem.influencerManager || '—'}</span>
+                  <span className="font-black text-slate-800">{selectedViewItem.influencerManager || (selectedViewItem.brandManagerTeam ? 'Unassigned' : '—')}</span>
                   {selectedViewItem.brandManagerTeam && (
-                    <span className="text-[10px] text-purple-700 font-extrabold block">Team: {selectedViewItem.brandManagerTeam}</span>
+                    <span className="text-[10px] text-purple-700 font-extrabold block">Brand Manager: {selectedViewItem.brandManagerTeam}</span>
                   )}
                 </div>
                 <div>
@@ -4245,9 +4559,9 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
                   </div>
                   <div>
                     <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Managed By</span>
-                    <span className="font-extrabold text-xs text-slate-900">{selectedViewItem.influencerManager || '—'}</span>
+                    <span className="font-extrabold text-xs text-slate-900">{selectedViewItem.influencerManager || (selectedViewItem.brandManagerTeam ? 'Unassigned' : '—')}</span>
                     {selectedViewItem.brandManagerTeam && (
-                      <span className="text-[10px] text-purple-700 font-extrabold block">Team: {selectedViewItem.brandManagerTeam}</span>
+                      <span className="text-[10px] text-purple-700 font-extrabold block">Brand Manager: {selectedViewItem.brandManagerTeam}</span>
                     )}
                   </div>
                 </div>
@@ -4321,6 +4635,241 @@ export const InfluencerManagementView: React.FC<InfluencerManagementViewProps> =
         warningMessage={deleteModalState.warningMessage}
         loading={deleteModalState.loading}
       />
+
+      {/* HISTORICAL / PREVIOUS MONTH COLLABORATION IMPORT MODAL */}
+      <Modal
+        isOpen={isImportModalOpen}
+        onClose={() => {
+          if (!isSubmittingImport) {
+            setIsImportModalOpen(false);
+            setImportFile(null);
+            setImportFileBase64('');
+            setImportPreviewList([]);
+            setImportStatusMessage(null);
+          }
+        }}
+        title="Import Collaborations (Excel / CSV)"
+        maxWidth="max-w-3xl"
+      >
+        <div className="space-y-4 text-xs">
+          {/* Top Info Banner & Template Download */}
+          <div className="p-4 bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 border border-purple-200/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                <FileSpreadsheet size={18} className="text-purple-600" />
+                <span>Import Previous Month or Offline Data</span>
+              </h4>
+              <p className="text-slate-600 text-xs font-medium leading-relaxed">
+                Upload collaboration records for past or custom months. These records are protected from live Google Sheet auto-sync and will automatically update target achievements.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleDownloadSampleTemplate}
+              className="px-3.5 py-2 bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-2xs transition shrink-0 cursor-pointer"
+              title="Download sample CSV template formatted with sheet headers"
+            >
+              <Download size={13} />
+              <span>Download Template</span>
+            </button>
+          </div>
+
+          {/* Month Scope & Year Configuration */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+            <div>
+              <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">
+                Target Month Scope
+              </label>
+              <select
+                value={importMonthOverride}
+                onChange={e => setImportMonthOverride(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-purple-500 cursor-pointer"
+              >
+                <option value="auto">Auto-detect from Date column (Recommended)</option>
+                <option value="september_2026">September 2026</option>
+                <option value="august_2026">August 2026</option>
+                <option value="july_2026">July 2026</option>
+                <option value="june_2026">June 2026</option>
+                <option value="may_2026">May 2026</option>
+                <option value="april_2026">April 2026</option>
+                <option value="march_2026">March 2026</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">
+                Default Year
+              </label>
+              <input
+                type="number"
+                value={importYearOverride}
+                onChange={e => setImportYearOverride(Number(e.target.value))}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-purple-500"
+                min="2020"
+                max="2035"
+              />
+            </div>
+          </div>
+
+          {/* Drag & Drop File Upload Zone */}
+          <div>
+            <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">
+              Select Excel / CSV File (.xlsx, .xls, .csv)
+            </label>
+            <div
+              onDragOver={e => e.preventDefault()}
+              onDrop={e => {
+                e.preventDefault();
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                  handleFileSelected(e.dataTransfer.files[0]);
+                }
+              }}
+              className={`p-6 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center text-center transition cursor-pointer ${
+                importFile ? 'border-purple-400 bg-purple-50/40' : 'border-slate-300 hover:border-purple-400 bg-slate-50/60 hover:bg-purple-50/20'
+              }`}
+              onClick={() => {
+                const input = document.getElementById('collab-file-input');
+                if (input) input.click();
+              }}
+            >
+              <input
+                id="collab-file-input"
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={e => {
+                  if (e.target.files && e.target.files[0]) {
+                    handleFileSelected(e.target.files[0]);
+                  }
+                }}
+              />
+              <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold mb-2 shadow-2xs">
+                {isReadingFile ? <Loader2 size={24} className="animate-spin text-purple-600" /> : <Upload size={24} />}
+              </div>
+
+              {importFile ? (
+                <div className="space-y-0.5">
+                  <p className="font-extrabold text-slate-900 text-xs">{importFile.name}</p>
+                  <p className="text-[11px] text-purple-700 font-bold">
+                    {(importFile.size / 1024).toFixed(1)} KB • {importTotalRows > 0 ? `${importTotalRows} rows detected` : 'Parsing file...'}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <p className="font-bold text-slate-800 text-xs">
+                    Drag and drop your spreadsheet here, or <span className="text-purple-700 underline font-extrabold">browse</span>
+                  </p>
+                  <p className="text-[10px] text-slate-400 font-medium">
+                    Supports Excel (.xlsx, .xls) and CSV (.csv) formats matching standard headers
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Status Message Banner */}
+          {importStatusMessage && (
+            <div className={`p-3.5 rounded-xl border flex items-center gap-2 text-xs font-bold animate-fade-in ${
+              importStatusMessage.type === 'success'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                : 'bg-rose-50 border-rose-200 text-rose-900'
+            }`}>
+              {importStatusMessage.type === 'success' ? <CheckCircle2 size={16} className="text-emerald-600" /> : <AlertCircle size={16} className="text-rose-600" />}
+              <span>{importStatusMessage.text}</span>
+            </div>
+          )}
+
+          {/* Live Data Preview Table */}
+          {importPreviewList.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black uppercase text-slate-700">
+                  Data Preview (First {importPreviewList.length} of {importTotalRows} rows)
+                </span>
+                <span className="text-[10px] font-bold text-slate-400">
+                  Columns mapped automatically
+                </span>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-slate-200 max-h-56 overflow-y-auto">
+                <table className="w-full text-left text-[11px] border-collapse">
+                  <thead className="sticky top-0 bg-slate-800 text-slate-200 font-bold">
+                    <tr>
+                      <th className="p-2 border-b border-r border-slate-700 text-center w-8">#</th>
+                      <th className="p-2 border-b border-r border-slate-700">Date</th>
+                      <th className="p-2 border-b border-r border-slate-700">Brand</th>
+                      <th className="p-2 border-b border-r border-slate-700">Assignee</th>
+                      <th className="p-2 border-b border-r border-slate-700 text-center">Type</th>
+                      <th className="p-2 border-b border-r border-slate-700">Deliverable</th>
+                      <th className="p-2 border-b border-slate-700 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white font-medium text-slate-800">
+                    {importPreviewList.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50">
+                        <td className="p-2 text-center text-slate-400 font-bold border-r border-slate-100">{row.rowNumber}</td>
+                        <td className="p-2 font-semibold text-slate-700 border-r border-slate-100 whitespace-nowrap">{row.date}</td>
+                        <td className="p-2 font-extrabold text-slate-900 border-r border-slate-100">{row.brandName}</td>
+                        <td className="p-2 font-bold text-slate-800 border-r border-slate-100">{row.assignee || row.brandManager || '—'}</td>
+                        <td className="p-2 text-center border-r border-slate-100">
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${
+                            row.collabType === 'Paid' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-blue-100 text-blue-800 border-blue-300'
+                          }`}>
+                            {row.collabType}
+                          </span>
+                        </td>
+                        <td className="p-2 text-slate-700 border-r border-slate-100">{row.videoType}</td>
+                        <td className="p-2 text-center">
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-slate-100 text-slate-800 border border-slate-200">
+                            {row.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Modal Actions */}
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2">
+            <button
+              type="button"
+              disabled={isSubmittingImport}
+              onClick={() => {
+                setIsImportModalOpen(false);
+                setImportFile(null);
+                setImportFileBase64('');
+                setImportPreviewList([]);
+                setImportStatusMessage(null);
+              }}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition text-xs border border-slate-200 cursor-pointer disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={isSubmittingImport || !importFileBase64 || importPreviewList.length === 0}
+              onClick={handleConfirmImport}
+              className="px-5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold transition text-xs shadow-md shadow-purple-600/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer active:scale-95"
+            >
+              {isSubmittingImport ? (
+                <>
+                  <Loader2 size={13} className="animate-spin" />
+                  <span>Importing Records...</span>
+                </>
+              ) : (
+                <>
+                  <Upload size={13} />
+                  <span>Import {importTotalRows > 0 ? `${importTotalRows} Records` : 'Collaborations'}</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* COMMISSION SLABS & INCENTIVE RULES MODAL */}
       <Modal

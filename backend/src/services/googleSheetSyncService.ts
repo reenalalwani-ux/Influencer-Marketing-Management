@@ -146,8 +146,8 @@ export async function processBarterRows(rows: Record<string, string>[], currentS
     // Skip empty rows that have neither brandName, influencer name, orderId, productLink, nor videoDescription
     if (!brandName && !rawInfName && !orderId && !productLink && !videoDescription) continue;
 
-    // Strict Employee / Team Member Assignee Matching:
-    // Check Assigne (Column F), BRAND MANAGER (Column D), Brand Manager Team (Column E)
+    // Strict Employee / Panel Member Assignee Matching:
+    // Only registered panel members (Users / Employees) can be set as Assignee
     let matchedMemberName = '';
     const candidateNames = [rawAssignee, rawManager, rawTeam].filter(Boolean);
     for (const cand of candidateNames) {
@@ -162,8 +162,8 @@ export async function processBarterRows(rows: Record<string, string>[], currentS
       }
     }
 
-    const managerName = rawAssignee || matchedMemberName || '';
-    const managerTeam = (rawAssignee && rawManager) ? rawManager : (rawTeam || rawManager || '');
+    const managerName = matchedMemberName || '';
+    const brandManager = rawManager || rawTeam || '';
 
     const finalInfName = rawInfName || '';
     const contentLink = getCol('CONTENT LINK', 'Content Link') || '';
@@ -176,9 +176,8 @@ export async function processBarterRows(rows: Record<string, string>[], currentS
 
     const { moneyReceivedBy, paymentDoneBy } = parseAccountOwnerDetails(remarkRaw, inAmtRaw, outAmtRaw);
 
-    // Clean influencer name (strictly from sheet only)
-    const cleanInfName = finalInfName.replace(/\s*\((Barter|Paid)\)\s*/gi, '').trim() || '';
-    const instaId = finalInfName ? (finalInfName.startsWith('@') ? finalInfName : parseInstagramHandle(finalInfName)) : '';
+    // Clean influencer name & handle (strictly keep blank if it is a website, product URL, or non-instagram link)
+    const { name: cleanInfName, handle: instaId, link: profileLinkVal } = sanitizeInfluencerAndHandle(finalInfName);
 
     const parsedRowDate = rowDateStr ? parseSheetDate(rowDateStr) : undefined;
     const transactionDate = parsedRowDate || new Date();
@@ -209,9 +208,9 @@ export async function processBarterRows(rows: Record<string, string>[], currentS
       existing.brandName = brandName || existing.brandName;
       existing.influencerName = cleanInfName;
       existing.influencerInstagramId = instaId;
-      existing.profileLink = instaId ? (instaId.startsWith('http') ? instaId : `https://instagram.com/${instaId.replace(/^@/, '')}`) : '';
+      existing.profileLink = profileLinkVal;
       existing.influencerManager = managerName;
-      existing.brandManagerTeam = managerTeam;
+      existing.brandManagerTeam = brandManager;
       existing.productLink = productLink;
       existing.videoType = videoType;
       existing.videoDescription = videoDescription;
@@ -252,9 +251,9 @@ export async function processBarterRows(rows: Record<string, string>[], currentS
         brandName,
         influencerName: cleanInfName,
         influencerInstagramId: instaId,
-        profileLink: instaId ? (instaId.startsWith('http') ? instaId : `https://instagram.com/${instaId.replace(/^@/, '')}`) : '',
+        profileLink: profileLinkVal,
         influencerManager: managerName,
-        brandManagerTeam: managerTeam,
+        brandManagerTeam: brandManager,
         productLink,
         videoType,
         videoDescription,
@@ -496,17 +495,64 @@ export async function syncBarterFromGoogleSheet(): Promise<{
   }
 }
 
-function parseInstagramHandle(urlOrText: any): string {
-  if (!urlOrText) return '';
-  const str = String(urlOrText).trim();
-  if (str.includes('instagram.com/')) {
-    const parts = str.split('instagram.com/')[1].split('/')[0].split('?')[0];
-    if (parts && parts !== 'reel' && parts !== 'p' && parts !== 'reels') {
-      return str.startsWith('@') ? str : '@' + parts;
+function sanitizeInfluencerAndHandle(input: string) {
+  if (!input) return { name: '', handle: '', link: '' };
+  const raw = String(input).trim();
+  if (!raw) return { name: '', handle: '', link: '' };
+
+  const lower = raw.toLowerCase();
+
+  // If it's a website URL, Shopify URL, product URL, or non-instagram link, keep completely blank
+  if (lower.startsWith('http://') || lower.startsWith('https://') || lower.startsWith('www.') || lower.startsWith('@http')) {
+    if (!lower.includes('instagram.com/')) {
+      return { name: '', handle: '', link: '' };
     }
   }
-  if (!str.startsWith('http') && str.length < 35 && !str.includes('/') && !str.includes('?')) {
-    return str.startsWith('@') ? str : '@' + str;
+
+  // If it contains domain extensions or web paths without being Instagram
+  if (lower.includes('.com') || lower.includes('.in') || lower.includes('.co') || lower.includes('.store') || lower.includes('.shop') || lower.includes('.org') || lower.includes('.net')) {
+    if (!lower.includes('instagram.com/')) {
+      return { name: '', handle: '', link: '' };
+    }
   }
-  return '';
+
+  // If it's a full Instagram URL e.g. https://www.instagram.com/creator_name/?...
+  if (lower.includes('instagram.com/')) {
+    const cleanUrl = raw.split('?')[0].split('#')[0];
+    const parts = cleanUrl.split('/').filter(Boolean);
+    const candidate = parts.pop() || '';
+    if (candidate && candidate !== 'instagram.com' && candidate !== 'www.instagram.com' && candidate !== 'reel' && candidate !== 'p' && candidate !== 'reels') {
+      const cleanHandle = candidate.replace(/^@/, '').replace(/\s+/g, '').trim();
+      return {
+        name: cleanHandle,
+        handle: `@${cleanHandle}`,
+        link: `https://instagram.com/${cleanHandle}`
+      };
+    }
+    return { name: '', handle: '', link: '' };
+  }
+
+  // If raw string has slashes (like /path/to/page)
+  if (raw.includes('/')) {
+    return { name: '', handle: '', link: '' };
+  }
+
+  // Clean normal name / handle
+  const clean = raw.replace(/\s*\((Barter|Paid)\)\s*/gi, '').trim();
+  if (!clean) return { name: '', handle: '', link: '' };
+
+  const cleanHandle = clean.replace(/^@/, '').replace(/\s+/g, '').trim();
+  if (cleanHandle.length > 0 && cleanHandle.length < 50) {
+    return {
+      name: clean.startsWith('@') ? cleanHandle : clean,
+      handle: `@${cleanHandle}`,
+      link: `https://instagram.com/${cleanHandle}`
+    };
+  }
+
+  return { name: '', handle: '', link: '' };
+}
+
+function parseInstagramHandle(urlOrText: any): string {
+  return sanitizeInfluencerAndHandle(urlOrText).handle;
 }

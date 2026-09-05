@@ -157,14 +157,22 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
   const [targetBarterCollabs, setTargetBarterCollabs] = useState<number>(8);
   const [targetPaidCollabs, setTargetPaidCollabs] = useState<number>(2);
 
-  const fetchBrands = async (page = currentPage) => {
+  const fetchBrands = async (page: number = currentPage, query: string = searchTerm, type: string = brandTypeFilter) => {
     try {
-      const res = await api.get(`/brands?page=${page}&limit=${itemsPerPage}`);
+      let url = `/brands?page=${page}&limit=${itemsPerPage}`;
+      if (query && query.trim()) {
+        url += `&search=${encodeURIComponent(query.trim())}`;
+      }
+      if (type && type !== 'All') {
+        url += `&brandType=${encodeURIComponent(type)}`;
+      }
+      const res = await api.get(url);
       if (res.success) {
-        setBrands(res.data);
+        setBrands(res.data || []);
         if (res.pagination) {
           setServerTotalPages(res.pagination.totalPages || 1);
           setServerTotalItems(res.pagination.total || 0);
+          setCurrentPage(res.pagination.page || page);
         }
       }
     } catch (err) {
@@ -175,8 +183,12 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
   };
 
   useEffect(() => {
-    fetchBrands(1);
-  }, []);
+    const handler = setTimeout(() => {
+      setCurrentPage(1);
+      fetchBrands(1, searchTerm, brandTypeFilter);
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [searchTerm, brandTypeFilter]);
 
   const handleBrandTypeChange = (type: 'New' | 'Running') => {
     setBrandType(type);
@@ -339,19 +351,7 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
     }
   };
 
-  const filteredBrands = brands.filter(b => {
-    const matchesSearch = 
-      b.brandName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.brandId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.industry.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (b.assignedExecutive && b.assignedExecutive.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const matchesType = brandTypeFilter === 'All' || (b.brandType || 'Running') === brandTypeFilter;
-    return matchesSearch && matchesType;
-  });
-
-  const paginatedBrands = filteredBrands;
+  const paginatedBrands = brands;
 
   const columns: DataTableColumn<Brand>[] = [
     {
@@ -550,15 +550,25 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
 
       {/* Search & Brand Type Filter */}
       <div className="bg-white p-3 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 border border-slate-200 shadow-xs">
-        <div className="flex items-center space-x-3 w-full sm:w-2/3">
+        <div className="relative flex items-center space-x-3 w-full sm:w-2/3">
           <Search size={16} className="text-purple-600 ml-1 shrink-0" />
           <input
             type="text"
             placeholder="Search by brand name, ID, executive, industry, or contact person..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none bg-transparent"
+            className="w-full text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none bg-transparent pr-8"
           />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              className="text-slate-400 hover:text-slate-600 p-1 rounded-full cursor-pointer transition"
+              title="Clear search"
+            >
+              ✕
+            </button>
+          )}
         </div>
 
         <div className="flex items-center space-x-2.5 self-end sm:self-auto shrink-0 relative">
@@ -570,7 +580,7 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
               className="px-3.5 py-2 rounded-xl bg-purple-50/80 hover:bg-purple-100/80 border border-purple-200 text-purple-900 text-xs font-black flex items-center gap-2 cursor-pointer transition shadow-2xs"
             >
               <span>
-                {brandTypeFilter === 'All' && `🌐 All Brands (${brands.length})`}
+                {brandTypeFilter === 'All' && `🌐 All Brands (${serverTotalItems})`}
                 {brandTypeFilter === 'Running' && `⚡ Running Brands`}
                 {brandTypeFilter === 'New' && `✨ New Brands`}
               </span>
@@ -592,7 +602,7 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
                     }`}
                   >
                     <span>🌐 All Brands</span>
-                    <span className="text-[10px] bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full font-extrabold">{brands.length}</span>
+                    <span className="text-[10px] bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full font-extrabold">{serverTotalItems}</span>
                   </button>
 
                   <button
@@ -625,11 +635,9 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
             )}
           </div>
 
-          {filteredBrands.length > 0 && (
-            <span className="text-xs font-extrabold text-slate-400 whitespace-nowrap bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200">
-              {filteredBrands.length} records
-            </span>
-          )}
+          <span className="text-xs font-extrabold text-slate-400 whitespace-nowrap bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200">
+            {serverTotalItems} records
+          </span>
         </div>
       </div>
 
@@ -645,11 +653,11 @@ export const BrandManagementView: React.FC<BrandManagementViewProps> = ({ userRo
             emptyMessage="No brands found matching criteria."
             currentPage={currentPage}
             totalPages={serverTotalPages}
-            totalItems={serverTotalItems || filteredBrands.length}
+            totalItems={serverTotalItems}
             itemsPerPage={itemsPerPage}
             onPageChange={(page) => {
               setCurrentPage(page);
-              fetchBrands(page);
+              fetchBrands(page, searchTerm, brandTypeFilter);
             }}
           />
         </div>

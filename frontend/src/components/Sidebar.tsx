@@ -113,8 +113,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeView, setActiveVie
       label: 'Tasks & Postings',
       icon: CheckSquare,
       subItems: [
-        { id: 'tasks', label: 'Tasks & Content', icon: CheckSquare },
-        { id: 'daily-posting', label: 'Daily Posting', icon: Clock, badge: 'Core' },
         { id: 'calendar', label: 'Posting Calendar', icon: Calendar },
         { id: 'content-calendar', label: 'Content Calendar', icon: FileSpreadsheet },
       ]
